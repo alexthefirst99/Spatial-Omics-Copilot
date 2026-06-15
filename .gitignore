@@ -17,3 +17,10 @@ dash_viv_viewer/demo_data/
 *.tif
 *.svs
 *.ndpi
+
+tmp_data/
+dash_viv_viewer/demo_data/
+dash_viv_viewer/node_modules/
+*.ome.tiff
+*.tiff
+*.tif
