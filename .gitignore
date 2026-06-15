@@ -1,0 +1,19 @@
+
+# Python / temp / cache
+tmp_data/
+__pycache__/
+*.pyc
+
+# Node / frontend build artifacts
+node_modules/
+dash_viv_viewer/node_modules/
+dist/
+build/
+
+# Large image/data files
+dash_viv_viewer/demo_data/
+*.ome.tiff
+*.tiff
+*.tif
+*.svs
+*.ndpi
