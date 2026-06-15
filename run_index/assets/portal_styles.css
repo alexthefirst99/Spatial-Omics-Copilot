@@ -1,0 +1,353 @@
+/* ======================== Portal Styling - Apple-Inspired Design ======================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    background: linear-gradient(135deg, #f5f5f7, #e3e3e8);
+    color: #1d1d1f;
+    min-height: 100vh;
+}
+
+.portal-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ======================== Hero Section ======================== */
+.hero-section {
+    height: 50vh;
+    min-height: 400px;
+    background: linear-gradient(135deg, #0071e3 0%, #005bb5 50%, #003d82 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 120%;
+    height: 120%;
+    background-image:
+        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+    opacity: 0.6;
+    animation: float 20s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+
+    33% {
+        transform: translate(30px, -30px) rotate(5deg);
+    }
+
+    66% {
+        transform: translate(-20px, 20px) rotate(-5deg);
+    }
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    color: white;
+    padding: 40px;
+}
+
+.hero-title {
+    font-size: 72px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: -2px;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.hero-subtitle {
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: 24px;
+    opacity: 0.95;
+}
+
+.hero-badge {
+    display: inline-block;
+    padding: 8px 24px;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* ======================== Main Content ======================== */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px;
+    gap: 40px;
+}
+
+/* ======================== Access Card ======================== */
+.access-card {
+    max-width: 480px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(25px) saturate(180%);
+    border-radius: 24px;
+    padding: 48px 40px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    transform: translateY(-80px);
+}
+
+.card-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0071e3, #005bb5);
+    border-radius: 16px;
+    color: white;
+    font-size: 28px;
+}
+
+.card-title {
+    font-size: 28px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 8px;
+    color: #1d1d1f;
+}
+
+.card-subtitle {
+    font-size: 14px;
+    text-align: center;
+    color: #86868b;
+    margin-bottom: 32px;
+}
+
+/* ======================== Input Group ======================== */
+.input-group {
+    margin-bottom: 24px;
+}
+
+.input-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1d1d1f;
+    margin-bottom: 8px;
+}
+
+.email-input {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 15px;
+    border: 1px solid rgba(0, 113, 227, 0.3);
+    border-radius: 12px;
+    background: rgba(0, 113, 227, 0.02);
+    color: #1d1d1f;
+    transition: all 0.3s ease;
+}
+
+.email-input:focus {
+    outline: none;
+    border-color: #0071e3;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
+}
+
+.email-input::placeholder {
+    color: #86868b;
+}
+
+.error-message {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #ff3b30;
+    min-height: 20px;
+}
+
+/* ======================== Terms Check ======================== */
+.terms-check {
+    margin: 24px 0;
+    padding: 16px;
+    background: rgba(0, 113, 227, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 113, 227, 0.1);
+}
+
+.terms-check label {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #1d1d1f;
+    cursor: pointer;
+}
+
+.terms-check input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    cursor: pointer;
+}
+
+/* ======================== Launch Button ======================== */
+.launch-button {
+    width: 100%;
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #0071e3, #005bb5);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+}
+
+.launch-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 113, 227, 0.4);
+}
+
+.launch-button:active {
+    transform: translateY(0);
+}
+
+.launch-button i {
+    margin-left: 8px;
+}
+
+/* ======================== Launch Output ======================== */
+.launch-output {
+    margin-top: 20px;
+    min-height: 40px;
+    font-size: 14px;
+}
+
+.loading-box,
+.success-box,
+.error-box {
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.loading-box {
+    background: rgba(0, 113, 227, 0.1);
+    color: #0071e3;
+    border: 1px solid rgba(0, 113, 227, 0.2);
+}
+
+.success-box {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.error-box {
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+    border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+/* ======================== Info Section ======================== */
+.info-section {
+    max-width: 680px;
+    width: 100%;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    margin-top: -40px;
+}
+
+.info-section h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #1d1d1f;
+}
+
+.info-section p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #3a3a3c;
+    margin-bottom: 24px;
+}
+
+.info-stats {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #0071e3;
+    font-weight: 500;
+}
+
+.stat-item i {
+    font-size: 18px;
+}
+
+/* ======================== Footer ======================== */
+.portal-footer {
+    padding: 40px 20px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.footer-text {
+    font-size: 13px;
+    color: #86868b;
+}
+
+/* ======================== Responsive Design ======================== */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 48px;
+    }
+
+    .hero-subtitle {
+        font-size: 18px;
+    }
+
+    .access-card {
+        padding: 32px 24px;
+    }
+
+    .info-stats {
+        flex-direction: column;
+    }
+}

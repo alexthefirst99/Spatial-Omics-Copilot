@@ -1,0 +1,452 @@
+/home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+  warnings.warn(warning, PythonDeprecationWarning)
+Dash is running on http://0.0.0.0:2002/loki_launch/
+
+ * Serving Flask app 'index_app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:2002
+ * Running on http://172.31.2.217:2002
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [26/Jan/2026 19:07:56] "GET /loki_launch/ HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:07:56] "GET /loki_launch/assets/portal_styles.css?m=1769449127.6053286 HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:07:56] "GET /loki_launch/_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:07:56] "GET /loki_launch/_dash-dependencies HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:07:56] "GET /loki_launch/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:07:56] "[35m[1mPOST /loki_launch/_dash-update-component HTTP/1.1[0m" 204 -
+127.0.0.1 - - [26/Jan/2026 19:08:07] "GET /loki_launch/ HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:07] "[36mGET /loki_launch/assets/portal_styles.css?m=1769449127.6053286 HTTP/1.1[0m" 304 -
+127.0.0.1 - - [26/Jan/2026 19:08:07] "GET /loki_launch/_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:07] "GET /loki_launch/_dash-dependencies HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:07] "GET /loki_launch/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:07] "[35m[1mPOST /loki_launch/_dash-update-component HTTP/1.1[0m" 204 -
+127.0.0.1 - - [26/Jan/2026 19:08:36] "GET /loki_launch/ HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:36] "GET /loki_launch/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:51] "GET /loki_launch/ HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/assets/portal_styles.css?m=1769449127.6053286 HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/deps/polyfill@7.v2_14_1m1749369328.12.1.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/dash-renderer/build/dash_renderer.v2_14_1m1749369328.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/deps/prop-types@15.v2_14_1m1749369328.8.1.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/deps/react@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/deps/react-dom@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/dcc/dash_core_components.v2_12_1m1749369328.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/dcc/dash_core_components-shared.v2_12_1m1749369328.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/html/dash_html_components.v2_0_15m1749369328.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:52] "GET /loki_launch/_dash-component-suites/dash/dash_table/bundle.v5_2_8m1749369328.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:53] "GET /loki_launch/_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:53] "GET /loki_launch/_dash-dependencies HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:08:53] "[35m[1mPOST /loki_launch/_dash-update-component HTTP/1.1[0m" 204 -
+127.0.0.1 - - [26/Jan/2026 19:08:53] "GET /loki_launch/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:09:23] "POST /loki_launch/_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:09:25] "POST /loki_launch/_dash-update-component HTTP/1.1" 200 -
+[INFO] Saved session bd1692e6 to S3
+[INFO] Started app on port 33321 with PID 3022042 for token bd1692e6
+[App on port 33321] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 33321] warnings.warn(warning, PythonDeprecationWarning)
+[App on port 33321] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 33321] warnings.warn(warning, PythonDeprecationWarning)
+[Email] Sent launch email to wchen5@houstonmethodist.org
+[App on port 33321] Dash is running on http://0.0.0.0:33321/app/bd1692e6/
+[App on port 33321] 
+[App on port 33321] * Serving Flask app 'app'
+[App on port 33321] * Debug mode: off
+[App on port 33321] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+[App on port 33321] * Running on all addresses (0.0.0.0)
+[App on port 33321] * Running on http://127.0.0.1:33321
+[App on port 33321] * Running on http://172.31.2.217:33321
+[App on port 33321] [33mPress CTRL+C to quit[0m
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:45] "GET /app/bd1692e6/ HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/chat.css?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/opioid.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/upload_styles.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/font.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/_dash-component-suites/dash/deps/polyfill@7.v2_14_1m1749369328.12.1.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/spinner.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/_dash-component-suites/dash/deps/react@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/_dash-component-suites/dash/deps/react-dom@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/_dash-component-suites/dash/deps/prop-types@15.v2_14_1m1749369328.8.1.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/_dash-component-suites/dash_uploader/_build/dash_uploader.v0_5_0m1769449127.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/_dash-component-suites/dash_leaflet/dash_leaflet.v1_0_11m1749369341.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/async-EditControl.ts.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:46] "GET /app/bd1692e6/assets/async-GeoJSON.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/async-LocateControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/async-MeasureControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/async-flatgeobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/async-geobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/dashExtensions_default.js?m=1769449127.6023288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/chat.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/dash_leaflet.js?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/assets/s3_upload.js?m=1769454092.536755 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/_dash-component-suites/dash/dash-renderer/build/dash_renderer.v2_14_1m1749369328.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/_dash-component-suites/dash/dcc/dash_core_components-shared.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/_dash-component-suites/dash/dcc/dash_core_components.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/_dash-component-suites/dash/html/dash_html_components.v2_0_15m1749369328.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:47] "GET /app/bd1692e6/_dash-component-suites/dash/dash_table/bundle.v5_2_8m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "GET /app/bd1692e6/_dash-dependencies HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "GET /app/bd1692e6/_dash-layout HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "GET /app/bd1692e6/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "[35m[1mPOST /app/bd1692e6/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "POST /app/bd1692e6/_dash-update-component HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "[35m[1mPOST /app/bd1692e6/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:48] "GET /app/bd1692e6/fonts/fontawesome-webfont.woff2?v=4.7.0 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:49] "[35m[1mPOST /app/bd1692e6/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:49] "GET /app/bd1692e6/fonts/fontawesome-webfont.woff?v=4.7.0 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:49] "POST /app/bd1692e6/_dash-update-component HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:49] "GET /app/bd1692e6/fonts/fontawesome-webfont.ttf?v=4.7.0 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:50] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:52] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:53] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:55] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:57] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:09:59] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:01] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:02] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:04] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:06] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:10:57] "POST /loki_launch/_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:10:58] "POST /loki_launch/_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:11:07] "POST /loki_launch/_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 19:11:09] "POST /loki_launch/_dash-update-component HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:08] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:10] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:11] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:13] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:15] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:17] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:10:19] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[INFO] Saved session 8a86451f to S3
+[INFO] Started app on port 38947 with PID 3022185 for token 8a86451f
+[App on port 38947] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 38947] warnings.warn(warning, PythonDeprecationWarning)
+[App on port 38947] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 38947] warnings.warn(warning, PythonDeprecationWarning)
+[Email] Sent launch email to ttran7@houstonmethodist.org
+[App on port 38947] Dash is running on http://0.0.0.0:38947/app/8a86451f/
+[App on port 38947] 
+[App on port 38947] * Serving Flask app 'app'
+[App on port 38947] * Debug mode: off
+[App on port 38947] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+[App on port 38947] * Running on all addresses (0.0.0.0)
+[App on port 38947] * Running on http://127.0.0.1:38947
+[App on port 38947] * Running on http://172.31.2.217:38947
+[App on port 38947] [33mPress CTRL+C to quit[0m
+[INFO] Saved session dca154ac to S3
+[INFO] Started app on port 45689 with PID 3022214 for token dca154ac
+[App on port 45689] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 45689] warnings.warn(warning, PythonDeprecationWarning)
+[App on port 45689] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning: Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 45689] warnings.warn(warning, PythonDeprecationWarning)
+[Email] Sent launch email to wchen5@houstonmethodist.org
+[App on port 45689] Dash is running on http://0.0.0.0:45689/app/dca154ac/
+[App on port 45689] 
+[App on port 45689] * Serving Flask app 'app'
+[App on port 45689] * Debug mode: off
+[App on port 45689] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+[App on port 45689] * Running on all addresses (0.0.0.0)
+[App on port 45689] * Running on http://127.0.0.1:45689
+[App on port 45689] * Running on http://172.31.2.217:45689
+[App on port 45689] [33mPress CTRL+C to quit[0m
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:32] "HEAD /app/bd1692e6/ HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:32] "GET /app/bd1692e6/ HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/chat.css?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/deps/polyfill@7.v2_14_1m1749369328.12.1.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/spinner.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/font.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/upload_styles.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/opioid.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/deps/react@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash_leaflet/dash_leaflet.v1_0_11m1749369341.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/deps/prop-types@15.v2_14_1m1749369328.8.1.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/deps/react-dom@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash_uploader/_build/dash_uploader.v0_5_0m1769449127.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/async-EditControl.ts.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/async-GeoJSON.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/async-LocateControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/async-MeasureControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/async-flatgeobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/async-geobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/dashExtensions_default.js?m=1769449127.6023288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/chat.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/dash_leaflet.js?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/assets/s3_upload.js?m=1769454092.536755 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/dash-renderer/build/dash_renderer.v2_14_1m1749369328.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/dcc/dash_core_components.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/dcc/dash_core_components-shared.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:33] "GET /app/bd1692e6/_dash-component-suites/dash/html/dash_html_components.v2_0_15m1749369328.min.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "GET /app/bd1692e6/_dash-component-suites/dash/dash_table/bundle.v5_2_8m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "GET /app/bd1692e6/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "GET /app/bd1692e6/_dash-dependencies HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "GET /app/bd1692e6/_dash-layout HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "[35m[1mPOST /app/bd1692e6/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "POST /app/bd1692e6/_dash-update-component HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "[35m[1mPOST /app/bd1692e6/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "[35m[1mPOST /app/bd1692e6/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:34] "POST /app/bd1692e6/_dash-update-component HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:34] "GET /app/dca154ac/ HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/font.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/chat.css?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/opioid.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/spinner.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash/deps/polyfill@7.v2_14_1m1749369328.12.1.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash/deps/react-dom@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/upload_styles.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash/deps/react@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash/deps/prop-types@15.v2_14_1m1749369328.8.1.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash_uploader/_build/dash_uploader.v0_5_0m1769449127.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/async-EditControl.ts.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash_leaflet/dash_leaflet.v1_0_11m1749369341.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/async-GeoJSON.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/async-LocateControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/async-MeasureControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/async-flatgeobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/async-geobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/chat.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/dashExtensions_default.js?m=1769449127.6023288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/dash_leaflet.js?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/assets/s3_upload.js?m=1769454092.536755 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash/dash-renderer/build/dash_renderer.v2_14_1m1749369328.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:35] "GET /app/dca154ac/_dash-component-suites/dash/dcc/dash_core_components.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:36] "GET /app/dca154ac/_dash-component-suites/dash/dcc/dash_core_components-shared.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:36] "GET /app/dca154ac/_dash-component-suites/dash/html/dash_html_components.v2_0_15m1749369328.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:36] "GET /app/dca154ac/_dash-component-suites/dash/dash_table/bundle.v5_2_8m1749369328.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:36] "GET /app/dca154ac/_dash-layout HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:36] "GET /app/dca154ac/_dash-dependencies HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:36] "GET /app/dca154ac/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "POST /app/dca154ac/_dash-update-component HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "[35m[1mPOST /app/dca154ac/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "[35m[1mPOST /app/dca154ac/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "[35m[1mPOST /app/dca154ac/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:37] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "GET /app/dca154ac/fonts/fontawesome-webfont.woff2?v=4.7.0 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "GET /app/dca154ac/fonts/fontawesome-webfont.woff?v=4.7.0 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "POST /app/dca154ac/_dash-update-component HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:37] "GET /app/dca154ac/fonts/fontawesome-webfont.ttf?v=4.7.0 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:38] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:40] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:40] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:42] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:43] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:44] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:45] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:46] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:47] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:49] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:49] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:51] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:52] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:53] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:54] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:55] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:56] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:11:58] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:11:58] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:12:00] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:01] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:12:02] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:12:03] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:04] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:12:05] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:07] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:12:07] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:10] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:13] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:16] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:19] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:22] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:25] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:28] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning:
+[App on port 33321] 
+[App on port 33321] Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 33321] 
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:30] "POST /app/bd1692e6/upload_proxy HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:31] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] /home/ssm-user/github/env/lib64/python3.9/site-packages/boto3/compat.py:89: PythonDeprecationWarning:
+[App on port 33321] 
+[App on port 33321] Boto3 will no longer support Python 3.9 starting April 29, 2026. To continue receiving service updates, bug fixes, and security updates please upgrade to Python 3.10 or later. More information can be found here: https://aws.amazon.com/blogs/developer/python-support-policy-updates-for-aws-sdks-and-tools/
+[App on port 33321] 
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:33] "POST /app/bd1692e6/_dash-update-component HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:34] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:37] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:41] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:43] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:46] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:49] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:52] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:55] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:12:58] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:00] "GET /app/8a86451f/ HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/chat.css?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/font.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/deps/polyfill@7.v2_14_1m1749369328.12.1.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/opioid.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/spinner.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/upload_styles.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/deps/react@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/deps/prop-types@15.v2_14_1m1749369328.8.1.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/deps/react-dom@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash_uploader/_build/dash_uploader.v0_5_0m1769449127.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash_leaflet/dash_leaflet.v1_0_11m1749369341.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/async-EditControl.ts.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/async-GeoJSON.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/async-LocateControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/async-MeasureControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/async-flatgeobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/async-geobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/chat.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/dashExtensions_default.js?m=1769449127.6023288 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/dash_leaflet.js?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/assets/s3_upload.js?m=1769454092.536755 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/dash-renderer/build/dash_renderer.v2_14_1m1749369328.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/dcc/dash_core_components.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/dcc/dash_core_components-shared.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/html/dash_html_components.v2_0_15m1749369328.min.js HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:01] "GET /app/8a86451f/_dash-component-suites/dash/dash_table/bundle.v5_2_8m1749369328.js HTTP/1.1" 200 -
+[App on port 33321] 127.0.0.1 - - [26/Jan/2026 19:13:02] "GET /app/bd1692e6/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] [2026-01-26 19:13:02,875] ERROR in app: Exception on /app/bd1692e6/_dash-update-component [POST]
+[App on port 33321] Traceback (most recent call last):
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask/app.py", line 2190, in wsgi_app
+[App on port 33321] response = self.full_dispatch_request()
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask/app.py", line 1486, in full_dispatch_request
+[App on port 33321] rv = self.handle_user_exception(e)
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask_restx/api.py", line 672, in error_router
+[App on port 33321] return original_handler(e)
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask/app.py", line 1484, in full_dispatch_request
+[App on port 33321] rv = self.dispatch_request()
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask/app.py", line 1469, in dispatch_request
+[App on port 33321] return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/dash/dash.py", line 1310, in dispatch
+[App on port 33321] ctx.run(
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/dash/_callback.py", line 442, in add_context
+[App on port 33321] output_value = func(*func_args, **func_kwargs)  # %% callback invoked %%
+[App on port 33321] File "/home/ssm-user/loki2_web/EC2_Loki2_web/app/app.py", line 680, in callback_copy_and_rename_file
+[App on port 33321] return copy_and_rename_file(n_clicks, folder_id, work_dir, zip=True)
+[App on port 33321] File "/home/ssm-user/loki2_web/EC2_Loki2_web/niceview/interface/callback.py", line 1046, in copy_and_rename_file
+[App on port 33321] if n_clicks > 0:
+[App on port 33321] TypeError: '>' not supported between instances of 'NoneType' and 'int'
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:02] "GET /app/8a86451f/_dash-layout HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:02] "GET /app/8a86451f/_dash-dependencies HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:03] "GET /app/8a86451f/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:03] "[35m[1mPOST /app/8a86451f/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:03] "[35m[1mPOST /app/8a86451f/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:03] "POST /app/8a86451f/_dash-update-component HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:03] "[35m[1mPOST /app/8a86451f/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:03] "POST /app/8a86451f/_dash-update-component HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:04] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:06] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:08] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:10] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:11] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:13] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:15] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:17] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/ HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/chat.css?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/font.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/opioid.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/spinner.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/deps/polyfill@7.v2_14_1m1749369328.12.1.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/upload_styles.css?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/deps/react@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/deps/react-dom@16.v2_14_1m1749369328.14.0.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/deps/prop-types@15.v2_14_1m1749369328.8.1.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash_uploader/_build/dash_uploader.v0_5_0m1769449127.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash_leaflet/dash_leaflet.v1_0_11m1749369341.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/async-EditControl.ts.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/async-GeoJSON.js?m=1769449127.6003287 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/async-LocateControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/async-MeasureControl.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/async-flatgeobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/async-geobuf.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/chat.js?m=1769449127.6013288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/dashExtensions_default.js?m=1769449127.6023288 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/dash_leaflet.js?m=1769449127.6043286 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/assets/s3_upload.js?m=1769454092.536755 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/dash-renderer/build/dash_renderer.v2_14_1m1749369328.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/dcc/dash_core_components-shared.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/dcc/dash_core_components.v2_12_1m1749369328.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/html/dash_html_components.v2_0_15m1749369328.min.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-component-suites/dash/dash_table/bundle.v5_2_8m1749369328.js HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-dependencies HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_dash-layout HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "GET /app/dca154ac/_favicon.ico?v=2.14.1 HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "[35m[1mPOST /app/dca154ac/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:18] "[35m[1mPOST /app/dca154ac/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:19] "POST /app/dca154ac/_dash-update-component HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:19] "[35m[1mPOST /app/dca154ac/_dash-update-component HTTP/1.1[0m" 204 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:19] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:19] "POST /app/dca154ac/_dash-update-component HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:20] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:21] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:22] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:24] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:24] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:26] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:27] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:28] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:29] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:30] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:31] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 38947] 127.0.0.1 - - [26/Jan/2026 19:13:33] "GET /app/8a86451f/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:33] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:36] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:39] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:42] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:45] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:48] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:51] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:54] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:13:57] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:00] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:03] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:06] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:09] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:12] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:15] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:18] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:21] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:24] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:28] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:30] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:33] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:37] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:40] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:43] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:46] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:49] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:52] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:55] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:14:58] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:01] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:04] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:06] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:09] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:13] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:16] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:19] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:22] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:25] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:28] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:31] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:34] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:37] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:39] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:42] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:45] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 45689] 127.0.0.1 - - [26/Jan/2026 19:15:48] "GET /app/dca154ac/_reload-hash HTTP/1.1" 200 -
+[App on port 33321] [2026-01-26 19:15:50,490] ERROR in app: Exception on /app/bd1692e6/_dash-update-component [POST]
+[App on port 33321] Traceback (most recent call last):
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/server_thread/server.py", line 58, in get_server
+[App on port 33321] return ServerManager._LIVE_SERVERS[key]
+[App on port 33321] KeyError: 33322
+[App on port 33321] 
+[App on port 33321] During handling of the above exception, another exception occurred:
+[App on port 33321] 
+[App on port 33321] Traceback (most recent call last):
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask/app.py", line 2190, in wsgi_app
+[App on port 33321] response = self.full_dispatch_request()
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask/app.py", line 1486, in full_dispatch_request
+[App on port 33321] rv = self.handle_user_exception(e)
+[App on port 33321] File "/home/ssm-user/github/env/lib64/python3.9/site-packages/flask_restx/api.py", line 672, in error_router
+[App on port 33321] return original_handler(e)

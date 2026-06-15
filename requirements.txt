@@ -1,0 +1,48 @@
+# Local Dash component used by the website.
+# Keep this near the top so `pip install -r requirements.txt` installs the
+# viewer package and its bundled dash_viv_viewer.min.js.
+-e ./dash_viv_viewer
+
+# Web app
+dash==2.14.1
+dash_loading_spinners==1.0.0
+Flask==2.3.3
+flask-cors
+plotly==5.18.0
+requests
+
+# AWS / S3
+boto3
+s3fs
+
+# Data science
+anndata==0.10.3
+matplotlib==3.8.1
+numpy==1.26.1
+pandas==2.1.1
+scanpy==1.9.6
+scikit-image==0.22.0
+scikit_learn==1.3.2
+scipy==1.11.3
+
+# Image / geospatial
+# `pyvips` is the Python binding. The native `libvips` library must be
+# installed separately before importing pyvips:
+#   conda install -c conda-forge libvips==8.18.2
+#   # or on EC2/Linux: sudo dnf install vips vips-devel
+opencv_contrib_python==4.6.0.66
+opencv_python==4.8.1.78
+opencv_python_headless==4.8.1.78
+Pillow==10.0.1
+pyproj==3.6.1
+pyvips>=2.2.1
+rasterio==1.3.9
+shapely==2.0.2
+tifffile==2024.8.30
+
+# Utilities
+ipyleaflet==0.17.4
+ollama
+packaging>=24.0
+setuptools>=68.0.0
+toml==0.10.2

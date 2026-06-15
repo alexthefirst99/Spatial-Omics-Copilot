@@ -1,0 +1,56 @@
+{
+    "src/lib/components/VivViewer.react.js": {
+        "description": "A Viv-powered WebGL image viewer with an ROI drawing toolbar for Dash.",
+        "displayName": "VivViewer",
+        "methods": [],
+        "props": {
+            "id": {
+                "type": {
+                    "name": "string"
+                },
+                "required": false,
+                "description": "The ID used to identify this component in Dash callbacks."
+            },
+            "image_url": {
+                "type": {
+                    "name": "string"
+                },
+                "required": false,
+                "description": "URL to the OME-TIFF image to display.",
+                "defaultValue": {
+                    "value": "''",
+                    "computed": false
+                }
+            },
+            "height": {
+                "type": {
+                    "name": "number"
+                },
+                "required": false,
+                "description": "Height of the viewer in pixels.",
+                "defaultValue": {
+                    "value": "600",
+                    "computed": false
+                }
+            },
+            "width": {
+                "type": {
+                    "name": "number"
+                },
+                "required": false,
+                "description": "Width of the viewer in pixels. If omitted, fills the container."
+            },
+            "rois": {
+                "type": {
+                    "name": "array"
+                },
+                "required": false,
+                "description": "List of drawn ROIs. Each item has {type: 'rect'|'polygon', points: [[x,y],...]}.  Updated by the component whenever the user draws or clears ROIs.",
+                "defaultValue": {
+                    "value": "[]",
+                    "computed": false
+                }
+            }
+        }
+    }
+}

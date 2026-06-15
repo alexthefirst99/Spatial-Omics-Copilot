@@ -1,0 +1,101 @@
+/* Hide default Dash loading spinner, use our custom one */
+.custom-spinner-container ._dash-loading-callback {
+    display: none !important;
+}
+
+/* Custom spinner overlay */
+.custom-spinner-container::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    border: 6px solid transparent;
+    border-radius: 50%;
+    border-top-color: #0071e3;
+    border-right-color: #0071e3;
+    border-bottom-color: rgba(0, 113, 227, 0.3);
+    border-left-color: rgba(0, 113, 227, 0.3);
+    animation: custom-spinner-rotate 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    z-index: 1000;
+}
+
+/* Only show spinner when loading */
+.custom-spinner-container:not(._dash-loading) {
+    position: relative;
+}
+
+.custom-spinner-container._dash-loading::before {
+    display: block;
+}
+
+@keyframes custom-spinner-rotate {
+    0% {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+/* Spinner container positioning */
+.custom-spinner-container {
+    position: relative;
+    min-height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Alternative pulse design (not used by default, but available) */
+.custom-spinner-pulse {
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.custom-spinner-pulse-dot {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0071e3;
+    animation: custom-spinner-pulse 1.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.custom-spinner-pulse-dot:nth-child(1) {
+    left: 8px;
+    animation-delay: 0s;
+}
+
+.custom-spinner-pulse-dot:nth-child(2) {
+    left: 8px;
+    animation-delay: -0.4s;
+}
+
+.custom-spinner-pulse-dot:nth-child(3) {
+    left: 32px;
+    animation-delay: -0.8s;
+}
+
+.custom-spinner-pulse-dot:nth-child(4) {
+    left: 56px;
+    animation-delay: -1.2s;
+}
+
+@keyframes custom-spinner-pulse {
+    0% {
+        top: 8px;
+        height: 64px;
+    }
+
+    50%,
+    100% {
+        top: 24px;
+        height: 32px;
+    }
+}

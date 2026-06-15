@@ -1,0 +1,334 @@
+/* ======================== S3 Upload Component - Professional Design ======================== */
+
+.s3-upload-wrapper {
+    margin: 12px 0;
+}
+
+/* Upload Drop Zone */
+.s3-upload-zone {
+    position: relative;
+    border: 2px dashed rgba(0, 113, 227, 0.3);
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+    background: rgba(0, 113, 227, 0.02);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.s3-upload-zone:hover {
+    border-color: #0071e3;
+    background: rgba(0, 113, 227, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 113, 227, 0.1);
+}
+
+.s3-upload-zone.drag-over {
+    border-color: #0071e3;
+    background: rgba(0, 113, 227, 0.08);
+    border-width: 3px;
+}
+
+/* Upload Icon */
+.upload-icon {
+    color: #0071e3;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+    margin-bottom: 8px;
+}
+
+.s3-upload-zone:hover .upload-icon {
+    opacity: 1;
+    transform: translateY(-2px);
+}
+
+.upload-icon .fa {
+    color: #0071e3 !important;
+    font-size: 32px !important;
+}
+
+/* Upload Text */
+.upload-text-primary {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1d1d1f;
+    margin-bottom: 4px;
+}
+
+.upload-text-secondary {
+    font-size: 12px;
+    color: #86868b;
+    margin-bottom: 8px;
+}
+
+.upload-file-types {
+    font-size: 11px;
+    color: #86868b;
+    font-style: italic;
+}
+
+/* Hidden File Input */
+.upload-file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* File Info Display */
+.upload-file-info {
+    margin: 16px 0;
+    padding: 16px;
+    background: rgba(0, 113, 227, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 113, 227, 0.15);
+}
+
+.file-info-row {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #1d1d1f;
+}
+
+.file-name {
+    flex: 1;
+    font-weight: 500;
+    margin-right: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-size {
+    font-size: 12px;
+    color: #86868b;
+    font-weight: 400;
+}
+
+/* Progress Container */
+.upload-progress-container {
+    margin-top: 16px;
+}
+
+.upload-progress-bar-wrapper {
+    position: relative;
+    width: 100%;
+    height: 28px;
+    background: rgba(0, 113, 227, 0.08);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.upload-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #0071e3 0%, #005bb5 100%);
+    border-radius: 14px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+}
+
+.upload-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d1d1f;
+    z-index: 2;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.upload-status {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #86868b;
+    text-align: center;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.upload-status.success {
+    color: #28a745;
+}
+
+.upload-status.error {
+    color: #ff3b30;
+}
+
+.upload-status.processing {
+    color: #0071e3;
+}
+
+/* Loading Spinner for Status */
+.upload-status::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+}
+
+.upload-status.processing::before {
+    display: inline-block;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* States */
+.s3-upload-wrapper.uploading .s3-upload-zone {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.s3-upload-wrapper.uploading .upload-progress-container {
+    display: block !important;
+}
+
+.s3-upload-wrapper.has-file .s3-upload-zone {
+    display: none;
+}
+
+.s3-upload-wrapper.has-file .upload-file-info {
+    display: block !important;
+}
+
+/* Cancel Button */
+.upload-cancel-btn {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid #ff3b30;
+    border-radius: 8px;
+    color: #ff3b30;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.upload-cancel-btn:hover {
+    background: #ff3b30;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
+}
+
+.upload-cancel-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(255, 59, 48, 0.2);
+}
+
+/* Spatial omics upload result */
+.omics-upload-result {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.omics-upload-summary {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(52, 199, 89, 0.28);
+    border-radius: 8px;
+    background: rgba(52, 199, 89, 0.07);
+    color: #1d1d1f;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.omics-upload-summary.error {
+    border-color: rgba(255, 59, 48, 0.32);
+    background: rgba(255, 59, 48, 0.07);
+}
+
+.omics-upload-title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: 6px;
+}
+
+.omics-upload-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.omics-upload-stats span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(0, 113, 227, 0.08);
+    color: #1d1d1f;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.omics-upload-genes {
+    font-size: 11px;
+    line-height: 1.35;
+    color: #6e6e73;
+    max-width: 100%;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+}
+
+.omics-upload-summary h5,
+.omics-upload-summary p,
+.omics-upload-summary .text {
+    max-width: 100%;
+    margin: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.omics-upload-summary h5 {
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.25;
+}
+
+.omics-upload-summary p {
+    font-size: 11px !important;
+    line-height: 1.35;
+    color: #6e6e73;
+}
+
+.omics-upload-summary p + p {
+    margin-top: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+

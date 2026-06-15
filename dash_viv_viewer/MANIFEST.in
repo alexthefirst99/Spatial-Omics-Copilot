@@ -1,0 +1,3 @@
+include dash_viv_viewer/*.js
+include dash_viv_viewer/*.map
+include dash_viv_viewer/metadata.json
