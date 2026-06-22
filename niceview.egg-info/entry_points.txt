@@ -1,0 +1,2 @@
+[console_scripts]
+mjolnir = app.app:main

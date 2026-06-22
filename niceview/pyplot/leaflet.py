@@ -14,7 +14,8 @@ def create_viv_viewer(
     cmap=None,
     geojson_coords=None,
     token="",
-    overlay=False
+    overlay=False,
+    spots=None
 ):
     """Create viv viewer.
     
@@ -33,6 +34,20 @@ def create_viv_viewer(
     """
     if geojson_coords is None:
         geojson_coords = []
+    if spots is None:
+        spots = []
+
+    cluster_counts = {}
+    cluster_colors = {}
+    for spot in spots:
+        cluster = spot.get("cluster") if isinstance(spot, dict) else None
+        if cluster is None:
+            continue
+        cluster = str(cluster)
+        cluster_counts[cluster] = cluster_counts.get(cluster, 0) + 1
+        color = spot.get("color")
+        if color:
+            cluster_colors[cluster] = color
 
     image_urls = []
     
@@ -120,6 +135,61 @@ def create_viv_viewer(
                     ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '4px'})
                 )
     
+    # Spatial cluster legend from uploaded h5ad clustering.
+    if cluster_counts:
+        legend_items.append(
+            html.Div("Spatial clusters", style={
+                'fontFamily': 'SF Pro Text, sans-serif',
+                'fontSize': '12px',
+                'fontWeight': '700',
+                'color': '#1d1d1f',
+                'marginBottom': '8px'
+            })
+        )
+        fallback_colors = [
+            '#0071e3', '#ff9500', '#34c759', '#af52de', '#ff3b30',
+            '#00c7be', '#5856d6', '#ffcc00', '#5ac8fa', '#ff2d55',
+            '#30d158', '#bf5af2', '#ffd60a', '#64d2ff', '#a2845e',
+        ]
+        def cluster_sort_key(value):
+            try:
+                return (0, int(value))
+            except ValueError:
+                return (1, value)
+
+        for idx, cluster in enumerate(sorted(cluster_counts.keys(), key=cluster_sort_key)):
+            color = cluster_colors.get(cluster, fallback_colors[idx % len(fallback_colors)])
+            legend_items.append(
+                html.Div([
+                    html.Div(style={
+                        'width': '12px',
+                        'height': '12px',
+                        'backgroundColor': color,
+                        'marginRight': '8px',
+                        'borderRadius': '50%',
+                        'border': '1px solid rgba(0,0,0,0.18)'
+                    }),
+                    html.Span(f"Cluster {cluster}", style={
+                        'fontFamily': 'SF Pro Text, sans-serif',
+                        'fontSize': '12px',
+                        'color': '#1e1e1e',
+                        'fontWeight': '600',
+                        'marginRight': '8px'
+                    }),
+                    html.Span(f"{cluster_counts[cluster]:,}", style={
+                        'fontFamily': 'SF Pro Text, sans-serif',
+                        'fontSize': '11px',
+                        'color': '#6e6e73',
+                        'marginLeft': 'auto'
+                    })
+                ], style={
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'minWidth': '150px',
+                    'marginBottom': '5px'
+                })
+            )
+
     # Continuous Colormap Legend (if no classes, but cmap active)
     elif cmap is not None:
         # Build simple gradient box
@@ -141,8 +211,9 @@ def create_viv_viewer(
 
     legend_div = html.Div(legend_items, style={
         'position': 'absolute', 'bottom': '20px', 'left': '20px', 'zIndex': 1000,
-        'backgroundColor': 'rgba(255, 255, 255, 0.9)', 'padding': '10px',
-        'borderRadius': '6px', 'boxShadow': '0 2px 6px rgba(0,0,0,0.15)',
+        'backgroundColor': 'rgba(255, 255, 255, 0.92)', 'padding': '10px 12px',
+        'borderRadius': '8px', 'boxShadow': '0 8px 24px rgba(0,0,0,0.14)',
+        'border': '1px solid rgba(0,0,0,0.08)',
         'maxHeight': '300px', 'overflowY': 'auto',
         'display': 'none' if not legend_items else 'block'
     })
@@ -168,7 +239,9 @@ def create_viv_viewer(
             bg_color="white",
             active_layer=1 if has_overlay else 0,
             opacity={0: 1.0, 1: 0.5},
-            rois=[]
+            rois=[],
+            spots=spots,
+            selected_spot=None
         ),
         legend_div,
     ], style={'position': 'relative', 'width': '100%', 'height': f'{base_height}px'})

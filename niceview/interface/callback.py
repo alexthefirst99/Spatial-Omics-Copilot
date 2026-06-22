@@ -204,6 +204,92 @@ def _spatial_omics_dir(work_dir, folder_id=""):
     return f'{work_dir}/user{folder_id}/spatial_omics'
 
 
+def _spatial_omics_cluster_path(work_dir, folder_id=""):
+    return f'{_spatial_omics_dir(work_dir, folder_id)}/spatial_clusters.json'
+
+
+def _cluster_palette(labels):
+    colors = [
+        "#0071e3", "#ff9500", "#34c759", "#af52de", "#ff3b30",
+        "#00c7be", "#5856d6", "#ffcc00", "#5ac8fa", "#ff2d55",
+        "#30d158", "#bf5af2", "#ffd60a", "#64d2ff", "#a2845e",
+    ]
+    return {str(label): colors[i % len(colors)] for i, label in enumerate(sorted(set(map(str, labels))))}
+
+
+def run_spatial_basic_clustering(h5ad_path, cluster_path):
+    """Run a small Scanpy preprocessing workflow and save spatial cluster labels."""
+    import scanpy as sc
+
+    adata = ad.read_h5ad(h5ad_path)
+    if "spatial" not in adata.obsm:
+        raise ValueError('Missing required adata.obsm["spatial"] coordinates.')
+    if adata.n_obs < 3 or adata.n_vars < 3:
+        raise ValueError("Need at least 3 spots and 3 genes for clustering.")
+
+    adata.var_names_make_unique()
+
+    sc.pp.filter_genes(adata, min_cells=1)
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+
+    n_top_genes = min(2000, int(adata.n_vars))
+    if n_top_genes >= 50:
+        try:
+            sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, flavor="seurat", subset=True)
+        except Exception as e:
+            print(f"Spatial clustering HVG step skipped: {e}")
+
+    n_comps = min(50, int(adata.n_obs) - 1, int(adata.n_vars) - 1)
+    if n_comps < 2:
+        raise ValueError("Not enough dimensions for PCA clustering.")
+    sc.pp.pca(adata, n_comps=n_comps)
+    n_pcs = min(30, n_comps)
+
+    if int(adata.n_obs) > 20000:
+        from sklearn.cluster import MiniBatchKMeans
+
+        method = "pca_minibatch_kmeans_over_20k"
+        n_clusters = min(12, max(4, int(round(np.sqrt(float(adata.n_obs) / 3000.0)))))
+        x_pca = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
+        labels = MiniBatchKMeans(
+            n_clusters=n_clusters,
+            random_state=0,
+            batch_size=min(8192, int(adata.n_obs)),
+            n_init=5,
+        ).fit_predict(x_pca)
+        adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
+    else:
+        sc.pp.neighbors(adata, n_neighbors=min(15, max(2, int(adata.n_obs) - 1)), n_pcs=n_pcs)
+
+        method = "scanpy_leiden"
+        try:
+            sc.tl.leiden(adata, key_added="spatial_cluster", resolution=0.8)
+        except Exception as e:
+            print(f"Spatial clustering Leiden failed, using k-means fallback: {e}")
+            from sklearn.cluster import KMeans
+
+            method = "pca_kmeans_fallback"
+            n_clusters = min(8, max(2, int(round(np.sqrt(float(adata.n_obs) / 2.0)))))
+            x_pca = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
+            labels = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit_predict(x_pca)
+            adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
+
+    labels = [str(x) for x in adata.obs["spatial_cluster"].tolist()]
+    palette = _cluster_palette(labels)
+    clusters = {str(obs_name): label for obs_name, label in zip(adata.obs_names, labels)}
+    payload = {
+        "cluster_key": "spatial_cluster",
+        "method": method,
+        "n_spots": int(adata.n_obs),
+        "n_clusters": len(set(labels)),
+        "clusters": clusters,
+        "palette": palette,
+    }
+    vio.dump_json(payload, cluster_path, indent=2)
+    return payload
+
+
 def _upload_job_id_from_path(path):
     marker = "data_input_temp/tmp/"
     if marker not in path:
@@ -256,21 +342,55 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
             "spatial_key": "spatial",
             "preview_genes": preview_genes,
         }
+
+        cluster_summary = None
+        cluster_error = None
+        try:
+            if job_id:
+                status_store.update_status(job_id, 70, "Running basic clustering...")
+            cluster_path = _spatial_omics_cluster_path(work_dir, folder_id)
+            cluster_summary = run_spatial_basic_clustering(stored_path, cluster_path)
+            state.update({
+                "cluster_path": cluster_path,
+                "cluster_key": cluster_summary.get("cluster_key", "spatial_cluster"),
+                "cluster_method": cluster_summary.get("method"),
+                "n_clusters": cluster_summary.get("n_clusters"),
+            })
+        except Exception as e:
+            cluster_error = str(e)
+            state["cluster_error"] = cluster_error
+            print(f"Spatial clustering skipped: {cluster_error}")
+
         if job_id:
-            status_store.update_status(job_id, 80, "Saving h5ad metadata...")
+            status_store.update_status(job_id, 90, "Saving h5ad metadata...")
         vio.dump_json(state, _spatial_omics_state_path(work_dir, folder_id), indent=2)
 
         if job_id:
             status_store.update_status(job_id, 100, "h5ad ready for ROI analysis")
 
-        return html.Div(className="omics-upload-summary", children=[
+        summary_children = [
             html.Div("h5ad ready", className="omics-upload-title"),
             html.Div(className="omics-upload-stats", children=[
                 html.Span(f"{n_obs:,} spots"),
                 html.Span(f"{n_vars:,} genes"),
             ]),
-            html.Div("Example: " + ", ".join(preview_genes), className="omics-upload-genes"),
-        ])
+        ]
+        if cluster_summary:
+            summary_children.append(
+                html.Div(
+                    f"{cluster_summary.get('n_clusters', 0)} spatial clusters ready for viewer overlay",
+                    className="omics-upload-genes"
+                )
+            )
+        elif cluster_error:
+            summary_children.append(
+                html.Div(f"Clustering skipped: {cluster_error}", className="omics-upload-genes")
+            )
+        summary_children.append(
+            html.Div("Example: " + ", ".join(preview_genes), className="omics-upload-genes")
+        )
+
+        return html.Div(className="omics-upload-summary", children=summary_children)
     except Exception as e:
         if 'stored_path' in locals() and vio.exists(stored_path):
             vio.remove(stored_path)
@@ -1615,6 +1735,21 @@ def cell_selection_interface(n_clicks, folder_id, work_dir):
 
 
 
+def _safe_delete_session_path(path, label):
+    """Delete one generated session path without failing the whole cleanup."""
+    if not path:
+        return
+    try:
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+            print(f"Deleted {label}: {path}")
+        elif os.path.isfile(path):
+            os.remove(path)
+            print(f"Deleted {label}: {path}")
+    except Exception as e:
+        print(f"Failed to delete {label} ({path}): {e}")
+
+
 def clear_cache_forcall(*args):
     if len(args) >= 4:
         n_clicks, folder_id, work_dir = args[:3]
@@ -1625,14 +1760,27 @@ def clear_cache_forcall(*args):
     else:
         raise TypeError("clear_cache_forcall requires folder_id and work_dir")
 
-    # 1. Clean up "work_dir" (local cache or db/data) via vio
+    session_id = str(folder_id or "")
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    chat_dir = os.environ.get("LOKI_CHAT_DIR", os.path.join(project_root, "chat_sessions"))
+    tmp_base = os.environ.get("LOKI_TMP_BASE", os.path.join(project_root, "tmp_data"))
+
+    # Delete everything generated by this browser session:
+    # uploaded image/h5ad files, converted viewer cache, ROI state, and chat artifacts.
+    if session_id:
+        _safe_delete_session_path(os.path.join(chat_dir, session_id), "chat session data")
+        _safe_delete_session_path(os.path.join(tmp_base, "ome_tiff_cache", session_id), "OME-TIFF conversion cache")
+        _safe_delete_session_path(os.path.join(tmp_base, "uploads", session_id), "temporary uploads")
+    else:
+        print("Skipping session-specific cleanup because session id is empty.")
+
     if work_dir and vio.exists(work_dir):
         try:
             vio.rmdir(work_dir)
-            print(f"✅ Deleted cache: {work_dir}")
+            print(f"Deleted work directory and uploaded data: {work_dir}")
         except Exception as e:
-            print(f"⚠️ Failed to delete {work_dir}: {e}")
-    
+            print(f"Failed to delete work directory ({work_dir}): {e}")
+
     # (S3 / EC2 cleanup removed — local-only mode)
 
     print("Stopping server...")

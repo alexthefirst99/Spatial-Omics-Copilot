@@ -43,9 +43,9 @@ const btnStyle = (active, disabled, last = false) => ({
 function guessRgb({ Pixels }) {
     const numChannels = Pixels.Channel?.length ?? 1;
     const SamplesPerPixel = Pixels.Channel?.[0]?.SamplesPerPixel ?? 1;
-    const is3Channel8Bit = numChannels === 3 && Pixels.Type === 'uint8';
-    const interleavedRgb = Pixels.SizeC === 3 && numChannels === 1 && Pixels.Interleaved;
-    return SamplesPerPixel === 3 || is3Channel8Bit || interleavedRgb;
+    const is3Or4Channel8Bit = (numChannels === 3 || numChannels === 4) && Pixels.Type === 'uint8';
+    const interleavedRgb = (Pixels.SizeC === 3 || Pixels.SizeC === 4 || SamplesPerPixel === 4) && numChannels === 1 && Pixels.Interleaved;
+    return SamplesPerPixel === 3 || SamplesPerPixel === 4 || is3Or4Channel8Bit || interleavedRgb;
 }
 
 function isInterleaved(shape) {
@@ -53,9 +53,41 @@ function isInterleaved(shape) {
     return lastDimSize === 3 || lastDimSize === 4;
 }
 
-const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', active_layer = 0, opacity, rois = [], setProps }) => {
+const SPOT_CLUSTER_COLORS = [
+    '#0071e3', '#ff9500', '#34c759', '#af52de', '#ff3b30',
+    '#00c7be', '#5856d6', '#ffcc00', '#5ac8fa', '#ff2d55',
+    '#30d158', '#bf5af2', '#ffd60a', '#64d2ff', '#a2845e',
+];
+const SPOT_RENDER_LIMIT = 200000;
+const SPOT_GRID_MIN_SIZE = 96;
+const SPOT_RASTER_MAX_SIZE = 4096;
+
+function colorWithAlpha(color, alpha) {
+    if (typeof color !== 'string') return `rgba(0,113,227,${alpha})`;
+    if (!color.startsWith('#')) return color;
+    const hex = color.slice(1);
+    const full = hex.length === 3 ? hex.split('').map(ch => ch + ch).join('') : hex;
+    const n = Number.parseInt(full, 16);
+    if (!Number.isFinite(n)) return `rgba(0,113,227,${alpha})`;
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function spotClusterColor(spot) {
+    if (spot?.color) return spot.color;
+    if (spot?.cluster === undefined || spot?.cluster === null) return '#0071e3';
+    const text = String(spot.cluster);
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+    return SPOT_CLUSTER_COLORS[Math.abs(hash) % SPOT_CLUSTER_COLORS.length];
+}
+
+const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', active_layer = 0, opacity, rois = [], spots = [], selected_spot, setProps }) => {
     const containerRef = useRef(null);
     const svgRef = useRef(null);
+    const spotCanvasRef = useRef(null);
     const dragStartRef = useRef(null);
     const polyDownPos = useRef(null);
     const overlayDivRef = useRef(null);
@@ -75,6 +107,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
         if (typeof opacity === 'object') return opacity[internalActiveLayer] !== undefined ? opacity[internalActiveLayer] : 0.5;
         return opacity; // Support numeric opacity if passed
     });
+    const [clusterOpacity, setClusterOpacity] = useState(1);
     // Sync Dash->local when the prop changes externally
     useEffect(() => {
         if (opacity === undefined || opacity === null) return;
@@ -113,6 +146,9 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
 
     /* Drawing state */
     const [drawMode, setDrawMode] = useState(null); // null | 'rect' | 'polygon'
+    const [spotSelectMode, setSpotSelectMode] = useState(false);
+    const [selectedSpotId, setSelectedSpotId] = useState(selected_spot?.id || null);
+    const [hoverSpot, setHoverSpot] = useState(null);
     const [roiList, setRoiList] = useState(rois || []);
     const [rectDraft, setRectDraft] = useState(null);
     const [polyDraft, setPolyDraft] = useState([]);
@@ -324,6 +360,208 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
         }));
     }, []);
 
+    const spotList = Array.isArray(spots) ? spots : [];
+    const hasSpots = spotList.length > 0;
+
+    const spotGrid = useMemo(() => {
+        if (!hasSpots || !spotSelectMode) return null;
+        let maxRadius = 0;
+        for (const spot of spotList) {
+            const radius = Number(spot.r || 4);
+            if (Number.isFinite(radius)) maxRadius = Math.max(maxRadius, radius);
+        }
+        const cellSize = Math.max(SPOT_GRID_MIN_SIZE, maxRadius * 4);
+        const cells = new Map();
+        for (let i = 0; i < spotList.length; i++) {
+            const spot = spotList[i];
+            const x = Number(spot.x);
+            const y = Number(spot.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            const gx = Math.floor(x / cellSize);
+            const gy = Math.floor(y / cellSize);
+            const key = `${gx}:${gy}`;
+            const bucket = cells.get(key);
+            if (bucket) bucket.push(i);
+            else cells.set(key, [i]);
+        }
+        return { cells, cellSize, maxRadius };
+    }, [hasSpots, spotList, spotSelectMode]);
+
+    const spotRaster = useMemo(() => {
+        if (!hasSpots) return null;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let maxRadius = 0;
+        for (const spot of spotList) {
+            const x = Number(spot.x);
+            const y = Number(spot.y);
+            const radius = Number(spot.r || 4);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+            if (Number.isFinite(radius)) maxRadius = Math.max(maxRadius, radius);
+        }
+        if (!Number.isFinite(minX) || !Number.isFinite(minY) || maxX <= minX || maxY <= minY) return null;
+
+        const pad = Math.max(8, maxRadius * 2);
+        minX -= pad;
+        minY -= pad;
+        maxX += pad;
+        maxY += pad;
+        const imageWidth = maxX - minX;
+        const imageHeight = maxY - minY;
+        const scale = Math.min(1, SPOT_RASTER_MAX_SIZE / Math.max(imageWidth, imageHeight));
+        const rasterWidth = Math.max(1, Math.ceil(imageWidth * scale));
+        const rasterHeight = Math.max(1, Math.ceil(imageHeight * scale));
+        const raster = document.createElement('canvas');
+        raster.width = rasterWidth;
+        raster.height = rasterHeight;
+        const rasterCtx = raster.getContext('2d');
+        rasterCtx.clearRect(0, 0, rasterWidth, rasterHeight);
+        for (const spot of spotList) {
+            const x = Number(spot.x);
+            const y = Number(spot.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            const color = spotClusterColor(spot);
+            const r = Math.max(1, Number(spot.r || 4) * scale);
+            rasterCtx.fillStyle = colorWithAlpha(color, 1);
+            rasterCtx.beginPath();
+            rasterCtx.arc((x - minX) * scale, (y - minY) * scale, r, 0, Math.PI * 2);
+            rasterCtx.fill();
+        }
+        return { canvas: raster, minX, minY, maxX, maxY };
+    }, [hasSpots, spotList]);
+
+    const drawSpotMarker = useCallback((ctx, spot, fill, stroke, scale = 1.2) => {
+        const screen = imageToScreen(Number(spot.x), Number(spot.y), 0);
+        if (!screen || !viewState) return;
+        const zoomScale = Math.pow(2, viewState.zoom);
+        const r = Math.max(2, Number(spot.r || 4) * zoomScale * scale);
+        const [cx, cy] = screen;
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }, [imageToScreen, viewState]);
+
+    const drawSpotCanvas = useCallback(() => {
+        const canvas = spotCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.max(1, Math.round(containerSize.width));
+        const h = Math.max(1, Math.round(containerSize.height));
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        if (!viewState || !hasSpots) return;
+
+        if (spotRaster) {
+            const topLeft = imageToScreen(spotRaster.minX, spotRaster.minY, 0);
+            const bottomRight = imageToScreen(spotRaster.maxX, spotRaster.maxY, 0);
+            if (topLeft && bottomRight) {
+                const dx = topLeft[0];
+                const dy = topLeft[1];
+                const dw = bottomRight[0] - topLeft[0];
+                const dh = bottomRight[1] - topLeft[1];
+                if (dw > 1 && dh > 1 && dx < w && dy < h && dx + dw > 0 && dy + dh > 0) {
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.save();
+                    ctx.globalAlpha = clusterOpacity;
+                    ctx.drawImage(spotRaster.canvas, dx, dy, dw, dh);
+                    ctx.restore();
+                }
+            }
+        }
+
+        if (!spotSelectMode) return;
+        if (selectedSpotId) {
+            const selected = spotList.find(s => String(s.id) === String(selectedSpotId));
+            if (selected) drawSpotMarker(ctx, selected, 'rgba(255,149,0,0.65)', '#ff9500', 1.5);
+        }
+        if (hoverSpot) {
+            const color = spotClusterColor(hoverSpot);
+            drawSpotMarker(ctx, hoverSpot, colorWithAlpha(color, 0.64), color, 1.35);
+        }
+    }, [clusterOpacity, containerSize, drawSpotMarker, hasSpots, hoverSpot, imageToScreen, selectedSpotId, spotList, spotRaster, spotSelectMode, viewState]);
+
+    useEffect(() => { drawSpotCanvas(); }, [drawSpotCanvas]);
+
+    const findNearestSpot = useCallback((clientX, clientY) => {
+        const canvas = spotCanvasRef.current;
+        if (!canvas || !hasSpots || !spotGrid || !viewState) return null;
+        const bounds = canvas.getBoundingClientRect();
+        const clickX = clientX - bounds.left;
+        const clickY = clientY - bounds.top;
+        const imagePoint = screenToImage(clickX, clickY);
+        if (!imagePoint) return null;
+
+        const zoomScale = Math.pow(2, viewState.zoom);
+        const searchImageRadius = spotGrid.maxRadius + 24 / Math.max(zoomScale, 0.0001);
+        const range = Math.max(1, Math.ceil(searchImageRadius / spotGrid.cellSize));
+        const centerGx = Math.floor(imagePoint[0] / spotGrid.cellSize);
+        const centerGy = Math.floor(imagePoint[1] / spotGrid.cellSize);
+
+        let best = null;
+        let bestDist = Infinity;
+        for (let gx = centerGx - range; gx <= centerGx + range; gx++) {
+            for (let gy = centerGy - range; gy <= centerGy + range; gy++) {
+                const bucket = spotGrid.cells.get(`${gx}:${gy}`);
+                if (!bucket) continue;
+                for (const i of bucket) {
+                    const spot = spotList[i];
+                    const screen = imageToScreen(Number(spot.x), Number(spot.y), 0);
+                    if (!screen) continue;
+                    const dx = screen[0] - clickX;
+                    const dy = screen[1] - clickY;
+                    const dist = dx * dx + dy * dy;
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = { ...spot, index: i, screenX: screen[0], screenY: screen[1] };
+                    }
+                }
+            }
+        }
+        if (!best) return null;
+        const visibleRadius = Math.max(5, Number(best.r || 4) * zoomScale + 5);
+        return bestDist <= visibleRadius * visibleRadius ? best : null;
+    }, [hasSpots, imageToScreen, screenToImage, spotGrid, spotList, viewState]);
+
+    const onSpotClick = useCallback((e) => {
+        if (!spotSelectMode || !hasSpots) return;
+        const best = findNearestSpot(e.clientX, e.clientY);
+        if (best) {
+            if (String(best.id) === String(selectedSpotId)) {
+                setSelectedSpotId(null);
+                if (setProps) setProps({ selected_spot: null });
+            } else {
+                setSelectedSpotId(best.id);
+                if (setProps) setProps({ selected_spot: best });
+            }
+        } else {
+            setSelectedSpotId(null);
+            if (setProps) setProps({ selected_spot: null });
+        }
+    }, [findNearestSpot, hasSpots, selectedSpotId, setProps, spotSelectMode]);
+
+    const onSpotMove = useCallback((e) => {
+        if (!spotSelectMode || !hasSpots || isDrawing) return;
+        const best = findNearestSpot(e.clientX, e.clientY);
+        setHoverSpot(best);
+    }, [findNearestSpot, hasSpots, isDrawing, spotSelectMode]);
+
     const onMouseDown = drawMode === 'rect' ? onRectDown : onPolyDown;
     const onMouseMove = useCallback((e) => { onRectMove(e); onPolyMove(e); }, [onRectMove, onPolyMove]);
     const onMouseUp = drawMode === 'rect' ? onRectUp : onPolyUp;
@@ -337,7 +575,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
         if (!loader) return null;
 
         // Determine data type and bands for the overlay loader
-        const isRgb = loader.dtype === 'Uint8' && loader.shape[loader.shape.length - 1] === 3;
+        const isRgb = loader.dtype === 'Uint8' && (loader.shape[loader.shape.length - 1] === 3 || loader.shape[loader.shape.length - 1] === 4);
         const is16 = loader.dtype === 'Uint16';
         const maxVal = is16 ? 65535 : 255;
 
@@ -406,7 +644,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
     console.log('[VivViewer] rendering, containerSize:', containerSize);
 
     return (
-        <div id={id} ref={containerRef} style={{ position: 'relative', width: width || '100%', height, background: bg_color, overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' }}>
+        <div id={id} ref={containerRef} onMouseMove={onSpotMove} onMouseLeave={() => setHoverSpot(null)} style={{ position: 'relative', width: width || '100%', height, background: bg_color, overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' }}>
             {!loaders.length ? (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontFamily: 'monospace' }}>
                     {image_url ? 'Loading images…' : 'No image_url provided'}
@@ -443,27 +681,68 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                         </div>
                     )}
 
-                    {/* Layer & Mode Toolbar (Right aligned) */}
-                    {loaders.length > 1 && (
+
+                    {hasSpots && (
+                        <canvas
+                            ref={spotCanvasRef}
+                            onClick={onSpotClick}
+                            title={`${spotList.length} spatial spots`}
+                            style={{
+                                position: 'absolute', inset: 0, zIndex: 350,
+                                pointerEvents: spotSelectMode ? 'auto' : 'none',
+                                cursor: spotSelectMode ? 'pointer' : 'default'
+                            }}
+                        />
+                    )}
+                    {hoverSpot && (
                         <div style={{
-                            position: 'absolute', top: 12, right: 12, zIndex: 500,
+                            position: 'absolute', zIndex: 700,
+                            left: Math.min(containerSize.width - 220, Math.max(10, hoverSpot.screenX + 12)),
+                            top: Math.min(containerSize.height - 74, Math.max(10, hoverSpot.screenY + 12)),
+                            pointerEvents: 'none',
+                            background: 'rgba(255,255,255,0.94)',
+                            border: '1px solid rgba(0,0,0,0.12)',
+                            borderRadius: 8,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                            padding: '8px 10px',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
+                            fontSize: 12,
+                            color: '#1d1d1f',
+                            maxWidth: 220
+                        }}>
+                            <div style={{ fontWeight: 700, marginBottom: 3 }}>Spot {hoverSpot.id}</div>
+                            {hoverSpot.cluster !== undefined && hoverSpot.cluster !== null && (
+                                <div>Cluster {hoverSpot.cluster}</div>
+                            )}
+                            <div>x {Number(hoverSpot.x).toFixed(1)}, y {Number(hoverSpot.y).toFixed(1)}</div>
+                        </div>
+                    )}
+
+                    {/* Layer & Mode Toolbar (Right aligned) */}
+                    {(loaders.length > 1 || hasSpots) && (
+                        <div style={{
+                            position: 'absolute', right: 12, bottom: 12, zIndex: 650,
                             display: 'flex', flexDirection: 'column', gap: 6,
                             background: 'white', padding: '10px 14px',
                             border: '2px solid rgba(0,0,0,0.25)', borderRadius: 4,
                             boxShadow: '0 1px 5px rgba(0,0,0,0.4)',
                             pointerEvents: 'auto', fontFamily: 'sans-serif', fontSize: 13
                         }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: 2 }}>View Mode</div>
-                            <select
-                                value={viewMode}
-                                onChange={e => setViewMode(e.target.value)}
-                                style={{ padding: 4, borderRadius: 3, border: '1px solid #ccc', outline: 'none' }}
-                            >
-                                <option value="single">Single Layer</option>
-                                <option value="side-by-side">Side by Side</option>
-                            </select>
+                            {loaders.length > 1 && (
+                                <>
+                                    <div style={{ fontWeight: 'bold', marginBottom: 2 }}>View Mode</div>
+                                    <select
+                                        value={viewMode}
+                                        onChange={e => setViewMode(e.target.value)}
+                                        style={{ padding: 4, borderRadius: 3, border: '1px solid #ccc', outline: 'none' }}
+                                    >
+                                        <option value="single">Single Layer</option>
+                                        <option value="side-by-side">Side by Side</option>
+                                    </select>
+                                </>
+                            )}
 
-                            {viewMode === 'single' && (
+                            {viewMode === 'single' && loaders.length > 1 && (
                                 <>
                                     <div style={{ fontWeight: 'bold', marginTop: 8, marginBottom: 2 }}>Active Layer</div>
                                     <select
@@ -509,6 +788,19 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                                     )}
                                 </>
                             )}
+
+                            {hasSpots && (
+                                <div style={{ marginTop: 8 }}>
+                                    <div style={{ fontWeight: 'bold', marginBottom: 2 }}>Cluster Opacity</div>
+                                    <input
+                                        type="range"
+                                        min="0" max="1" step="0.05"
+                                        value={clusterOpacity}
+                                        onChange={e => setClusterOpacity(parseFloat(e.target.value))}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -520,8 +812,9 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                         boxShadow: '0 1px 5px rgba(0,0,0,0.4)', overflow: 'hidden',
                         pointerEvents: 'auto'
                     }}>
-                        <button title="Draw rectangle ROI" onClick={() => { setDrawMode(m => m === 'rect' ? null : 'rect'); cancelPolygon(); }} style={btnStyle(drawMode === 'rect', false)}>▭</button>
-                        <button title="Draw polygon ROI" onClick={() => { setDrawMode(m => m === 'polygon' ? null : 'polygon'); setRectDraft(null); }} style={btnStyle(drawMode === 'polygon', false)}>⬡</button>
+                        {hasSpots && <button title={spotSelectMode ? 'Turn off spot selection' : `Show/select spatial spots (${spotList.length})`} onClick={() => { const next = !spotSelectMode; setSpotSelectMode(next); if (!next) { setSelectedSpotId(null); setHoverSpot(null); if (setProps) setProps({ selected_spot: null }); } setDrawMode(null); cancelPolygon(); }} style={btnStyle(spotSelectMode, false)}>•</button>}
+                        <button title="Draw rectangle ROI" onClick={() => { setDrawMode(m => m === 'rect' ? null : 'rect'); setSpotSelectMode(false); cancelPolygon(); }} style={btnStyle(drawMode === 'rect', false)}>▭</button>
+                        <button title="Draw polygon ROI" onClick={() => { setDrawMode(m => m === 'polygon' ? null : 'polygon'); setSpotSelectMode(false); setRectDraft(null); }} style={btnStyle(drawMode === 'polygon', false)}>⬡</button>
                         {drawMode === 'polygon' && polyDraft.length >= 3 && (
                             <button title="Finish polygon" onClick={finishPolygon} style={{ ...btnStyle(false, false), background: '#d4f7d4', color: 'green', fontWeight: 'bold', fontSize: 13 }}>✓</button>
                         )}
@@ -541,7 +834,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
                         pointerEvents: isDrawing ? 'auto' : 'none',
                         cursor: drawMode === 'rect' ? 'crosshair' : drawMode === 'polygon' ? 'cell' : 'default',
-                        userSelect: 'none', overflow: 'hidden'
+                        userSelect: 'none', overflow: 'hidden', zIndex: 600
                     }}
                         onMouseDown={onMouseDown} onMouseMove={onMouseMove}
                         onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}
@@ -564,11 +857,11 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                                 const screenPts = roi.points.map(([ix, iy]) => imageToScreen(ix, iy, paneIndex)).filter(Boolean);
                                 if (!screenPts.length) return null;
                                 const ptStr = screenPts.map(([x, y]) => `${x},${y}`).join(' ');
-                                const color = roi.type === 'rect' ? 'red' : '#1a66ff';
-                                const fill = roi.type === 'rect' ? 'rgba(255,50,50,0.1)' : 'rgba(26,102,255,0.1)';
+                                const color = '#00e5ff';
+                                const fill = 'rgba(0,229,255,0.12)';
                                 return (
                                     <g key={`${roi.id}-pane${paneIndex}`} clipPath={`url(#pane${paneIndex})`}>
-                                        <polygon points={ptStr} fill={fill} stroke={color} strokeWidth={2} />
+                                        <polygon points={ptStr} fill={fill} stroke={color} strokeWidth={3} />
                                         <text x={screenPts[0][0] + 4} y={screenPts[0][1] + 14} fontSize={11} fill={color} style={{ fontFamily: 'monospace', pointerEvents: 'none' }}>#{idx + 1}</text>
                                     </g>
                                 );
@@ -579,18 +872,18 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                         {rectDraft && rectDraft.width > 0 && (
                             <g clipPath={viewMode === 'side-by-side' && loaders.length >= 2 ? (rectDraft.x >= containerSize.width / 2 ? 'url(#pane1)' : 'url(#pane0)') : undefined}>
                                 <rect x={rectDraft.x} y={rectDraft.y} width={rectDraft.width} height={rectDraft.height}
-                                    fill="rgba(255,50,50,0.15)" stroke="red" strokeWidth={2} strokeDasharray="6 3" />
+                                    fill="rgba(0,229,255,0.14)" stroke="#00e5ff" strokeWidth={3} strokeDasharray="6 3" />
                             </g>
                         )}
 
                         {/* Live polygon draft */}
                         {polyDraft.length > 0 && (
                             <g clipPath={viewMode === 'side-by-side' && loaders.length >= 2 ? (polyDraft[0].x >= containerSize.width / 2 ? 'url(#pane1)' : 'url(#pane0)') : undefined}>
-                                {polyDraft.length >= 3 && <polygon points={polyDraft.map(p => `${p.x},${p.y}`).join(' ')} fill="rgba(26,102,255,0.1)" stroke="none" />}
-                                <polyline points={polyDraft.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#1a66ff" strokeWidth={2} />
-                                {cursor && <line x1={polyDraft[polyDraft.length - 1].x} y1={polyDraft[polyDraft.length - 1].y} x2={cursor.x} y2={cursor.y} stroke="#1a66ff" strokeWidth={1.5} strokeDasharray="5 3" />}
-                                {cursor && polyDraft.length >= 2 && <line x1={cursor.x} y1={cursor.y} x2={polyDraft[0].x} y2={polyDraft[0].y} stroke="#1a66ff" strokeWidth={1} strokeDasharray="3 4" opacity={0.4} />}
-                                {polyDraft.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={i === 0 ? 6 : 4} fill={i === 0 ? '#1a66ff' : 'white'} stroke="#1a66ff" strokeWidth={2} />)}
+                                {polyDraft.length >= 3 && <polygon points={polyDraft.map(p => `${p.x},${p.y}`).join(' ')} fill="rgba(0,229,255,0.12)" stroke="none" />}
+                                <polyline points={polyDraft.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#00e5ff" strokeWidth={3} />
+                                {cursor && <line x1={polyDraft[polyDraft.length - 1].x} y1={polyDraft[polyDraft.length - 1].y} x2={cursor.x} y2={cursor.y} stroke="#00e5ff" strokeWidth={2} strokeDasharray="5 3" />}
+                                {cursor && polyDraft.length >= 2 && <line x1={cursor.x} y1={cursor.y} x2={polyDraft[0].x} y2={polyDraft[0].y} stroke="#00e5ff" strokeWidth={1.5} strokeDasharray="3 4" opacity={0.4} />}
+                                {polyDraft.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={i === 0 ? 6 : 4} fill={i === 0 ? '#00e5ff' : 'white'} stroke="#00343a" strokeWidth={2} />)}
                             </g>
                         )}
                     </svg>

@@ -42,7 +42,13 @@ class VivViewer(Component):
     - rois (list; default []):
         List of drawn ROIs. Each item has ``{type, points}`` where
         ``points`` is a list of ``[x, y]`` image-pixel coordinates.
-        Updated whenever the user draws or clears ROIs."""
+        Updated whenever the user draws or clears ROIs.
+
+    - spots (list; default []):
+        Spatial transcriptomics spot overlay items. Each item has ``{id, x, y, r}``.
+
+    - selected_spot (dict; optional):
+        The spot most recently selected in the viewer."""
 
     _children_props = []
     _base_nodes = ['children']
@@ -60,11 +66,13 @@ class VivViewer(Component):
         active_layer=Component.UNDEFINED,
         opacity=Component.UNDEFINED,
         rois=Component.UNDEFINED,
+        spots=Component.UNDEFINED,
+        selected_spot=Component.UNDEFINED,
         **kwargs
     ):
-        self._prop_names = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois']
+        self._prop_names = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois', 'spots', 'selected_spot']
         self._valid_wildcard_attributes = []
-        self.available_properties = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois']
+        self.available_properties = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois', 'spots', 'selected_spot']
         self.available_wildcard_properties = []
         _explicit_args = kwargs.pop('_explicit_args')
         _locals = locals()

@@ -49,6 +49,9 @@ import ssl
 # ----------------------------------------------------------------------------
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_APP_DIR, '..'))
+_LOCAL_DASH_VIV_VIEWER = os.path.join(_PROJECT_ROOT, 'dash_viv_viewer')
+if _LOCAL_DASH_VIV_VIEWER not in sys.path:
+    sys.path.insert(0, _LOCAL_DASH_VIV_VIEWER)
 
 # Directory for chat session JSON files
 CHAT_DIR = os.environ.get('LOKI_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))

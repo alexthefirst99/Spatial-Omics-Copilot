@@ -69,12 +69,9 @@ def convert_to_ome_tiff(
     # Streaming load via pyvips (handles SVS, huge TIFFs, PNG, etc without OOM)
     img = pyvips.Image.new_from_file(input_path, access="sequential")
     
-    # If the image has an alpha channel, we usually don't need it for standard HE WSIs.
-    # VivViewer handles standard RGB perfectly.
-    if img.bands == 4:
-        # Extract RGB, ignoring alpha to prevent viewer rendering artifacts
-        img = img.extract_band(0, n=3)
-        
+    # Preserve RGBA overlays. Older code dropped alpha, which made transparent
+    # cluster layers cover the base histology image.
+
     # VivViewer requires OME-XML metadata in the ImageDescription tag.
     # Otherwise it fails with TypeError: Cannot read properties of undefined (reading 'replace')
     vips_format_map = {
@@ -84,18 +81,20 @@ def convert_to_ome_tiff(
         'float': 'float', 'double': 'double',
     }
     ome_type = vips_format_map.get(img.format, 'uint8')
-    is_rgb = (img.bands == 3)
+    is_rgb = (img.bands in (3, 4))
     vips_version = _libvips_version(pyvips)
 
-    if compression == "auto" and is_rgb and ome_type == "uint8":
+    if compression == "auto" and is_rgb and ome_type == "uint8" and img.bands == 3:
         save_compression = "jpeg"
+    elif compression == "auto" and img.bands == 4:
+        save_compression = "deflate"
     else:
         save_compression = compression
     if save_compression == "auto":
         save_compression = "deflate"
     
     if is_rgb:
-        channel_xml = '<Channel ID="Channel:0:0" SamplesPerPixel="3"><LightPath/></Channel>'
+        channel_xml = f'<Channel ID="Channel:0:0" SamplesPerPixel="{img.bands}"><LightPath/></Channel>'
         ome_pixels_attrs = f'SizeC="1" SizeT="1" SizeX="{img.width}" SizeY="{img.height}" SizeZ="1" Type="{ome_type}" Interleaved="true"'
     else:
         channel_xml = '<Channel ID="Channel:0:0" SamplesPerPixel="1"><LightPath/></Channel>'
