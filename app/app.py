@@ -19,7 +19,6 @@ import webbrowser
 import shutil
 import fcntl
 import concurrent.futures
-import subprocess
 import copy
 import ollama
 import tifffile
@@ -75,12 +74,12 @@ OME_CACHE_LOCKS_GUARD = threading.Lock()
 # Import custom layout and utilities
 try:
     from app.layout import create_layout
-    from app.utils import setup_work_dir, open_browser
+    from app.utils import setup_work_dir
     import niceview.utils.io as vio
     import app.status_store as status_store
 except ImportError:
     from layout import create_layout
-    from utils import setup_work_dir, open_browser
+    from utils import setup_work_dir
     import niceview.utils.io as vio
 
 # Import tile server
@@ -132,18 +131,14 @@ def ensure_ome_tiff_cached(path, token):
 gene_chosen = None
 # Import custom interface logic
 from niceview.interface.callback import (
-    upload_image, upload_spot_data, upload_spatial_h5ad, build_roi_gene_context, get_roi_high_expression_genes, upload_cell_data,
-    show_cell_spot_upload, update_output_visual,
-    upload_pathway, upload_coordinate, get_pathway_output,
-    upload_cnv, get_gene, cell_vmin_vmax, spot_vmin_vmax,
-    reset, copy_and_rename_file, save_roi,
-    cell_selection_interface,
+    upload_image, upload_spatial_h5ad, build_roi_gene_context,
+    get_roi_high_expression_genes, reset, save_roi,
     clear_cache_forcall
 )
 
 from niceview.interface.interface import (
     prepare_file_folder, update_data_cache,
-    dump_default_para_arg, add_token_mapping, calculation_cell_detection
+    dump_default_para_arg, add_token_mapping
 )
 
 # Parse arguments
@@ -187,15 +182,6 @@ def _lock_and_write_session(path, data):
             fcntl.flock(f, fcntl.LOCK_UN)
     os.replace(tmp_path, path)
 
-def _touch_dirty_flag():
-    path = _dirty_flag_path()
-    try:
-        with open(path, 'w') as f:
-            f.write("1")
-    except Exception as e:
-        print(f"Warning: Failed to update dirty flag: {e}")
-
-
 # ----------------------------------------------------------------------------
 # BOT WORKER — runs inference and Loki directly in background threads
 # ----------------------------------------------------------------------------
@@ -213,37 +199,6 @@ os.makedirs(DATA_CACHE_DIR, exist_ok=True)
 _bot_executor = concurrent.futures.ThreadPoolExecutor(max_workers=50)
 processing_keys = set()
 processing_lock = threading.Lock()
-
-
-def update_progress(session_id, percent, message):
-    try:
-        status_data = {
-            "percent": percent,
-            "message": message,
-            "timestamp": time.time(),
-            "status": "processing" if percent < 100 else "done"
-        }
-        status_dir = os.path.join(CHAT_DIR, session_id)
-        os.makedirs(status_dir, exist_ok=True)
-        path = os.path.join(status_dir, "loki_status.json")
-        tmp = path + '.tmp'
-        with open(tmp, 'w') as f:
-            json.dump(status_data, f)
-        os.replace(tmp, path)
-    except Exception as e:
-        print(f"Failed to update progress: {e}")
-
-
-def copy_local_file(src_path, dst_path):
-    try:
-        if not os.path.exists(src_path):
-            print(f"[copy] Source not found: {src_path}")
-            return False
-        shutil.copy2(src_path, dst_path)
-        return True
-    except Exception as e:
-        print(f"[copy] Error copying {src_path} -> {dst_path}: {e}")
-        return False
 
 
 def crop_image_by_roi(image_path, roi_path, output_path):
@@ -436,9 +391,6 @@ def _stream_openai_chat(messages, model_name):
 def run_model_inference(messages, provider=None, model_name=None):
     provider = (provider or "ollama").lower()
 
-    if messages and "run loki analysis" in messages[-1].get("content", "").lower():
-        return
-
     if provider == "openai":
         selected_model = model_name or os.environ.get("OPENAI_MODEL", "gpt-4o")
         print(f"DEBUG: Calling OpenAI (model={selected_model}, history={len(messages)})")
@@ -541,212 +493,6 @@ def safe_update_last_assistant_image(session_id, image_paths, target_timestamp=N
     return False
 
 
-class AsyncLokiRunner(threading.Thread):
-    def __init__(self, session_id, target_img_path, work_dir, session_key, roi_path=None):
-        super().__init__()
-        self.session_id = session_id
-        self.target_img_path = target_img_path
-        self.work_dir = work_dir
-        self.session_key = session_key
-        self.roi_path = roi_path
-        self.daemon = True
-
-    def check_cancelled(self):
-        cancel_path = os.path.join(CHAT_DIR, self.session_id, "cancel_signal")
-        if os.path.exists(cancel_path):
-            print(f"[{self.session_id}] Cancellation detected. Aborting.")
-            try:
-                os.remove(cancel_path)
-            except Exception:
-                pass
-            return True
-        return False
-
-    def run(self):
-        print(f"[{self.session_id}] AsyncLokiRunner started on {self.target_img_path}")
-        tmp_dir = tempfile.mkdtemp()
-        loki_out_dir = None
-        plot_artifact_dir = None
-        plot_artifact_dir_preexisting = False
-        try:
-            update_progress(self.session_id, 0, "Initializing...")
-
-            try:
-                session_data = _read_session(self.session_id) or {}
-                last_msg = session_data.get("messages", [{}])[-1]
-            except Exception as e:
-                print(f"[AsyncLoki] Failed to read session: {e}")
-                last_msg = {}
-
-            if self.check_cancelled():
-                return
-
-            # 1. Convert to Loki-compatible TIFF
-            update_progress(self.session_id, 5, "Converting image...")
-            compatible_tiff = os.path.join(tmp_dir, f"loki_input_{os.path.basename(self.target_img_path)}.tiff")
-            try:
-                try:
-                    image_data = tifffile.imread(self.target_img_path)
-                except Exception:
-                    img_pil = _PILImage.open(self.target_img_path)
-                    if img_pil.mode != 'RGB':
-                        img_pil = img_pil.convert('RGB')
-                    image_data = np.array(img_pil)
-                tifffile.imwrite(compatible_tiff, image_data, compression='zlib', tile=(256, 256))
-                target_img_for_loki = compatible_tiff
-            except Exception as e:
-                print(f"Conversion failed ({e}), using original.")
-                target_img_for_loki = self.target_img_path
-
-            if self.check_cancelled():
-                return
-
-            # 2. Run loki2.sh
-            update_progress(self.session_id, 20, "Running Loki (cell detection)...")
-            cmd_loki = ["bash", "loki2.sh", target_img_for_loki]
-            process = subprocess.Popen(
-                cmd_loki, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, universal_newlines=True
-            )
-            last_update_time = time.time()
-            current_progress = 20
-            for line in process.stdout:
-                if self.check_cancelled():
-                    process.kill()
-                    return
-                print(f"[Loki-{self.session_id}] {line.strip()}")
-                now = time.time()
-                if now - last_update_time > 1.0:
-                    clean_line = line.strip()[:50]
-                    if current_progress < 60:
-                        current_progress += 0.5
-                    update_progress(self.session_id, int(current_progress), f"Loki: {clean_line}")
-                    last_update_time = now
-            process.wait()
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, cmd_loki)
-
-            # 3. Find output
-            basename = os.path.splitext(os.path.basename(target_img_for_loki))[0]
-            loki_out_dir = f"./outputs/loki_{basename}.tiff"
-            json_path = None
-            if os.path.exists(loki_out_dir):
-                for f in os.listdir(loki_out_dir):
-                    if f.endswith("_cells.json"):
-                        json_path = os.path.join(loki_out_dir, f)
-                        break
-            if not json_path:
-                raise FileNotFoundError(f"Could not find *_cells.json in {loki_out_dir}")
-
-            if self.check_cancelled():
-                return
-
-            # 4. Generate overlay
-            update_progress(self.session_id, 70, "Generating overlay...")
-            overlay_out = os.path.join(tmp_dir, f"overlay_{basename}.tif")
-            plot_artifact_dir = f"./{os.path.basename(os.path.dirname(target_img_for_loki))}"
-            plot_artifact_dir_preexisting = os.path.isdir(plot_artifact_dir)
-            cmd_plot = [
-                "conda", "run", "-n", "biogis",
-                "python", "plot_annotation.py",
-                "--image", target_img_for_loki,
-                "--json", json_path,
-                "--output", overlay_out
-            ]
-            subprocess.run(cmd_plot, check=True)
-
-            # 5. Store results
-            update_progress(self.session_id, 80, "Storing results...")
-            session_results_dir = os.path.join(CHAT_DIR, self.session_id)
-            os.makedirs(session_results_dir, exist_ok=True)
-            overlay_local = os.path.join(session_results_dir, f"overlay_{basename}.tif")
-            shutil.copy2(overlay_out, overlay_local)
-
-            cell_types_arg = []
-            possible_json_path = os.path.join(plot_artifact_dir, "present_cell_types.json")
-            if os.path.exists(possible_json_path):
-                cell_types_arg = ["--cell_types_json", possible_json_path]
-
-            overlay_crop_path = None
-            if self.roi_path and os.path.exists(self.roi_path):
-                try:
-                    update_progress(self.session_id, 85, "Cropping overlay...")
-                    crop_filename = f"overlay_crop_{basename}_{int(time.time())}.png"
-                    local_crop = os.path.join(tmp_dir, crop_filename)
-                    if crop_image_by_roi(overlay_out, self.roi_path, local_crop):
-                        crops_dir = os.path.join(session_results_dir, "crops")
-                        os.makedirs(crops_dir, exist_ok=True)
-                        persistent_crop = os.path.join(crops_dir, crop_filename)
-                        shutil.copy2(local_crop, persistent_crop)
-                        overlay_crop_path = persistent_crop
-                except Exception as e:
-                    print(f"[AsyncLoki] Crop failed: {e}")
-
-            # 6. Run preprocess
-            update_progress(self.session_id, 90, "Finalizing database...")
-            preprocess_slots = last_msg.get("preprocess_slots", {})
-            overlay_dest_args = []
-            if preprocess_slots:
-                overlay_file_slot = preprocess_slots.get("overlay_file")
-                if overlay_file_slot and overlay_file_slot.get("key"):
-                    overlay_dest_args = ["--output_overlay", overlay_file_slot["key"]]
-
-            cmd_pre = [
-                "conda", "run", "-n", "mjolnir",
-                "python", "run_preprocess.py",
-                "--work_dir", self.work_dir,
-                "--image", overlay_out,
-                "--mode", "overlay"
-            ] + cell_types_arg + overlay_dest_args
-
-            res = subprocess.run(cmd_pre, capture_output=True, text=True)
-            if res.returncode != 0:
-                final_msg = f"Analysis failed during database update.\n{res.stderr or res.stdout}"
-            else:
-                update_progress(self.session_id, 100, "Analysis complete")
-                final_msg = "Loki Analysis Complete. Overlay available."
-
-            # 7. Update session
-            assistant_msg = {
-                "role": "assistant",
-                "content": final_msg,
-                "timestamp": time.time(),
-                "source": "async_loki_runner"
-            }
-            if overlay_crop_path:
-                assistant_msg["images"] = [overlay_crop_path]
-                assistant_msg["content"] += "\n(Overlay crop attached for review)"
-            safe_update_session(self.session_id, assistant_msg)
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            update_progress(self.session_id, 100, "Analysis failed")
-            safe_update_session(self.session_id, {
-                "role": "assistant",
-                "content": f"Loki Analysis Failed: {e}",
-                "timestamp": time.time(),
-                "source": "async_loki_runner"
-            })
-        finally:
-            cleanup_dirs = [tmp_dir, loki_out_dir]
-            if plot_artifact_dir and not plot_artifact_dir_preexisting:
-                cleanup_dirs.append(plot_artifact_dir)
-            seen = set()
-            for d in cleanup_dirs:
-                if not d:
-                    continue
-                d = os.path.abspath(d)
-                if d in seen:
-                    continue
-                seen.add(d)
-                if os.path.isdir(d):
-                    try:
-                        shutil.rmtree(d)
-                    except Exception:
-                        pass
-
-
 def process_session(session_id):
     print(f"DEBUG: Worker started for session {session_id}")
     tmp_dir = tempfile.mkdtemp()
@@ -793,20 +539,6 @@ def process_session(session_id):
         from concurrent.futures import ThreadPoolExecutor
 
         def do_inference():
-            if "run loki analysis" in user_text.lower():
-                if local_full_images:
-                    work_dir = last_msg.get("work_dir")
-                    if work_dir:
-                        roi_path_for_loki = last_msg.get("roi_path")
-                        runner = AsyncLokiRunner(session_id, local_full_images[0], work_dir, session_id, roi_path_for_loki)
-                        runner.start()
-                        update_progress(session_id, 1, "Starting background worker...")
-                        return "Loki Analysis Started in background. You can continue chatting.", False, 0
-                    else:
-                        return "Error: 'work_dir' missing.", False, 0
-                else:
-                    return "No images found to analyze.", False, 0
-
             timestamp = time.time()
             safe_update_session(session_id, {
                 "role": "assistant",
@@ -913,23 +645,6 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
 
     if roi_path:
         new_message["roi_path"] = roi_path
-
-    # Determine preprocess overlay path for run_preprocess.py
-    target_sample_id = None
-    target_sample_id_file = None
-    try:
-        args_for_cache = vio.load_json(f'{work_dir}/user/args.json')
-        target_sample_id = args_for_cache.get("sampleId", target_sample_id)
-        original_filename = args_for_cache.get("fileName")
-        if target_sample_id and original_filename:
-            target_sample_id_file = f"{target_sample_id}-{original_filename}"
-    except Exception as e:
-        print(f"Warning: Failed to load args.json for preprocess paths: {e}")
-
-    if target_sample_id_file:
-        overlay_key = os.path.join(work_dir, "db", "cache", f"{target_sample_id_file}-gis-blend-cell-type-img.tiff")
-        new_message["preprocess_slots"] = {"overlay_file": {"key": overlay_key}}
-        print(f"Preprocess overlay path: {overlay_key}")
 
     session_data["messages"].append(new_message)
     session_data["updated_at"] = time.time()
@@ -1696,77 +1411,14 @@ def main():
     #         return dash.no_update
     #     return upload_image([filenames_upload_image], folder_id, work_dir, app_dir)
 
-    # Callback to handle upload of additional spot data
-    # Callback to handle upload of additional spot data
     @app.callback(
-        Output('gene-dropdown-spot', 'children'),
-        Input('upload-data-addition-spot-result', 'value')
+        Output('h5ad-upload-summary', 'children'),
+        Input('upload-spatial-h5ad-result', 'value')
     )
-    def callback_upload_spot_data(filenames_upload_spot_data):
-        if not filenames_upload_spot_data:
+    def callback_upload_spatial_h5ad(filenames_upload_h5ad):
+        if not filenames_upload_h5ad:
             return dash.no_update
-        return upload_spatial_h5ad([filenames_upload_spot_data], folder_id, work_dir)
-
-    # Callback to handle upload of additional cell data
-    # Callback to handle upload of additional cell data
-    @app.callback(
-        Output('gene-dropdown-cell', 'children'),
-        Input('upload-data-addition-cell-result', 'value')
-    )
-    def callback_upload_cell_data(filenames_upload_cell_data):
-        if not filenames_upload_cell_data:
-            return dash.no_update
-        upload_cell = upload_cell_data([filenames_upload_cell_data], folder_id, work_dir)
-        return upload_cell
-    
-    # Callback to handle upload of additional cell data detection
-    # Callback to handle upload of additional cell data detection
-    @app.callback(
-        Output('cell-detection-confirm', 'children'),
-        Input('upload-data-addition-cell-detection-result', 'value')
-    )
-    def callback_upload_cell_data_detection(filenames_upload_cell_data):
-        if not filenames_upload_cell_data:
-            return dash.no_update
-        upload_cell = upload_cell_data([filenames_upload_cell_data], folder_id, work_dir)
-        calculation_cell_detection(folder_id, work_dir)
-        return upload_cell
-
-    # Callback to handle upload of pathway data
-    # Callback to handle upload of pathway data
-    @app.callback(
-        Output('pathway-dropdown', 'children'),
-        Input("upload-data-pathway-result", "value")
-    )
-    def callback_upload_pathway(filenames_upload_pathway):
-        if not filenames_upload_pathway:
-            return dash.no_update
-        return upload_pathway([filenames_upload_pathway], folder_id, work_dir)
-
-    # Callback to handle upload of CNV data
-    # Callback to handle upload of CNV data
-    @app.callback(
-        Output('status7', 'children'),
-        Input("upload-data-cnv-result", "value")
-    )
-    def callback_upload_cnv(filenames_upload_cnv):
-        if not filenames_upload_cnv:
-            return dash.no_update
-        return upload_cnv([filenames_upload_cnv], folder_id, work_dir)
-
-    # Callback to handle upload of coordinate data
-    # Callback to handle upload of coordinate data
-    @app.callback(
-        Output('status9', 'children'),
-        Input("upload-data-coor-result", 'value')
-    )
-    def callback_upload_coordinate(filenames_upload_coor):
-        if not filenames_upload_coor:
-            return dash.no_update
-        return upload_coordinate([filenames_upload_coor], folder_id, work_dir)
-
-
-    # ----------------------- UI State Callbacks -----------------------
+        return upload_spatial_h5ad([filenames_upload_h5ad], folder_id, work_dir)
 
     # Toggle callback removed to prevent conflict with client-side JS
     # @app.callback(
@@ -1776,44 +1428,6 @@ def main():
     # )
     # def toggle_submit_panel(n):
     #     return "collapsed" if n % 2 == 1 else ""
-
-    # Show upload section based on data type
-    @app.callback(
-        Output('additional-data-box', 'children'),
-        Input('spot-cell-option', 'data')
-    )
-    def callback_show_cell_spot_upload(spot_cell_option):
-        return show_cell_spot_upload(spot_cell_option, folder_id, work_dir)
-
-    # Update dropdown content for data type and visualization option
-    @app.callback(
-        Output('visualize-data-upload', 'children'),
-        Input('spot-cell-option', 'data'),
-        Input('visual-type-container', 'data')
-    )
-    def callback_update_output_visual(spot_cell_option, visualize_option):
-        return update_output_visual(spot_cell_option, visualize_option, folder_id, work_dir)
-
-    # Highlight selected button for spot/cell toggle
-    @app.callback(
-        Output({'type': 'spot-cell-btn', 'index': ALL}, 'className'),
-        Input('spot-cell-option', 'data'),
-        State({'type': 'spot-cell-btn', 'index': ALL}, 'id')
-    )
-    def toggle_spot_cell_highlight(selected_value, ids):
-        return ["toggle-btn active" if btn['index'] == selected_value else "toggle-btn" for btn in ids]
-
-    # Highlight selected visualization type button
-    @app.callback(
-        Output({'type': 'vis-type-btn', 'index': ALL}, 'className'),
-        Input('visual-type-container', 'data'),
-        State({'type': 'vis-type-btn', 'index': ALL}, 'id')
-    )
-    def toggle_visual_type_highlight(selected_value, ids):
-        return [
-            "toggle-btn active" if btn['index'] == selected_value else "toggle-btn"
-            for btn in ids
-        ]
 
     # ----------------------- Upload Toggle Callback -----------------------
     # @app.callback(
@@ -1830,16 +1444,15 @@ def main():
     # Replaced @du.callback because we are using custom JS/HTML uploader now
     @app.callback(
         [Output('status1', 'children'),
-         Output('processing-job-id', 'data'),
-         Output('start-loki-analysis-btn', 'disabled')],
+         Output('processing-job-id', 'data')],
         [Input('upload-data-image-result-dash', 'value')]
     )
     def callback_on_completion(upload_path):
         print(f"DEBUG: callback_on_completion ENTRY: path={upload_path}", flush=True)
-        
+
         if not upload_path:
             print("DEBUG: upload_path is empty, ignoring.", flush=True)
-            return dash.no_update, dash.no_update, dash.no_update
+            return dash.no_update, dash.no_update
 
         if upload_path == TUTORIAL_IMAGE_PATH:
             print("DEBUG: Tutorial image selected; using prebuilt OME-TIFF without preprocessing.", flush=True)
@@ -1853,11 +1466,11 @@ def main():
                 args_json["tutorialImagePath"] = TUTORIAL_IMAGE_PATH
                 vio.dump_json(args_json, args_path)
                 status_store.update_status("tutorial", 100, "Tutorial image ready")
-                return "Tutorial image ready. Click Re-visualize Image.", "tutorial", False
+                return "Tutorial image ready. Click Re-visualize Image.", "tutorial"
             except Exception as e:
                 print(f"ERROR preparing tutorial image: {e}", flush=True)
                 status_store.update_status("tutorial", 0, f"Error: {str(e)}")
-                return f"Tutorial image error: {e}", "tutorial", True
+                return f"Tutorial image error: {e}", "tutorial"
 
         filenames = [upload_path]
         print(f"DEBUG: callback_on_completion PROCESSING {upload_path}", flush=True)
@@ -1909,43 +1522,8 @@ def main():
 
         t = threading.Thread(target=run_processing_safe)
         t.start()
-        
-        # Loki temporarily disabled — keep button disabled after upload too
-        return "File uploaded. Starting processing...", job_id, True
 
-    # ----------------------- Check Existing File Callback -----------------------
-    @app.callback(
-        Output('start-loki-analysis-btn', 'disabled', allow_duplicate=True),
-        [Input('url', 'pathname'),
-         Input('visual-input', 'n_clicks')],
-        prevent_initial_call='initial_duplicate'
-    )
-    def check_loki_btn_state(pathname, n_clicks):
-        # Loki temporarily disabled
-        return True
-        try:
-             # Look for args.json to get sampleId
-             # work_dir and folder_id are available in main() scope
-             # Note: folder_id is usually empty string based on current code
-             args_path = f'{work_dir}/user{folder_id}/args.json'
-             if vio.exists(args_path):
-                 args_json = vio.load_json(args_path)
-                 if args_json.get("tutorialImagePath"):
-                     print("DEBUG: Tutorial image is active. Enabling Start Loki Button.")
-                     return False
-                 sample_id = args_json.get('sampleId')
-                 if sample_id:
-                     # Check if image exists in S3
-                     image_s3_path = f"{work_dir}/db/data/{sample_id}-wsi-img.tiff"
-                     if vio.exists(image_s3_path):
-                         print(f"DEBUG: Image found at {image_s3_path}. Enabling Start Loki Button.")
-                         return False # Disabled = False -> Enabled
-                     else:
-                         print(f"DEBUG: Image NOT found at {image_s3_path}.")
-        except Exception as e:
-            print(f"DEBUG: Error checking loki button state: {e}")
-        
-        return dash.no_update
+        return "File uploaded. Starting processing...", job_id
 
     # ----------------------- Progress Bar Callback -----------------------
     # ----------------------- Progress Bar Callback -----------------------
@@ -1988,141 +1566,19 @@ def main():
     #         
     #     return bar_ui, stop_interval
 
-    # Update selected value for data type (spot or cell)
-    @app.callback(
-        Output('spot-cell-option', 'data'),
-        Input({'type': 'spot-cell-btn', 'index': ALL}, 'n_clicks'),
-        State({'type': 'spot-cell-btn', 'index': ALL}, 'id')
-    )
-    def update_spot_cell_value(n_clicks, ids):
-        if not any(n_clicks):
-            return dash.no_update
-        return ctx.triggered_id['index']
-
-    # Update selected value for visualization type
-    @app.callback(
-        Output('visual-type-container', 'data'),
-        Input({'type': 'vis-type-btn', 'index': ALL}, 'n_clicks'),
-        State({'type': 'vis-type-btn', 'index': ALL}, 'id'),
-        State('visual-type-container', 'data'),
-        prevent_initial_call=True
-    )
-    def update_visual_type_value(n_clicks, ids, current_value):
-        if not any(n_clicks):
-            return dash.no_update
-
-        triggered_id = ctx.triggered_id
-        if not triggered_id:
-            return dash.no_update
-
-        clicked_index = triggered_id['index']
-        if clicked_index == current_value:
-            return None
-        else:
-            return clicked_index
-
-
     # ----------------------- Visualization + Tools -----------------------
 
-    # Generate pathway overlay visualization
-    @app.callback(
-        Output('input-image', 'children', allow_duplicate=True),
-        Input('spot-cell-option', 'data'),
-        Input('pathway-input-container', 'value'),
-        prevent_initial_call='initial_duplicate'
-    )
-    def callback_get_pathway_output(spot_cell_option, pathway_value):
-        return get_pathway_output(spot_cell_option, pathway_value, folder_id, work_dir)
-
-    # Generate gene overlay visualization
-    @app.callback(
-        Output('input-image', 'children', allow_duplicate=True),
-        Input('spot-cell-option', 'data'),
-        Input('gene-input-container', 'value'),
-        prevent_initial_call='initial_duplicate'
-    )
-    def callback_get_gene(spot_cell_option, gene_chosen):
-        print("gene_chosen", gene_chosen)
-        print("spot_cell_option", spot_cell_option)
-        return get_gene(spot_cell_option, gene_chosen, folder_id, work_dir)
-
-    # Adjust vmin/vmax for cell gene expression
-    @app.callback(
-        Output('input-image', 'children', allow_duplicate=True),
-        Input('cell-vminmax-button', 'n_clicks'),
-        Input('cell-input-min', 'value'),
-        Input('cell-input-max', 'value'),
-        prevent_initial_call='initial_duplicate'
-    )
-    def callback_cell_vmin_vmax(n_clicks, vmin, vmax):
-        if ctx.triggered_id == 'cell-vminmax-button':
-            return cell_vmin_vmax(n_clicks, vmin, vmax, folder_id, work_dir)
-        return dash.exceptions.PreventUpdate
-
-    # Adjust vmin/vmax for spot gene expression
-    @app.callback(
-        Output('input-image', 'children', allow_duplicate=True),
-        Input('spot-vminmax-button', 'n_clicks'),
-        Input('spot-input-min', 'value'),
-        Input('spot-input-max', 'value'),
-        prevent_initial_call='initial_duplicate'
-    )
-    def callback_spot_vmin_vmax(n_clicks, vmin, vmax):
-        if ctx.triggered_id == 'spot-vminmax-button':
-            return spot_vmin_vmax(n_clicks, vmin, vmax, folder_id, work_dir)
-        return dash.exceptions.PreventUpdate
-
     # Reset visualization and refresh rendering
+
     @app.callback(
         Output('input-image', 'children', allow_duplicate=True),
         Input("visual-input", "n_clicks"),
-        Input('spot-cell-option', 'data'),
-        Input('visual-type-container', 'data'),
         prevent_initial_call='initial_duplicate'
     )
-    def callback_reset(n_clicks, spot_cell_option, visual_type):
-        # Auto-switch to "CNV" (Cell Type) if Re-visualize is clicked and analysis results exist
-        if ctx.triggered_id == "visual-input" and n_clicks:
-             try:
-                 # Check if cell type overlay exists
-                 args = vio.load_json(f'{work_dir}/user{folder_id}/args.json')
-                 if args.get("tutorialImagePath"):
-                     print("DEBUG: Tutorial image is active. Using mock CNV overlay for layer controls.")
-                     visual_type = "CNV"
-                     spot_cell_option = "Cell data"
-                     return reset(n_clicks, spot_cell_option, visual_type, folder_id, work_dir)
-
-                 sample_id_file = args.get('sampleIdFile')
-                 overlay_candidates = []
-                 if sample_id_file:
-                     overlay_candidates.append(f"{work_dir}/db/cache/{sample_id_file}-gis-blend-cell-type-img.tiff")
-                 
-                 existing_overlay = next((path for path in overlay_candidates if vio.exists(path)), None)
-                 print(f"DEBUG: Loki overlay candidates: {overlay_candidates}; found={existing_overlay}")
-                 if existing_overlay:
-                     print("Loki results detected! Switching to CNV overlay view.")
-                     visual_type = "CNV"
-                     # Also ensure we are in "Cell data" mode?
-                     spot_cell_option = "Cell data" 
-                 elif visual_type == "CNV":
-                     print("DEBUG: CNV overlay not found. Showing base image instead.", flush=True)
-                     visual_type = None
-             except Exception as e:
-                 print(f"Error checking for Loki results: {e}")
-                 
-        return reset(n_clicks, spot_cell_option, visual_type, folder_id, work_dir)
-
+    def callback_reset(n_clicks):
+        return reset(n_clicks, None, None, folder_id, work_dir)
 
     # ----------------------- Save & Export -----------------------
-
-    # Trigger download of saved data
-    @app.callback(
-        Output('download', 'data'),
-        Input('btn_save', 'n_clicks'),
-        prevent_initial_call=True
-    )
-    def callback_copy_and_rename_file(n_clicks):
-        return copy_and_rename_file(n_clicks, folder_id, work_dir, zip=True)
 
     # Save ROI from drawing tool and show ROI marker genes
     @app.callback(
@@ -2174,17 +1630,6 @@ def main():
                 html.Div("Could not calculate ROI genes.", className="roi-gene-empty"),
             ])
 
-    # (show_mouse_position removed - VivViewer does not emit clickData)
-
-    # Run similar-cell search and output result
-    @app.callback(
-        Output('status8', 'data'),
-        Input('btn_find', 'n_clicks'),
-        prevent_initial_call='initial_duplicate'
-    )
-    def callbackcell_selection_interface(n_clicks):
-        return cell_selection_interface(n_clicks, folder_id, work_dir)
-
 
     timer = threading.Timer(7200, clear_cache_forcall, args=(VALID_TOKEN, work_dir))
     timer.daemon = True
@@ -2193,224 +1638,18 @@ def main():
     # Clear temp data and exit app
     @app.callback(
         Output('status6', 'children'),
-        Output('start-loki-analysis-btn', 'disabled', allow_duplicate=True),
         Input('clear-cache', 'n_clicks'),
         prevent_initial_call=True
     )
     def callback_clear_cache_forcall(n_clicks):
         print(f"DEBUG: Clear Cache Clicked. n_clicks={n_clicks}")
-        
+
         if n_clicks > 0:
             print("DEBUG: Executing clear_cache_forcall...")
             # We don't check for existence anymore, we just force exit
             clear_cache_forcall(VALID_TOKEN, work_dir)
-            return None, True
-        return dash.no_update, dash.no_update
-
-    @app.callback(
-        Output("input-image", "children", allow_duplicate=True),
-        Output("loki-interval", "disabled"),
-        Output("loki-progress-container", "style"),
-        Output("cancel-loki-btn", "disabled", allow_duplicate=True),
-        Output("cancel-loki-btn", "style", allow_duplicate=True),
-        Input("start-loki-analysis-btn", "n_clicks"),
-        prevent_initial_call=True
-    )
-    def start_loki_analysis(n_clicks):
-        if n_clicks:
-            print("Start Loki analysis clicked - Triggering Chat Job")
-            
-            # Use the token as session_id (same as chat api)
-            session_id = args.token 
-
-            # CLEANUP: Remove any stale cancel signal from previous runs
-            try:
-                cancel_path = os.path.join(CHAT_DIR, session_id, "cancel_signal")
-                if os.path.exists(cancel_path):
-                    os.remove(cancel_path)
-                    print(f"DEBUG: Cleaned up stale cancel_signal for {session_id}")
-            except: pass
-            
-            # Construct the prompt
-            prompt = "run loki analysis"
-            
-            # We don't attach new images here, we assume the context is already set via enqueue_chat_job
-            # But we should probably check if an image is loaded in work_dir to be safe?
-            # actually chat_api handles looking up the image from work_dir.
-            # So we just need to enqueue the message.
-            
-            try:
-                # Reuse the logic from chat_api's enqueue
-                # But we need to call enqueue_chat_job which is def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None)
-                
-                # Retrieve Work Dir & Image Path (similar to chat_api)
-                # Image is in work_dir/db/data/{sample_id}-wsi-img.tiff
-                try:
-                    args_json = vio.load_json(f'{work_dir}/user/args.json')
-                    sample_id = args_json.get('sampleId', 'default')
-                    sample_id_file = args_json.get('sampleIdFile')
-                except:
-                    args_json = {}
-                    sample_id = "default"
-                    sample_id_file = None
-                
-
-                image_s3_path = args_json.get("tutorialImagePath") or f"{work_dir}/db/data/{sample_id}-wsi-img.tiff"
-                images = []
-                if vio.exists(image_s3_path):
-                     images.append(image_s3_path)
-                print(f"DEBUG: Start Loki sample_id={sample_id}, sample_id_file={sample_id_file}, image={image_s3_path}, exists={bool(images)}")
-
-                if sample_id_file:
-                    overlay_s3_path = f"{work_dir}/db/cache/{sample_id_file}-gis-blend-cell-type-img.tiff"
-                    try:
-                        if vio.exists(overlay_s3_path):
-                            vio.remove(overlay_s3_path)
-                            print(f"DEBUG: Removed stale Loki overlay before new run: {overlay_s3_path}")
-                    except Exception as e:
-                        print(f"Warning: Failed to remove stale Loki overlay {overlay_s3_path}: {e}")
-                
-                # Enqueue the job
-                status = enqueue_chat_job(
-                    session_id=session_id,
-                    model="qwen2.5vl:72b", # Default model
-                    prompt=prompt,
-                    images=images,
-                    work_dir=work_dir,
-                    roi_path=None, # No specific ROI from button click yet
-                    visible=False  # HIDE from Chat UI
-                )
-                
-                # --- FIX: Reset Status to avoid "100%" flash from previous run ---
-                try:
-                    reset_status = {
-                        "percent": 0,
-                        "message": "Initializing...",
-                        "status": "queued",
-                        "timestamp": time.time()
-                    }
-                    status_dir = os.path.join(CHAT_DIR, session_id)
-                    os.makedirs(status_dir, exist_ok=True)
-                    status_path = os.path.join(status_dir, "loki_status.json")
-                    with open(status_path, 'w') as sf:
-                        json.dump(reset_status, sf)
-                    print(f"DEBUG: Reset loki_status.json for {session_id}")
-                except Exception as e:
-                    print(f"Error resetting status: {e}")
-                # -------------------------------------------------------------
-                
-                # Enable Cancel Button (False = Enabled) AND make it visible (display: block)
-                # Ensure the progress bar becomes visible immediately
-                # Return dash.no_update to keep the current image/content visible
-                return dash.no_update, False, {'display': 'block', 'marginTop': '15px'}, False, {'width': '35%', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto', 'textAlign': 'center', 'display': 'block'}
-                return dash.no_update, False, {'display': 'block', 'marginTop': '15px'}
-                
-            except Exception as e:
-                print(f"Error starting analysis: {e}")
-                return html.Div([
-                    html.Br(), html.H3(f"Error: {e}", style={'color': 'red', 'textAlign': 'center'})
-                ]), True, {'display': 'none'}, True, {'display': 'none'}
-                
-        return dash.no_update, dash.no_update, dash.no_update
-
-    # Restore progress bar state on page reload
-    @app.callback(
-        Output("loki-interval", "disabled", allow_duplicate=True),
-        Output("loki-progress-container", "style", allow_duplicate=True),
-        Output("cancel-loki-btn", "style", allow_duplicate=True),
-        Input("url", "pathname"),
-        prevent_initial_call="initial_duplicate"
-    )
-    def restore_progress_state(pathname):
-        # Always hide progress bar on page load
-        # It should only appear when the user clicks "Start Loki Analysis"
-        return True, {'display': 'none'}, {'display': 'none'}
-
-
-    @app.callback(
-        Output("loki-progress-bar", "style"),
-        Output("loki-progress-percent", "children"),
-        Output("loki-progress-label", "children"),
-        Output("loki-interval", "disabled", allow_duplicate=True),
-        Output("cancel-loki-btn", "style", allow_duplicate=True),
-        Input("loki-interval", "n_intervals"),
-        prevent_initial_call=True
-    )
-    def update_loki_progress(n):
-        session_id = args.token
-        status_path = os.path.join(CHAT_DIR, session_id, "loki_status.json")
-
-        try:
-            if not os.path.exists(status_path):
-                return {'width': '0%'}, "0%", "Waiting for worker...", False, dash.no_update
-
-            with open(status_path) as sf:
-                status_data = json.load(sf)
-
-            percent = status_data.get("percent", 0)
-            message = status_data.get("message", "Processing...")
-            status = status_data.get("status", "processing")
-
-            bar_style = {'width': f'{percent}%', 'height': '100%', 'backgroundColor': '#0071e3', 'transition': 'width 0.5s ease'}
-
-            if status == "done" or percent >= 100:
-                return bar_style, "100%", "Complete", True, {'display': 'none'}
-
-            return bar_style, f"{percent}%", message, False, {'width': '35%', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto', 'textAlign': 'center', 'display': 'block'}
-
-        except Exception as e:
-            print(f"Error poll loki status: {e}")
-            return {'width': '0%', 'backgroundColor': 'red'}, "Error", "Connection Error", True, {'display': 'none'}
-
-    # --- CANCEL LOKI ANALYSIS ---
-    @app.callback(
-        Output("loki-interval", "disabled", allow_duplicate=True),
-        Output("loki-progress-label", "children", allow_duplicate=True),
-        Output("loki-progress-bar", "style", allow_duplicate=True),
-        Output("cancel-loki-btn", "disabled"),
-        Output("start-loki-analysis-btn", "disabled", allow_duplicate=True),
-        Output("cancel-loki-btn", "style", allow_duplicate=True),
-        Input("cancel-loki-btn", "n_clicks"),
-        State("loki-interval", "disabled"),
-        prevent_initial_call=True
-    )
-    def cancel_loki_analysis(n_clicks, interval_disabled):
-        if not n_clicks:
-            return dash.no_update
-        
-        print("DEBUG: Cancel Loki Analysis Triggered.")
-        session_id = args.token
-        
-        # 1. Write Cancel Signal File (Robust Semaphore)
-        try:
-            cancel_dir = os.path.join(CHAT_DIR, session_id)
-            os.makedirs(cancel_dir, exist_ok=True)
-            with open(os.path.join(cancel_dir, "cancel_signal"), 'w') as csf:
-                csf.write("")
-            print(f"DEBUG: Wrote cancel_signal for {session_id}")
-        except Exception as e:
-            print(f"DEBUG: Failed to write cancel signal: {e}")
-
-        # 2. Update Status to Cancelled (Visual Only)
-        try:
-            cancel_status = {
-                "percent": 0,
-                "message": "Cancelled by user.",
-                "status": "cancelled",
-                "timestamp": time.time()
-            }
-            cancel_dir = os.path.join(CHAT_DIR, session_id)
-            os.makedirs(cancel_dir, exist_ok=True)
-            with open(os.path.join(cancel_dir, "loki_status.json"), 'w') as sf:
-                json.dump(cancel_status, sf)
-        except: pass
-
-        # 3. Disable Interval, Update UI
-        bar_style = {'width': '0%', 'backgroundColor': '#ff3b30'}
-        # Keep cancel disabled after clicking, re-enable start
-        # AND HIDE CANCEL BUTTON
-        return True, "Cancelled", bar_style, True, False, {'display': 'none'}
-
+            return None
+        return dash.no_update
 
     # --- OLLAMA WARMUP ---
     def warmup_ollama():
@@ -2433,7 +1672,6 @@ def main():
     threading.Thread(target=warmup_ollama, daemon=True).start()
 
     # Launch browser and run app
-    # threading.Thread(target=open_browser, args=(HOST, args.port, args.token)).start()
     app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=True)
 
 

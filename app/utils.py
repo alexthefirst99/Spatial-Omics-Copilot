@@ -12,11 +12,3 @@ def setup_work_dir():
     return work_dir
 
 
-def open_browser(host, port, token):
-    import os
-    import webbrowser
-    import time
-
-    time.sleep(1)
-    if not os.environ.get("WERKZEUG_RUN_MAIN"):
-        webbrowser.open_new(f'http://{host}:{port}/app/{token}')

@@ -4,12 +4,9 @@ from niceview.utils.cell import paint_regions
 import numpy as np
 from scipy.sparse import load_npz
 import cv2
-from shapely.geometry import Point, Polygon
 import os
-import copy
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import re
 
 import niceview.utils.io as vio
 
@@ -36,23 +33,6 @@ def txt_to_list(txt_file):
     return lines
 
 
-def list_to_txt(lines, txt_file):
-    """Write lines of a list to a txt file.
-
-    Args:
-        lines (list of str): list of string of lines to be written
-        txt_file (str): txt file path
-    
-    Returns:
-        txt_file (str): txt file path
-    """
-    with open(txt_file, 'w') as txt:
-        for line in lines:
-            txt.write(line)
-            txt.write('\n')
-    return txt_file
-
-
 def select_col_from_name(matrix, name_list, name):
     """Select column from matrix by name.
     
@@ -68,64 +48,6 @@ def select_col_from_name(matrix, name_list, name):
     if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
         return matrix[:, idx]
     return matrix.tocsr()[:, idx].todense()
-
-
-def _vmax_vmin_gene_exp(arr, vmax=None , vmin=None):
-    """
-    Get vmin vmax for specific gene in adata
-
-    Parameters:
-        arr (arr): gene expression array for one gene
-        gene (str): gene name
-        vmax(str,float): vmax, you can use percentage (p99) or float
-        vmin(str,float): vmin, you can use percentage (p0) or float
-    Returns:
-        adata
-    """
-    if vmin is not None and vmax is not None:
-        if isinstance(vmin, float) and isinstance(vmax, float):
-            vmin_q = vmin
-            vmax_q =vmax
-            min_max_q = np.clip(arr,a_max=vmax_q,a_min=vmin_q)
-            return min_max_q
-        else:
-            vmin = re.search(r'p(\d+)', vmin)
-            vmin = int(vmin.group(1))
-            vmin = vmin / 100
-            vmax = re.search(r'p(\d+)', vmax)
-            vmax = int(vmax.group(1))
-            vmax = vmax / 100
-            vmin_q = np.quantile(arr, vmin)
-            vmax_q = np.quantile(arr, vmax)
-            min_max_q = np.clip(arr,a_max=vmax_q,a_min=vmin_q)
-            return min_max_q
-    elif vmax is not None:
-        if isinstance(vmax, float):
-            vmax_q =vmax
-            vmax_q = np.clip(arr,a_max=vmax_q,a_min=arr.min())
-            return vmax_q
-        else:
-            vmax = re.search(r'p(\d+)', vmax)
-            vmax = int(vmax.group(1))
-            vmax = vmax / 100
-            vmax_q = np.quantile(arr, vmax)
-            vmax_q = np.clip(arr,a_max=vmax_q,a_min=arr.min())
-            return vmax_q
-    elif vmin is not None :
-        if isinstance(vmin, float): 
-            vmin_q = vmin
-            vmin_q = np.clip(arr,a_max=arr.max(),a_min=vmin_q)
-            return vmin_q
-        else:
-            vmin = re.search(r'p(\d+)', vmin)
-            vmin = int(vmin.group(1))
-            vmin = vmin / 100
-            vmin_q = np.quantile(arr, vmin)
-            vmin_q = np.clip(arr,a_max=arr.max(),a_min=vmin_q)
-            return vmin_q
-    
-    elif vmax is None or vmin is None:
-        return arr
 
 
 def normalize_array(arr, new_min, new_max, vmin=None, vmax=None):
@@ -445,96 +367,6 @@ def blend(img_path, mask_path, mask_opacity, heatmap=False):
     mask_ovelay = cv2.addWeighted(mask_img, mask_opacity, bkgd_blend, 1.0 - mask_opacity, 0)
     whole_img = cv2.addWeighted(mask_ovelay, 1.0, bkgd_non_blend, 1.0, 0)
     return whole_img
-
-
-def get_bounding_box(coords):
-    """Get bounding box of coordinates.
-    
-    Args:
-        coords (list of tuple): list of coordinates.
-    
-    Returns:
-        tuple: bounding box.
-    """
-    x_coords, y_coords = zip(*coords)
-    x1, y1 = min(x_coords), min(y_coords)
-    x2, y2 = max(x_coords), max(y_coords)
-    return x1, y1, x2, y2
-
-
-def save_roi_data_img(coords, adata, img, home_dir, resized_coords=None, spot_cell="cell"):
-    """Get roi from coordinates.
-    
-    Args:
-        coords (list of tuple): original coords.
-        adata (anndata.AnnData): anndata.
-        img (np.ndarray): image.
-        home_dir (str): home directory.
-        coords_temp (list of tuple): list of coordinates for rois in the rescaled image. (if the image is not rescaled, it is the same as coords)
-    """
-    for idx, coord in enumerate(coords):
-        
-        if adata is not None:
-            # because adata input can be original or regized so this does not matter
-            # the coords and adata will always be the same scale
-            roi = Polygon(coord)
-            locs = list(map(lambda x: roi.contains(Point(x)), adata.obsm['spatial']))
-            to_keep = adata[locs].copy()
-            if spot_cell == "cell":
-                h5ad_path = os.path.join(home_dir, f'roi-{idx}.h5ad')
-                if vio.is_s3(h5ad_path):
-                     # Write to temp file then upload
-                     import tempfile
-                     with tempfile.NamedTemporaryFile(suffix=".h5ad", delete=False, dir=TEMP_DIR) as tmp:
-                         to_keep.write_h5ad(tmp.name)
-                         tmp_path = tmp.name
-                     vio.copy(tmp_path, h5ad_path)
-                     os.remove(tmp_path)
-                else:
-                    to_keep.write_h5ad(h5ad_path)
-            else:
-                h5ad_path = os.path.join(home_dir, f'roi-{idx}-spot.h5ad')
-                if vio.is_s3(h5ad_path):
-                     import tempfile
-                     with tempfile.NamedTemporaryFile(suffix=".h5ad", delete=False, dir=TEMP_DIR) as tmp:
-                         to_keep.write_h5ad(tmp.name)
-                         tmp_path = tmp.name
-                     vio.copy(tmp_path, h5ad_path)
-                     os.remove(tmp_path)
-                else:
-                    to_keep.write_h5ad(h5ad_path)
-
-    for idx, coord_tmp in enumerate(resized_coords):    
-        # save image
-        # save region image based on resized_coords
-        # the wsi is still resized to 10k
-        x1, y1, x2, y2 = get_bounding_box(coord_tmp)
-        pts = np.array(coord_tmp, np.int32).reshape((-1, 1, 2))
-        img_copy = copy.deepcopy(img)
-        cv2.polylines(img_copy, [pts], isClosed=True, color=(255, 0, 0), thickness=4)
-        cropped_region = img_copy[y1:y2, x1:x2]
-        
-
-        # save big images with marked the region
-        cv2.polylines(img_copy, [pts], isClosed=True, color=(255, 0, 0), thickness=20)
-        height, width, _ = img_copy.shape
-        max_dim = max(height, width)
-        resize_factor = 2000 / max_dim
-        resized_img_marked = cv2.resize(img_copy, (int(width * resize_factor), int(height * resize_factor)))
-        
-
-        # save whole image without marked
-        img_non = copy.deepcopy(img)    
-        resized_img_non = cv2.resize(img_non, (int(width * resize_factor), int(height * resize_factor)))
-
-        if spot_cell == "cell":
-            vio.write_image(os.path.join(home_dir, f'roi-{idx}.jpeg'), cropped_region)
-            vio.write_image(os.path.join(home_dir, f'whole-marked-{idx}.jpeg'), resized_img_marked)
-            vio.write_image(os.path.join(home_dir, f'whole.jpeg'), resized_img_non)
-        else:
-            vio.write_image(os.path.join(home_dir, f'roi-{idx}-spot.jpeg'), cropped_region)
-            vio.write_image(os.path.join(home_dir, f'whole-marked-{idx}-spot.jpeg'), resized_img_marked)
-            vio.write_image(os.path.join(home_dir, f'whole-spot.jpeg'), resized_img_non)
 
 
 def quantile_to_number(input_str, arr):

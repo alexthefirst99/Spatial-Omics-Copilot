@@ -125,9 +125,10 @@ function initApp() {
       imagePaths.forEach((path) => {
         const token = getSessionID();
         const img = document.createElement("img");
-        // Route through proxy
-        img.src = `/app/${token}/preview?path=${encodeURIComponent(path)}`;
-        img.onclick = () => window.open(img.src, "_blank");
+        // Cache-bust so the browser always fetches the latest crop file
+        const freshSrc = `/app/${token}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
+        img.src = freshSrc;
+        img.onclick = () => window.open(freshSrc, "_blank");
         thumbs.appendChild(img);
       });
 
@@ -317,23 +318,21 @@ function initApp() {
                 lokiBtn.disabled = false;
               }
 
-              // If images arrived late (e.g. after streaming started)
-              // We might need to append them if they weren't there initially.
-              // But addMessage handled it initially. 
-              // If new images appeared at 'done' (like crops), we should append them.
+              // Always replace thumbs on done so we show the final correct crop,
+              // not whatever stale path was present during the streaming phase.
               if (pollData.images && pollData.images.length > 0) {
-                // Check if thumbs already exist
-                if (!aiMsgElement.querySelector(".roi-thumbs")) {
-                  const thumbs = document.createElement("div");
-                  thumbs.className = "roi-thumbs";
-                  pollData.images.forEach((path) => {
-                    const img = document.createElement("img");
-                    img.src = `/app/${token}/preview?path=${encodeURIComponent(path)}`;
-                    img.onclick = () => window.open(img.src, "_blank");
-                    thumbs.appendChild(img);
-                  });
-                  aiMsgElement.appendChild(thumbs);
-                }
+                const existing = aiMsgElement.querySelector(".roi-thumbs");
+                if (existing) existing.remove();
+                const thumbs = document.createElement("div");
+                thumbs.className = "roi-thumbs";
+                pollData.images.forEach((path) => {
+                  const img = document.createElement("img");
+                  const freshSrc = `/app/${token}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
+                  img.src = freshSrc;
+                  img.onclick = () => window.open(freshSrc, "_blank");
+                  thumbs.appendChild(img);
+                });
+                aiMsgElement.appendChild(thumbs);
               }
             }
 

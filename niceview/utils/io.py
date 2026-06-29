@@ -99,10 +99,6 @@ def read_h5ad(path):
     return sc.read_h5ad(path)
 
 
-def save_pil_image(img, path, **kwargs):
-    img.save(path, **kwargs)
-
-
 def open_raster(path, mode='r', **kwargs):
     return rasterio.open(path, mode, **kwargs)
 
@@ -119,25 +115,4 @@ def save_npz(path, matrix):
     scipy_save_npz(path, matrix)
 
 
-def write_list_to_txt(lst, path):
-    with open(path, 'w') as f:
-        for item in lst:
-            f.write(f"{item}\n")
 
-
-def write_csv(df, path, **kwargs):
-    df.to_csv(path, **kwargs)
-
-
-def zip_folder(folder_path, output_path):
-    import zipfile
-    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(folder_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, folder_path)
-                zipf.write(file_path, arcname)
-
-
-# Keep old name as alias for compatibility
-zip_folder_s3 = zip_folder

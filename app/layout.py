@@ -121,8 +121,6 @@ def create_layout(work_dir, folder_id):
     return html.Div(
     id="body",
     children=[
-        dcc.Store(id='spot-cell-option', storage_type='memory'),
-        dcc.Store(id='visual-type-container', storage_type='memory'),
         dcc.Location(id='url', refresh=False),
 
         html.Link(
@@ -220,12 +218,12 @@ def create_layout(work_dir, folder_id):
                     html.H5("Upload Gene Expression Matrix", className="text", style={"fontWeight": "600", "marginBottom": "5px"}),
                     html.P("Spatial transcriptomics data (.h5ad):", className="text", style={"fontSize": "14px", "marginBottom": "5px"}),
                     S3Upload(
-                        id="upload-data-addition-spot-result",
+                        id="upload-spatial-h5ad-result",
                         primary_text="Drag and drop h5ad file here",
                         file_types="Supports: .h5ad gene expression matrix",
                         accept=".h5ad"
                     ),
-                    html.Div(id="gene-dropdown-spot", className="omics-upload-result")
+                    html.Div(id="h5ad-upload-summary", className="omics-upload-result")
                 ]),
 
                 # -------------------------------------------------------------
@@ -255,54 +253,15 @@ def create_layout(work_dir, folder_id):
                                         html.Br(),
                                         # Removed Direct-to-S3 section as requested
                                         html.Br(),
-                                        html.Div([
-                                            html.Button(
-                                                "Start Loki Analysis",
-                                                id="start-loki-analysis-btn",
-                                                className="btn btn-primary",
-                                                style={'display': 'none'},
-                                                disabled=True
-                                            ),
-                                            
-                                            
-                                            # Progress Bar Section
-                                            html.Div(id="loki-progress-container", style={'display': 'none', 'marginTop': '15px'}, children=[
-                                                html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '5px'}, children=[
-                                                    html.Span(id="loki-progress-label", children="Initializing...", style={'fontSize': '12px', 'fontWeight': 'bold'}),
-                                                    html.Span(id="loki-progress-percent", children="0%", style={'fontSize': '12px'})
-                                                ]),
-                                                html.Div(style={'width': '100%', 'height': '8px', 'backgroundColor': '#e5e5ea', 'borderRadius': '4px', 'overflow': 'hidden'}, children=[
-                                                    html.Div(id="loki-progress-bar", style={'width': '0%', 'height': '100%', 'backgroundColor': '#0071e3', 'transition': 'width 0.5s ease'})
-                                                ]),
-                                            ]),
-                                            dcc.Interval(id="loki-interval", interval=2000, disabled=True)
-                                            
-                                        ], style={'textAlign': 'center', 'marginTop': '10px'}),
-                                        html.Button(
-                                                "Cancel", 
-                                                id="cancel-loki-btn", 
-                                                className="upload-cancel-btn", 
-                                                style={'width': '35%', 'marginTop': '0', 'textAlign': 'center', 'justifyContent': 'center', 'display': 'none'}, 
-                                                disabled=True
-                                            ),
                                         html.Br(),
-                                        custom_spinner(html.Div(id="visualize-data-upload")),
                                         html.Button('END SESSION', className="button btn-danger", id="clear-cache", n_clicks=0, style={'backgroundColor': '#ff3b30', 'color': 'white'}),
                                         html.P(["If you had not clicked END SESSION",html.Br(),"you can still visualize your latest data without re-upload"], className="text upload-instructions", style={"fontSize": "13px", "color": "#666", "lineHeight": "1.4"}),
-                                        html.Div(id='mouse-position'),
                                         # Hidden status loaders grouped to prevent flex-gap usage
                                         # change hash color to black
                                         html.Div([
                                             custom_spinner(html.Div(id="status1")),
-                                            custom_spinner(html.Div(id="status2")),
-                                            custom_spinner(dcc.Download(id="download")),
                                             custom_spinner(html.Div(id="status5")),
                                             custom_spinner(html.Div(id="status6")),
-                                            custom_spinner(html.Div(id="status7")),
-                                            custom_spinner(dcc.Download(id="status8")), # Keeping status8 as Download if unchanged elsewhere, but user error mentioned status9
-                                            custom_spinner(html.Div(id="status9")),
-                                            dcc.Input(id='pathway-input-container', value='', style={'display': 'none'}),
-                                            dcc.Input(id='gene-input-container', value='', style={'display': 'none'}),
                                         ], style={'display': 'none'}),
                                     ]
                                 ),
