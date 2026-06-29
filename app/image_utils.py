@@ -9,7 +9,7 @@ from PIL import Image as _PILImage
 _PILImage.MAX_IMAGE_PIXELS = None
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-TMP_BASE = os.environ.get('LOKI_TMP_BASE', os.path.join(_PROJECT_ROOT, 'tmp_data'))
+TMP_BASE = os.environ.get('COPILOT_TMP_BASE', os.path.join(_PROJECT_ROOT, 'tmp_data'))
 os.makedirs(TMP_BASE, exist_ok=True)
 
 OME_CACHE_LOCKS = {}

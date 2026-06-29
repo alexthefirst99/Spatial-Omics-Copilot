@@ -53,19 +53,19 @@ if _LOCAL_DASH_VIV_VIEWER not in sys.path:
     sys.path.insert(0, _LOCAL_DASH_VIV_VIEWER)
 
 # Directory for chat session JSON files
-CHAT_DIR = os.environ.get('LOKI_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))
+CHAT_DIR = os.environ.get('COPILOT_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))
 os.makedirs(CHAT_DIR, exist_ok=True)
 
-# Tutorial image — set LOKI_TUTORIAL_IMAGE env var to point to a local file
+# Tutorial image — set COPILOT_TUTORIAL_IMAGE env var to point to a local file
 TUTORIAL_IMAGE_PATH = os.environ.get(
-    'LOKI_TUTORIAL_IMAGE',
+    'COPILOT_TUTORIAL_IMAGE',
     os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif')
 )
-TUTORIAL_SAMPLE_ID = "loki-tutorial"
-TUTORIAL_SAMPLE_ID_FILE = "loki-tutorial-file-name"
+TUTORIAL_SAMPLE_ID = "copilot-tutorial"
+TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 # Base directory for temp/cache files (use /tmp or a configurable path)
-TMP_BASE = os.environ.get('LOKI_TMP_BASE', os.path.join(_PROJECT_ROOT, 'tmp_data'))
+TMP_BASE = os.environ.get('COPILOT_TMP_BASE', os.path.join(_PROJECT_ROOT, 'tmp_data'))
 os.makedirs(TMP_BASE, exist_ok=True)
 
 # Import custom layout and utilities

@@ -25,11 +25,11 @@ except ImportError:
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 TUTORIAL_IMAGE_PATH = os.environ.get(
-    'LOKI_TUTORIAL_IMAGE',
+    'COPILOT_TUTORIAL_IMAGE',
     os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif')
 )
-TUTORIAL_SAMPLE_ID = "loki-tutorial"
-TUTORIAL_SAMPLE_ID_FILE = "loki-tutorial-file-name"
+TUTORIAL_SAMPLE_ID = "copilot-tutorial"
+TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 try:
     from niceview.interface.callback import build_roi_gene_context

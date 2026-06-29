@@ -5,7 +5,7 @@ import time
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-CHAT_DIR = os.environ.get('LOKI_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))
+CHAT_DIR = os.environ.get('COPILOT_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))
 os.makedirs(CHAT_DIR, exist_ok=True)
 
 

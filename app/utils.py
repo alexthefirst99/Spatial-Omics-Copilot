@@ -6,9 +6,9 @@ def setup_work_dir():
     import uuid
 
     date_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    base = os.environ.get("LOKI_WORKDIR_BASE", os.path.join(os.path.expanduser("~"), "loki_workdirs"))
+    base = os.environ.get("COPILOT_WORKDIR_BASE", os.path.join(os.path.expanduser("~"), "copilot_workdirs"))
     os.makedirs(base, exist_ok=True)
-    work_dir = os.path.join(base, f"Loki_{date_time}_{str(uuid.uuid4())}")
+    work_dir = os.path.join(base, f"Copilot_{date_time}_{str(uuid.uuid4())}")
     return work_dir
 
 

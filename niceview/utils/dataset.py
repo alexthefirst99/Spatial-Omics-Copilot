@@ -29,10 +29,10 @@ Image.MAX_IMAGE_PIXELS = None
 CMAX = 255
 CMIN = 1  # avoid zero to distinguish from background
 TUTORIAL_IMAGE_S3_PATH = "s3://alextrywebsite/tutorial/loki_tutorial_hskin_melanoma_downsampled.ome.tif"
-TUTORIAL_SAMPLE_ID_FILE = "loki-tutorial-file-name"
+TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 
-TYPE_NUCLEI_DICT_LOKI = {
+TYPE_NUCLEI_DICT_COPILOT = {
     1: "Neoplastic",
     2: "Immune",
     3: "Stromal",
@@ -682,8 +682,8 @@ class ThorQuery:
                 unique_classes = {}
                 for idx in present_types:
                     idx = int(idx)
-                    if idx in TYPE_NUCLEI_DICT_LOKI:
-                        unique_classes[idx] = TYPE_NUCLEI_DICT_LOKI[idx]
+                    if idx in TYPE_NUCLEI_DICT_COPILOT:
+                        unique_classes[idx] = TYPE_NUCLEI_DICT_COPILOT[idx]
                     else:
                          unique_classes[idx] = f"Type {idx}"
                 return unique_classes
@@ -701,8 +701,8 @@ class ThorQuery:
                     # If label is already int (Loki style)
                     try:
                         idx = int(label)
-                        if idx in TYPE_NUCLEI_DICT_LOKI:
-                            unique_classes[idx] = TYPE_NUCLEI_DICT_LOKI[idx]
+                        if idx in TYPE_NUCLEI_DICT_COPILOT:
+                            unique_classes[idx] = TYPE_NUCLEI_DICT_COPILOT[idx]
                         elif label in self._cell_label_encoder:
                              idx = self._cell_label_encoder[label]
                              unique_classes[idx] = label

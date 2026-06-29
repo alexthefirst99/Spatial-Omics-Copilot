@@ -3,7 +3,7 @@ import os
 
 # Local file-based status store
 STATUS_DIR = os.environ.get(
-    'LOKI_STATUS_DIR',
+    'COPILOT_STATUS_DIR',
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'status_data')
 )
 os.makedirs(STATUS_DIR, exist_ok=True)
