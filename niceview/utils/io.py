@@ -13,10 +13,6 @@ import rasterio
 import io
 
 
-def is_s3(path):
-    return False
-
-
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
 

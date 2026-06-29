@@ -19,6 +19,7 @@ from niceview.utils.tools import blend, draw_circles
 
 from niceview.utils.cell import get_nuclei_pixels
 from niceview.pyplot.heatmap import heatmap_from_scatter
+from niceview.utils.aristotle import AristotleDataset
 from scipy import ndimage
 import scipy
 from pyproj import Geod
@@ -56,83 +57,6 @@ TYPE_NUCLEI_DICT_LOKI = {
     22: "Connective",
     23: "Lamina propria",
 }
-
-class AristotleDataset:
-    """Aristotle dataset."""
-    
-    def __init__(self, data_dir, data_extension, cache_dir, cache_extension, primary_key_list):
-        """Initialize Aristotle dataset.
-        
-        Args:
-            data_dir (str): data directory.
-            data_extension (dict): data extension.
-            cache_dir (str): cache directory.
-            cache_extension (dict): cache extension.
-            primary_key_list (list of str): list of primary keys.
-        """
-        self.data_dir = data_dir
-        self.data_extension = data_extension
-        self.cache_dir = cache_dir
-        self.cache_extension = cache_extension
-        self.primary_key_list = primary_key_list
-    
-    def get_data_field(self, primary_key, data_field):
-        """Get data field.
-        
-        Args:
-            primary_key (str): primary key.
-            data_field (str): data field.
-        
-        Returns:
-            str: data field path.
-            
-        Raises:
-            ValueError: bad input primary key.
-        """
-        # if primary_key not in self.primary_key_list:
-        #     raise ValueError('Bad input primary key')
-        
-        filename = self._unparse_filename(primary_key, data_field, self.data_extension[data_field])
-        filepath = vio.join_path(self.data_dir, filename)
-        return filepath
-    
-    def get_cache_field(self, primary_key, cache_field):
-        """Get cache field.
-        
-        Args:
-            primary_key (str): primary key.
-            cache_field (str): cache field.
-            
-        Returns:
-            str: cache field path.
-            
-        Raises:
-            ValueError: bad input primary key.
-        """
-        # if primary_key not in self.primary_key_list:
-        #     raise ValueError('Bad input primary key')
-        
-        filename = self._unparse_filename(
-            primary_key, cache_field, self.cache_extension[cache_field],
-        )
-        filepath = vio.join_path(self.cache_dir, filename)
-        return filepath
-    
-    def _unparse_filename(self, primary_key, field_name, extension):
-        """Unparse filename.
-        
-        Args:
-            primary_key (str): primary key.
-            field_name (str): field name.
-            extension (str): extension.
-        
-        Returns:
-            str: filename.
-        """
-        filename = '-'.join([primary_key, field_name])
-        filename = '.'.join([filename, extension])
-        return filename
-
 
 class ThorQuery:
     """Container for query."""
@@ -847,15 +771,6 @@ class ThorQuery:
         client = SimpleNamespace(filename=file_path)
         return client, None
 
-    def release_tile_client(self, file_path):
-        """No-op: kept for API compatibility (TileClient removed)."""
-        return True
-
-    @staticmethod
-    def get_tile_client_info():
-        """No-op: kept for API compatibility (TileClient removed)."""
-        return {}
-
     def get_coord_mapping(self, sample_id):
         """Get coordinate mapping from geographic to pixel.
         
@@ -885,20 +800,6 @@ class ThorQuery:
             self.dataset.get_cache_field(sample_id, 'gis-wsi-img'),
         )
         return raster.xy
-
-    def get_sample_img_shape(self, sample_id):
-        """Get sample image shape.
-        
-        Args:
-            sample_id (str): sample id.
-        
-        Returns:
-            tuple: height and width.
-        """
-        raster = rasterio.open(
-            self.dataset.get_cache_field(sample_id, 'gis-wsi-img'),
-        )
-        return raster.shape
 
     def get_gene_max(self, sample_id, selected_cell_gene_name):
         """Get cmax.
