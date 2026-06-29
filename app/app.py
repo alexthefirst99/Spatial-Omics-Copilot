@@ -523,6 +523,10 @@ def main():
     # Start Warmup in background thread so it doesn't block app launch
     threading.Thread(target=warmup_ollama, daemon=True).start()
 
+    # Open browser after a short delay to let the server start
+    url = f"http://localhost:{args.port}/app/{args.token}"
+    threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+
     # Launch browser and run app
     app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=True)
 
