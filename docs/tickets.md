@@ -16,7 +16,26 @@
 | T-006 | Chat UI — AGENT TRACE card, pathway bar chart, DEG bar chart | ✓ Done |
 | T-007 | Folder structure — `rag/deg/`, `rag/pathway/`, `rag/pubmed/`, `rag/agent/` | ✓ Done |
 
-## Milestone 2: DEG Extraction (rag/deg/)
+## Milestone 2: Preprocessing (rag/preprocessing.py)
+
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-033 | Add spot-level QC filtering — minimum genes per spot, maximum mitochondrial gene fraction | Spots below threshold removed before normalization; `min_genes` and `max_mito_pct` are configurable params |
+| T-034 | Store raw counts layer before normalization | `adata.layers["counts"]` present after preprocessing; DEG Wilcoxon test reads from it |
+| T-035 | Cache preprocessed adata to disk | Re-running on same h5ad skips preprocessing and loads cached result in < 1s |
+| T-036 | Write `test_preprocessing.py` | Tests cover: valid h5ad processes without error, missing spatial key raises ValueError, HVG selection reduces gene count, PCA components present in result |
+
+## Milestone 3: Clustering (rag/clustering.py)
+
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-037 | Expose Leiden resolution as configurable parameter | `run_spatial_clustering()` accepts `resolution` kwarg; default 0.8; stored in cluster JSON |
+| T-038 | Add spatial coordinates as auxiliary features | PCA embedding is augmented with normalized x/y coordinates before clustering; spatially coherent clusters improve visually |
+| T-039 | Support user-specified cluster count | `run_spatial_clustering()` accepts `n_clusters` override; skips auto-estimation when provided |
+| T-040 | Cache cluster results | Skip re-clustering if cluster JSON already exists and h5ad modification time has not changed |
+| T-041 | Write `test_clustering.py` | Tests cover: Leiden runs on small h5ad, KMeans fallback triggers on Leiden failure, palette has correct number of colors, cluster JSON schema is valid |
+
+## Milestone 4: DEG Extraction (rag/deg/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -25,7 +44,7 @@
 | T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset |
 | T-011 | Write `test_deg.py` | Tests cover cluster selection, ROI selection, empty selection |
 
-## Milestone 3: Pathway Enrichment (rag/pathway/)
+## Milestone 5: Pathway Enrichment (rag/pathway/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -33,7 +52,7 @@
 | T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception |
 | T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability |
 
-## Milestone 4: PubMed Retrieval (rag/pubmed/)
+## Milestone 6: PubMed Retrieval (rag/pubmed/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -43,7 +62,7 @@
 | T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable |
 | T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability |
 
-## Milestone 5: LangGraph Agent (rag/agent/)
+## Milestone 7: LangGraph Agent (rag/agent/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -53,7 +72,7 @@
 | T-023 | Add max-iteration guard | Agent stops after 5 tool calls |
 | T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict |
 
-## Milestone 6: Prompt Engineering (rag/agent/prompt.py)
+## Milestone 8: Prompt Engineering (rag/agent/prompt.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -61,7 +80,7 @@
 | T-026 | Add structured citation instructions | LLM cites papers inline as [1], [2] consistently |
 | T-027 | Test prompts against demo dataset | Responses are biologically relevant for the demo data |
 
-## Milestone 7: Demo Data & Evaluation
+## Milestone 9: Demo Data & Evaluation
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
