@@ -16,17 +16,28 @@ spatial-omics-copilot/
 │   ├── session.py                # thread-safe chat session read/write
 │   ├── image_utils.py            # ROI crop, OME-TIFF cache
 │   ├── status_store.py           # upload progress tracking
+│   ├── utils.py                  # shared utilities
 │   └── assets/
-│       ├── chat.js               # AGENT TRACE, pathway/DEG panels
-│       └── opioid.css
+│       ├── chat.js               # chat transport + AGENT TRACE/pathway/DEG panels
+│       ├── chat.css              # chat panel styling
+│       ├── opioid.css            # main application layout styling
+│       ├── s3_upload.js          # browser-side upload handling and progress
+│       ├── spinner.css           # loading state styling
+│       ├── upload_styles.css     # upload drop zone/progress styling
+│       ├── tutorial.js           # tutorial button/client behavior
+│       ├── tutorial.css          # tutorial controls styling
+│       └── font.css              # font imports
 ├── niceview/                     # UI layer
 │   ├── interface/
 │   │   ├── upload.py             # image + h5ad upload handlers
-│   │   ├── visualization.py      # spot overlay, VivViewer setup
-│   │   ├── actions.py            # re-visualize, save ROI
+│   │   ├── visualization.py      # WSI client, spatial spot overlay, VivViewer setup
+│   │   ├── actions.py            # re-visualize, save ROI, clear session/cache
 │   │   ├── callback.py           # Dash callbacks
+│   │   ├── interface.py          # compatibility exports + token mapping
 │   │   └── data_io.py            # session data helpers
-│   └── utils/                    # io, colors, rendering helpers
+│   ├── pyplot/
+│   │   └── leaflet.py            # Dash VivViewer component builder + cluster legend
+│   └── utils/                    # io, dataset, path/viewer helper dependencies
 ├── rag/                          # analysis layer
 │   ├── pipeline.py               # fallback sequential pipeline (_run_sequential)
 │   ├── preprocessing.py          # QC, normalize, PCA
@@ -36,14 +47,14 @@ spatial-omics-copilot/
 │   │   └── extraction.py         # DEG computation
 │   ├── pathway/
 │   │   ├── __init__.py           # exposes: enrich_pathways
-│   │   └── enrichment.py         # ORA against GO / KEGG
+│   │   └── enrichment.py         # mock enrichment; target: GO / KEGG ORA
 │   ├── pubmed/
 │   │   ├── __init__.py           # exposes: retrieve_abstracts
-│   │   └── retrieval.py          # NCBI E-utilities + vector store
+│   │   └── retrieval.py          # mock PubMed retrieval; target: NCBI E-utilities
 │   └── agent/
 │       ├── __init__.py           # exposes: run_agent  ← only public entry point
-│       ├── graph.py              # LangGraph agent (currently mock)
-│       ├── tools.py              # LangChain tool definitions
+│       ├── graph.py              # run_agent wrapper; target: LangGraph agent
+│       ├── tools.py              # planned LangChain tools placeholder
 │       └── prompt.py             # context string formatting
 ├── dash_viv_viewer/              # VivViewer React component
 └── docs/
@@ -55,63 +66,109 @@ Run command: `python app/app.py --port 8081 --token hello`
 
 ```text
 Browser (Dash + VivViewer)
-  → ROI drawn / cluster clicked → Flask /chat endpoint (routes.py)
-  → run_agent(message, work_dir, cluster_id, coords)   ← only call into rag/
-  → routes.py enqueues job with {rag_context_str, rag_metadata}
-  → worker.py injects context_str into messages → inference.py streams tokens
-  → session.py writes to chat_sessions/
-  → browser polls and renders streamed response
+  → cluster clicked / ROI drawn
+      → app.py callback calls rag.deg immediately
+      → caches gene list to cluster_context.json / roi_context.json
+  → user sends chat message → Flask /chat endpoint (routes.py)
+      → routes.py loads cached gene_objects
+      → run_agent(gene_objects, message, label)   ← only call into rag/
+      → routes.py enqueues job with {rag_context_str, rag_metadata}
+      → worker.py injects context_str into messages → inference.py streams tokens
+      → session.py writes to chat_sessions/
+      → browser polls and renders streamed response
 
-run_agent() internals (rag/agent/graph.py):
-  → deg tool    (rag/deg/)
-  → pathway tool (rag/pathway/)
-  → pubmed tool  (rag/pubmed/)
+Target run_agent() internals (rag/agent/graph.py):
+  → pathway tool (rag/pathway/)   — GO / KEGG ORA
+  → pubmed tool  (rag/pubmed/)    — NCBI abstract retrieval
   → prompt.py   formats context string
   → returns {gene_objects, context_str, metadata}
+
+Current fallback:
+  → rag/agent/graph.py calls rag/pipeline._run_sequential()
+  → _run_sequential() always runs mock pathway + mock PubMed retrieval
 ```
 
 ## 3. Module Responsibilities
 
+### app/
+
 | **Module** | **Responsibility** |
 | --- | --- |
-| `app/routes.py` | HTTP handlers — calls `run_agent()`, enqueues job |
-| `app/worker.py` | Background job — injects RAG context, calls `inference.py` |
-| `app/inference.py` | Ollama and OpenAI streaming LLM calls |
-| `app/session.py` | Thread-safe JSON session read/write (fcntl locking) |
-| `app/image_utils.py` | ROI image crop, OME-TIFF cache management |
-| `niceview/interface/upload.py` | Image and h5ad upload, triggers clustering |
-| `niceview/interface/visualization.py` | Spot overlay and VivViewer setup |
-| `rag/pipeline.py` | Fallback sequential pipeline (used until LangGraph is ready) |
-| `rag/preprocessing.py` | QC, normalization, HVG, PCA on h5ad |
+| `app/app.py` | Dash entry point — registers layout, callbacks, and Flask server |
+| `app/layout.py` | Dash UI layout definition (components, IDs) |
+| `app/routes.py` | Flask HTTP handlers — `/chat`, `/chat/poll`, `/chat/clear`, `/ome_tiff`, `/preview`; calls `run_agent()`, enqueues jobs |
+| `app/worker.py` | Background job queue — injects RAG context into messages, calls `inference.py`, writes stream |
+| `app/inference.py` | Ollama and OpenAI streaming LLM wrapper |
+| `app/session.py` | Thread-safe chat session read/write (fcntl locking, atomic writes) |
+| `app/image_utils.py` | ROI image crop and OME-TIFF pyramidal cache management |
+| `app/status_store.py` | File-based upload progress tracking (progress bar state) |
+| `app/utils.py` | Shared utilities — working directory setup, path helpers |
+| `app/assets/chat.js` | Chat client, stream polling, active-layer reporting, RAG metadata rendering |
+| `app/assets/s3_upload.js` | Browser-side upload handling and progress updates |
+| `app/assets/*.css` | Layout, chat, upload, tutorial, and spinner styling |
+
+### niceview/interface/
+
+| **Module** | **Responsibility** |
+| --- | --- |
+| `niceview/interface/callback.py` | Dash callback aggregator — re-exports all callbacks from `upload.py` and `actions.py` |
+| `niceview/interface/upload.py` | Image and h5ad upload handlers; validates spatial coordinates; triggers clustering |
+| `niceview/interface/visualization.py` | WSI client setup, spatial spot extraction, optional cluster overlay image, VivViewer assembly |
+| `niceview/interface/actions.py` | Re-visualize callback helper, ROI JSON/coordinate persistence, session/cache cleanup |
+| `niceview/interface/interface.py` | Compatibility exports from `data_io.py`/`visualization.py` plus token mapping |
+| `niceview/interface/data_io.py` | Session data read/write helpers using `ThorQuery` |
+
+### niceview/utils/ and niceview/pyplot/
+
+`app.py` directly imports only `niceview.utils.io`. The other files below are reached indirectly through `niceview.interface.*` helpers.
+
+| **Module** | **Current app call path** | **Responsibility** |
+| --- | --- | --- |
+| `niceview/utils/io.py` | Direct: `app.py` and `routes.py` import `niceview.utils.io as vio` | File I/O wrapper for JSON, TOML, paths, images, arrays, and cache files |
+| `niceview/utils/dataset.py` | Indirect: `app.py` → `niceview.interface.interface/data_io.py` → `ThorQuery` | Data/cache client currently used for WSI generation and viewer tile clients |
+| `niceview/utils/aristotle.py` | Indirect: `ThorQuery` → `AristotleDataset` | Constructs data/cache filenames from sample IDs and field names |
+| `niceview/utils/colors.py` | Indirect: `leaflet.py` imports viewer constants and color helpers from it | Provides colormap constants and helper functions used by viewer legend code |
+| `niceview/pyplot/leaflet.py` | Indirect but active: `app.py` → `reset()`/viewer callbacks → `visualization.py` → `create_viv_viewer()` | Builds `VivViewer`, image URLs, ROI props, and clickable cluster legend |
+
+### rag/
+
+| **Module** | **Responsibility** |
+| --- | --- |
+| `rag/pipeline.py` | Current fallback sequential pipeline — always runs pathway + PubMed context assembly |
+| `rag/preprocessing.py` | QC, normalization, HVG selection, PCA on h5ad |
 | `rag/clustering.py` | Leiden / KMeans spatial clustering, saves cluster JSON |
-| `rag/deg/extraction.py` | DEG extraction from cluster or ROI |
-| `rag/pathway/enrichment.py` | ORA against GO / KEGG |
-| `rag/pubmed/retrieval.py` | PubMed NCBI API + vector store |
-| `rag/agent/graph.py` | LangGraph agent — decides which tools to call |
-| `rag/agent/tools.py` | LangChain tool definitions wrapping rag submodules |
+| `rag/deg/extraction.py` | DEG extraction from cluster or ROI selection |
+| `rag/pathway/enrichment.py` | Current mock pathway enrichment over hardcoded gene sets; target: real ORA against GO / KEGG |
+| `rag/pubmed/retrieval.py` | Current mock PubMed retrieval over curated abstracts; target: NCBI E-utilities retrieval |
+| `rag/agent/graph.py` | Current `run_agent()` wrapper around `_run_sequential()`; target: LangGraph tool-selection agent |
+| `rag/agent/tools.py` | Placeholder for planned LangChain tools: `pathway_tool`, `pubmed_tool` |
 | `rag/agent/prompt.py` | Formats RAG evidence into LLM context string |
 
 ## 4. Single Entry Point Contract
 
-`routes.py` and `app.py` only ever call one function from `rag/`:
+`routes.py` is the only caller of `run_agent`. `app.py` calls DEG directly (not `run_agent`):
 
 ```python
+# routes.py — called when user sends a chat message
 from rag.agent import run_agent
+result = run_agent(gene_objects, message="", label="selection")
 
-result = run_agent(work_dir, message="", cluster_id=None, coords=None, folder_id="")
+# app.py — called immediately when user clicks cluster or draws ROI
+from rag.deg import get_cluster_high_expression_genes, get_roi_high_expression_genes
 ```
 
-Returns:
+See `docs/specs.md` section 3.4 for the full `run_agent` input/output contract.
+
 ```python
 {
-    "gene_objects": [{"gene": "SNAP25", "log2_fold_change": 3.81}, ...],
-    "context_str":  "\n\nRAG-retrieved biological context...",
+    "gene_objects": [...],   # gene list passed back through (from input)
+    "context_str":  "...",   # evidence string → prepended to LLM prompt (worker.py)
     "metadata": {
-        "trace":     [{"step": "...", "detail": "...", "icon": "..."}, ...],
-        "degs":      [{"gene": "SNAP25", "log2fc": 3.81}, ...],
-        "pathways":  [{"source": "GO", "name": "...", "neg_log10p": 5.1, "gene_count": 8}, ...],
-        "citations": [{"id": 1, "pmid": "...", "title": "...", "journal": "...", "year": 2024}, ...],
-        "label":     "Cluster 2",
+        "trace":     [...],  # steps agent ran → AGENT TRACE card in chat UI
+        "degs":      [...],  # top 8 DEGs → bar chart in chat UI
+        "pathways":  [...],  # enriched pathways → bar chart in chat UI
+        "citations": [...],  # PubMed abstracts → citation list in chat UI
+        "label":     "...",  # region label → panel headers
     }
 }
 ```
@@ -128,28 +185,34 @@ worker.py  → appends context_str to messages → inference.py → streams toke
 
 ## 6. Technology Stack
 
-| **Category** | **Packages** |
-| --- | --- |
-| Core | Python 3.11, Flask, Dash |
-| Image | pyvips, tifffile, Pillow, opencv-python |
-| Spatial data | anndata, scanpy, scipy, scikit-learn |
-| Visualization | dash-viv-viewer (local), plotly |
-| LLM | Ollama, OpenAI SDK |
-| RAG / Agents | LangChain, LangGraph |
-| Pathway | gseapy (GO / KEGG ORA) |
-| Literature | PubMed E-utilities API (requests), biopython |
-| Vector store | chromadb or faiss-cpu |
-| Session | fcntl, json |
+| **Category** | **Current** | **Planned / Target** |
+| --- | --- | --- |
+| Core | Python 3.11, Flask, Dash | — |
+| Image | pyvips/OME-TIFF conversion path, tifffile, Pillow, opencv-python | — |
+| Spatial data | anndata, scanpy, scipy, scikit-learn | — |
+| Visualization | local `dash_viv_viewer`, Plotly/Dash components | — |
+| LLM | Ollama Python client, OpenAI Chat Completions HTTP call | — |
+| RAG / Agents | `_run_sequential()` fallback | LangGraph + LangChain tools |
+| Pathway | Hardcoded mock gene-set enrichment | gseapy / GO / KEGG ORA |
+| Literature | Hardcoded mock curated abstracts | PubMed E-utilities API |
+| Vector store | Not active in current code | chromadb or faiss-cpu |
+| Session | fcntl, json | — |
 
 ## 7. Environment Variables
 
 | **Variable** | **Required** | **Purpose** |
 | --- | --- | --- |
-| `OLLAMA_MODEL` | Yes (if Ollama) | Local model name |
-| `OPENAI_API_KEY` | No | Enables OpenAI models (e.g. gpt-4o) |
-| `PUBMED_API_KEY` | No | Higher PubMed rate limit (10 req/s) |
+| `OLLAMA_MODEL` | No | Override local Ollama model; defaults to `qwen3-vl:30b` |
+| `OLLAMA_HOST` | No | Override Ollama server URL; defaults to `http://localhost:11435` |
+| `OPENAI_API_KEY` | Yes if using OpenAI provider | Enables OpenAI chat responses |
+| `OPENAI_MODEL` | No | Override OpenAI model; defaults to `gpt-4o` |
+| `OPENAI_INSECURE_SSL` | No | Local-dev escape hatch; `1` disables OpenAI SSL verification retry |
 | `COPILOT_CHAT_DIR` | No | Override chat session path |
 | `COPILOT_WORKDIR_BASE` | No | Override working directory path |
+| `COPILOT_TMP_BASE` | No | Override temporary upload/OME-TIFF cache path |
+| `COPILOT_STATUS_DIR` | No | Override upload status JSON path |
+| `COPILOT_TUTORIAL_IMAGE` | No | Override local tutorial OME-TIFF path |
+| `PUBMED_API_KEY` | Planned, not active | Intended for future live PubMed E-utilities rate limits |
 
 ## 8. Technical Risks
 
@@ -157,7 +220,7 @@ worker.py  → appends context_str to messages → inference.py → streams toke
 | --- | --- |
 | Gigapixel image OOM | pyvips streaming — never load full image into RAM |
 | LLM hallucinating citations | Only cite PMIDs returned by PubMed tool |
-| PubMed rate limit | Cache in vector store; use API key |
-| LangGraph infinite loop | Max 5 tool calls per turn |
+| Future PubMed rate limit | Cache live retrieval results; use `PUBMED_API_KEY` when NCBI integration lands |
+| Future LangGraph infinite loop | Enforce max 5 tool calls per turn when replacing `_run_sequential()` |
 | Session file corruption | Catch JSON errors; start fresh session |
 | OME-TIFF conversion slow | Async conversion with progress bar |

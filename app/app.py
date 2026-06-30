@@ -92,7 +92,7 @@ try:
     )
     from app.image_utils import (
         OME_CACHE_LOCKS, OME_CACHE_LOCKS_GUARD,
-        crop_image_by_roi, _image_to_data_url,
+        crop_image_by_roi,
         get_ome_cache_path, ensure_ome_tiff_cached,
     )
     from app.worker import (
@@ -112,7 +112,7 @@ except ImportError:
     )
     from image_utils import (
         OME_CACHE_LOCKS, OME_CACHE_LOCKS_GUARD,
-        crop_image_by_roi, _image_to_data_url,
+        crop_image_by_roi,
         get_ome_cache_path, ensure_ome_tiff_cached,
     )
     from worker import (
@@ -142,7 +142,6 @@ gene_chosen = None
 from niceview.interface.callback import (
     upload_image, upload_spatial_h5ad, reset, save_roi, clear_cache_forcall
 )
-from rag.agent import run_agent
 from rag.deg import get_roi_high_expression_genes, get_cluster_high_expression_genes
 
 from niceview.interface.interface import (
@@ -253,16 +252,6 @@ def main():
     # Callback to handle upload of H&E image
     # Callback to handle upload of H&E image
     # Callback to handle upload of H&E image
-    # Callback to handle upload of H&E image
-    # @app.callback(
-    #     Output('status1', 'children'),
-    #     Input('upload-data-image-result', 'value')
-    # )
-    # def callback_upload_image(filenames_upload_image):
-    #     if not filenames_upload_image:
-    #         return dash.no_update
-    #     return upload_image([filenames_upload_image], folder_id, work_dir, app_dir)
-
     @app.callback(
         Output('h5ad-upload-summary', 'children'),
         Input('upload-spatial-h5ad-result', 'value')
@@ -271,26 +260,6 @@ def main():
         if not filenames_upload_h5ad:
             return dash.no_update
         return upload_spatial_h5ad([filenames_upload_h5ad], folder_id, work_dir)
-
-    # Toggle callback removed to prevent conflict with client-side JS
-    # @app.callback(
-    #     Output("submit-wrapper", "className"),
-    #     Input("toggle-submit-btn", "n_clicks"),
-    #     prevent_initial_call=True
-    # )
-    # def toggle_submit_panel(n):
-    #     return "collapsed" if n % 2 == 1 else ""
-
-    # ----------------------- Upload Toggle Callback -----------------------
-    # @app.callback(
-    #     [Output("custom-uploader-container", "style"),
-    #      Output("standard-uploader-container", "style")],
-    #     Input("upload-mode-toggle", "value")
-    # )
-    # def toggle_uploader_visibility(selected_values):
-    #     if "standard" in selected_values:
-    #         return {"display": "none"}, {"display": "block"}
-    #     return {"display": "block"}, {"display": "none"}
 
     # ----------------------- Standard Dash Callback (Custom Uploader) -----------------------
     # Replaced @du.callback because we are using custom JS/HTML uploader now
@@ -377,47 +346,6 @@ def main():
 
         return "File uploaded. Starting processing...", job_id
 
-    # ----------------------- Progress Bar Callback -----------------------
-    # ----------------------- Progress Bar Callback -----------------------
-    # DISABLED: Frontend s3_upload.js now handles the UI updates via polling /upload_status/<job_id>
-    # @app.callback(
-    #     [Output('processing-status-container', 'children'),
-    #      Output('processing-interval', 'disabled', allow_duplicate=True)],
-    #     Input('processing-interval', 'n_intervals'),
-    #     State('processing-job-id', 'data'),
-    #     prevent_initial_call=True
-    # )
-    # def update_preprocessing_status(n, job_id):
-    #     if not job_id:
-    #         return dash.no_update, True
-    #
-    #     status_data = status_store.get_status(job_id)
-    #     # status example: {'progress': 50, 'message': 'Processing...', 'error': None}
-    #
-    #     progress = status_data.get('progress', 0)
-    #     message = status_data.get('message', 'Waiting...')
-    #     error = status_data.get('error')
-    #
-    #     # Create Progress Bar UI
-    #     bar_color = "#4CAF50" if not error else "#F44336"
-    #     if error:
-    #         message = f"Error: {error}"
-    #
-    #     bar_ui = html.Div([
-    #         html.Div(message, style={'marginBottom': '5px', 'fontSize': '14px', 'fontWeight': '500'}),
-    #         html.Div(
-    #             html.Div(style={'width': f'{progress}%', 'height': '100%', 'backgroundColor': bar_color, 'transition': 'width 0.5s'}),
-    #             style={'width': '100%', 'height': '20px', 'backgroundColor': '#e0e0e0', 'borderRadius': '10px', 'overflow': 'hidden'}
-    #         )
-    #     ])
-    #
-    #     # Stop polling if complete or error
-    #     stop_interval = False
-    #     if progress >= 100 or error:
-    #         stop_interval = True
-    #
-    #     return bar_ui, stop_interval
-
     # ----------------------- Visualization + Tools -----------------------
 
     # Reset visualization and refresh rendering
@@ -449,10 +377,13 @@ def main():
             if not vio.exists(coords_path):
                 return status, []
             coords = vio.load_json(coords_path)
-            rag = run_agent(work_dir, coords=coords, folder_id=folder_id)
-            vio.dump_json({"gene_objects": rag["gene_objects"]}, f'{work_dir}/user{folder_id}/roi_context.json')
+            deg_result = get_roi_high_expression_genes(
+                work_dir, coords, folder_id=folder_id, top_n=25
+            )
+            gene_objects = deg_result["top_genes"] if deg_result and deg_result.get("top_genes") else []
 
-            gene_objects = rag["gene_objects"]
+            vio.dump_json({"gene_objects": gene_objects}, f'{work_dir}/user{folder_id}/roi_context.json')
+
             if not gene_objects:
                 return status, html.Div(className="roi-gene-card", children=[
                     html.Div("ROI marker genes", className="roi-gene-title"),
@@ -465,11 +396,11 @@ def main():
                     html.Span(f"log2FC {g['log2_fold_change']:.2g}", className="roi-gene-score"),
                 ]) for g in gene_objects[:25]
             ]
-            n_spots = rag["metadata"]["trace"][0]["detail"]
+            n_spots = deg_result.get("selected_spots", 0)
             return status, html.Div(className="roi-gene-card", children=[
                 html.Div(className="roi-gene-header", children=[
                     html.Div("ROI marker genes", className="roi-gene-title"),
-                    html.Div(n_spots, className="roi-gene-count"),
+                    html.Div(f"{n_spots} spots", className="roi-gene-count"),
                 ]),
                 html.Div(gene_rows, className="roi-gene-list"),
             ])
@@ -494,13 +425,16 @@ def main():
         cluster_id = str(ctx.triggered_id["index"])
 
         try:
-            rag = run_agent(work_dir, cluster_id=cluster_id, folder_id=folder_id)
+            deg_result = get_cluster_high_expression_genes(
+                work_dir, cluster_id, folder_id=folder_id, top_n=25
+            )
+            gene_objects = deg_result["top_genes"] if deg_result and deg_result.get("top_genes") else []
+
             vio.dump_json({
                 "cluster_id": cluster_id,
-                "gene_objects": rag["gene_objects"],
+                "gene_objects": gene_objects,
             }, f'{work_dir}/user{folder_id}/cluster_context.json')
 
-            gene_objects = rag["gene_objects"]
             if not gene_objects:
                 return html.Div(className="roi-gene-card", children=[
                     html.Div(f"Cluster {cluster_id} marker genes", className="roi-gene-title"),
@@ -513,11 +447,11 @@ def main():
                     html.Span(f"log2FC {g['log2_fold_change']:.2g}", className="roi-gene-score"),
                 ]) for g in gene_objects[:25]
             ]
-            n_spots = rag["metadata"]["trace"][0]["detail"]
+            n_spots = deg_result.get("selected_spots", 0)
             return html.Div(className="roi-gene-card", children=[
                 html.Div(className="roi-gene-header", children=[
                     html.Div(f"Cluster {cluster_id} marker genes", className="roi-gene-title"),
-                    html.Div(n_spots, className="roi-gene-count"),
+                    html.Div(f"{n_spots} spots", className="roi-gene-count"),
                 ]),
                 html.Div(gene_rows, className="roi-gene-list"),
             ]), cluster_id

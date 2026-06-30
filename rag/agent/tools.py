@@ -1,31 +1,27 @@
 """
 LangChain Tool Definitions
 ==========================
-CURRENTLY EMPTY — define LangChain tools here so the LangGraph agent
-in graph.py can call them dynamically.
+CURRENTLY EMPTY — define LangChain tools here for the LangGraph agent.
 
-Each tool wraps one rag submodule function. The agent decides which
-tools to call based on the user message.
+DEG extraction is NOT a tool — it runs automatically before the agent
+starts, triggered by the user's cluster/ROI selection in the UI.
+The agent only decides whether to call pathway_tool and/or pubmed_tool.
 
-Expected tools:
-
-    deg_tool
-        Input:  cluster_id (str) or coords (list), work_dir (str)
-        Output: same as rag.deg.get_cluster_high_expression_genes()
-                {"selected_spots", "top_genes": [{"gene", "log2_fold_change", ...}]}
+Tools to implement:
 
     pathway_tool
-        Input:  genes (list[str])
+        When:   agent decides pathway context is relevant to the question
+        Input:  genes (list[str]) — from the DEG result already computed
         Output: same as rag.pathway.enrich_pathways()
                 [{"name", "gene_count", "set_size", "pvalue", "overlap"}, ...]
 
     pubmed_tool
-        Input:  genes (list[str]), pathways (list[str])
+        When:   agent decides literature context is relevant to the question
+        Input:  genes (list[str]), message (str) — message used to refine query
         Output: same as rag.pubmed.retrieve_abstracts()
                 [{"pmid", "title", "journal", "year", "snippet"}, ...]
 
 Import from the submodule __init__.py, not the implementation file directly:
-    from rag.deg import get_cluster_high_expression_genes, get_roi_high_expression_genes
     from rag.pathway import enrich_pathways
     from rag.pubmed import retrieve_abstracts
 

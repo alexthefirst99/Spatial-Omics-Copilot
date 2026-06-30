@@ -6,9 +6,9 @@
 2. App converts the image to a pyramidal OME-TIFF and renders it in VivViewer.
 3. Researcher optionally uploads an h5ad file; app runs spatial clustering and overlays colored spots.
 4. Researcher clicks a cluster or draws an ROI polygon on the tissue.
-5. App calls `run_agent()` — the single entry point into the RAG pipeline.
-6. Agent decides which tools to call (DEG, pathway, PubMed) based on the question.
-7. Tool results are formatted into a context string and injected into the LLM prompt.
+5. App runs DEG automatically and caches the gene list (`cluster_context.json` or `roi_context.json`).
+6. When a chat message is sent, `routes.py` calls `run_agent(gene_objects, message, label)`.
+7. Agent decides whether to call pathway_tool and/or pubmed_tool based on the question; results are formatted into a context string injected into the LLM prompt.
 8. LLM response streams token by token to the chat interface.
 9. Chat UI shows AGENT TRACE card, pathway bar chart, DEG bar chart, then streamed text.
 10. Researcher can ask follow-up questions; agent continues with full region context.
@@ -19,8 +19,8 @@
 | --- | --- | --- |
 | Whole-slide image | .tiff, .ome.tiff, .svs | Convert to pyramidal OME-TIFF; render via VivViewer |
 | Gene expression | .h5ad | Validate `adata.obsm["spatial"]`; run clustering; overlay spots |
-| Cluster selection | cluster label string | Passed as `cluster_id` to `run_agent()` |
-| ROI polygon | list of coordinate lists | Passed as `coords` to `run_agent()` |
+| Cluster selection | cluster label string | `app.py` calls DEG immediately; gene list cached to `cluster_context.json` |
+| ROI polygon | list of coordinate lists | `app.py` calls DEG immediately; gene list cached to `roi_context.json` |
 
 ## 3. RAG Tool Contracts
 
@@ -107,38 +107,81 @@ Required behavior:
 
 ```python
 # rag/agent/__init__.py
-def run_agent(work_dir, message="", cluster_id=None, coords=None, folder_id="") -> dict
+def run_agent(gene_objects, message="", label="selection") -> dict
 ```
 
-Returns:
+**Input parameters:**
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `gene_objects` | `list[dict]` | Pre-computed DEG result from `app.py`. Each dict has `"gene"` (str) and `"log2_fold_change"` (float). Pass `[]` to use the demo fallback (12 brain genes). DEG is **not** run inside `run_agent` — it always runs automatically in `app.py` when the user selects a cluster or ROI. |
+| `message` | `str` | User's chat message. The real agent uses this to decide which tools to call and to build smarter PubMed queries. |
+| `label` | `str` | Human-readable region label for UI headers, e.g. `"Cluster 5"`, `"ROI"`, `"demo"`. |
+
+Fallback: if `gene_objects` is empty, the pipeline substitutes demo genes and sets `label = "demo"`.
+
+**Output:**
+
 ```python
 {
-    "gene_objects": [{"gene": str, "log2_fold_change": float}, ...],
-    "context_str":  str,   # injected into LLM prompt by worker.py
+    "gene_objects": [
+        {"gene": str, "log2_fold_change": float},
+        ...
+    ],
+    # Full DEG list — used by app.py to render the cluster gene popup card.
+
+    "context_str": str,
+    # Formatted evidence string prepended to the LLM prompt by worker.py.
+    # Must start with "\n\n". Contains genes, pathways, and abstract snippets.
+
     "metadata": {
-        "trace":     [{"step": str, "detail": str, "icon": str}, ...],
-        "degs":      [{"gene": str, "log2fc": float}, ...],
-        "pathways":  [{"source": str, "name": str, "neg_log10p": float, "gene_count": int}, ...],
-        "citations": [{"id": int, "pmid": str, "title": str, "journal": str, "year": int}, ...],
-        "label":     str,
+        "trace": [
+            {"step": str, "detail": str, "icon": str},
+            ...
+        ],
+        # Steps the agent actually ran — shown in the AGENT TRACE card in the UI.
+        # icon values: "deg", "pathway", "pubmed"
+
+        "degs": [{"gene": str, "log2fc": float}, ...],
+        # Top 8 DEGs — shown as a bar chart in the chat UI.
+
+        "pathways": [
+            {"source": str, "name": str, "neg_log10p": float, "gene_count": int},
+            ...
+        ],
+        # Enriched pathways — shown as a bar chart in the chat UI.
+        # source: "GO" or "KEGG"   neg_log10p: bar length   gene_count: label
+
+        "citations": [
+            {"id": int, "pmid": str, "title": str, "journal": str, "year": int},
+            ...
+        ],
+        # PubMed abstracts — shown as citation list in the chat UI.
+        # id: 1-based index used for inline citation like [1], [2]
+
+        "label": str,
+        # Human-readable region label shown in panel headers.
+        # e.g. "Cluster 5", "ROI", "demo"
     }
 }
 ```
 
 ## 4. Agent Behavior
 
+**DEG extraction is not the agent's decision.** It runs automatically when the user clicks a cluster or draws an ROI in the UI (`app.py`), before any chat message is sent. The gene list is already available by the time the agent runs.
+
 The LangGraph agent in `rag/agent/graph.py`:
-1. Receives the user message, `work_dir`, `cluster_id` or `coords`.
-2. Decides which tools to call based on the question.
-3. Calls DEG tool, pathway tool, PubMed tool as needed.
-4. Passes results to `prompt.py` to build `context_str`.
+1. Receives the pre-computed gene list (from DEG) along with the user message.
+2. Decides whether to call **pathway_tool** (GO / KEGG enrichment) based on the question.
+3. Decides whether to call **pubmed_tool** (NCBI abstract retrieval) based on the question.
+4. Passes all results to `prompt.py` to build `context_str`.
 5. Returns the structured result dict above.
 
 Required behavior:
-- `trace` must reflect what the agent **actually** called — not a hardcoded list.
-- Must call at least one tool before answering a question about a tissue region.
+- `trace` must reflect what the agent actually ran — not a hardcoded list. DEG always appears since it always runs.
+- Agent decides pathway and/or PubMed based on the user message — both, one, or neither.
 - Must not invent gene functions, pathway names, or citations.
-- If all tools return empty, return demo fallback genes and label as "demo".
+- If no tools return results, use demo fallback genes and set `label` to `"demo"`.
 - Limit to 5 tool calls per turn to prevent infinite loops.
 
 ## 5. Chat Interface Behavior

@@ -26,15 +26,11 @@ Gene expression:    .h5ad
 
 Create a local `.env` file.
 
-### Required
-
-```bash
-OLLAMA_MODEL=llama3          # or any Ollama-hosted model
-```
-
 ### Optional
 
 ```bash
+OLLAMA_MODEL=...             # override Ollama model (default: qwen3-vl:30b)
+OLLAMA_HOST=...              # override Ollama server URL (default: http://localhost:11435)
 OPENAI_API_KEY=...           # enables OpenAI models (e.g. gpt-4o)
 PUBMED_API_KEY=...           # higher PubMed rate limit (optional but recommended)
 COPILOT_CHAT_DIR=...         # path to store chat sessions (default: ./chat_sessions)
@@ -53,8 +49,7 @@ conda activate spatial-copilot
 brew install vips            # macOS
 # sudo apt-get install libvips-dev  # Ubuntu/Linux
 
-pip install -r requirements.txt
-pip install -e ./dash_viv_viewer
+pip install -r requirements.txt   # includes -e ./dash_viv_viewer
 python app/app.py --port 8081 --token hello
 ```
 
@@ -81,17 +76,28 @@ spatial-omics-copilot/
 │   ├── session.py               # chat session read/write
 │   ├── image_utils.py           # ROI crop, OME-TIFF caching
 │   ├── status_store.py          # upload progress tracking
+│   ├── utils.py                 # shared utilities
 │   └── assets/
 │       ├── chat.js              # chat UI: AGENT TRACE, pathway/DEG panels
-│       └── opioid.css           # styles
+│       ├── chat.css             # chat panel styling
+│       ├── opioid.css           # main application layout styling
+│       ├── s3_upload.js         # browser-side upload handling
+│       ├── spinner.css          # loading state styling
+│       ├── upload_styles.css    # upload drop zone/progress styling
+│       ├── tutorial.js          # tutorial button behavior
+│       ├── tutorial.css         # tutorial controls styling
+│       └── font.css             # font imports
 ├── niceview/                    # UI layer
 │   ├── interface/
 │   │   ├── upload.py            # image + h5ad upload handlers
 │   │   ├── visualization.py     # spot overlay, VivViewer setup
 │   │   ├── actions.py           # re-visualize, save ROI
 │   │   ├── callback.py          # Dash callbacks
+│   │   ├── interface.py         # shared interface state
 │   │   └── data_io.py           # session data helpers
-│   └── utils/                   # io, colors, rendering helpers
+│   ├── pyplot/
+│   │   └── leaflet.py           # VivViewer component builder + cluster legend
+│   └── utils/                   # io, colors, dataset, aristotle helpers
 ├── rag/                         # analysis pipeline
 │   ├── pipeline.py              # fallback sequential pipeline (_run_sequential)
 │   ├── preprocessing.py         # QC, normalize, PCA
@@ -104,7 +110,7 @@ spatial-omics-copilot/
 │   │   └── enrichment.py        # ORA against GO / KEGG
 │   ├── pubmed/
 │   │   ├── __init__.py          # exposes: retrieve_abstracts
-│   │   └── retrieval.py         # NCBI E-utilities + vector store
+│   │   └── retrieval.py         # mock retrieval; target: NCBI E-utilities
 │   └── agent/
 │       ├── __init__.py          # exposes: run_agent  ← only public entry point
 │       ├── graph.py             # LangGraph agent (currently mock)

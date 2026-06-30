@@ -1,9 +1,13 @@
-# RAG pipeline for spatial omics copilot.
-# DEG extraction (both ROI and cluster) is already done in niceview/interface/roi.py:
-#   get_roi_high_expression_genes()     — genes enriched in a drawn ROI polygon
-#   get_cluster_high_expression_genes() — genes enriched in a spatial cluster
-# Each module here is a downstream pipeline stage that consumes that gene list:
-#   pathway_enrichment.py — ORA/GSEA against GO, Reactome, KEGG
-#   pubmed_retrieval.py   — fetch relevant abstracts via NCBI E-utilities
-#   llm_interpretation.py — format retrieved evidence for LLM context injection
-#   pipeline.py           — orchestrates all stages; returns metadata for the UI
+# RAG analysis layer for spatial omics copilot.
+#
+# DEG extraction runs automatically in app.py when the user selects a cluster
+# or ROI. The resulting gene list is cached and passed to run_agent().
+#
+# Subpackages:
+#   rag/deg/       — DEG extraction (cluster vs non-cluster, ROI vs non-ROI)
+#   rag/pathway/   — pathway enrichment ORA against GO / KEGG
+#   rag/pubmed/    — PubMed abstract retrieval via NCBI E-utilities
+#   rag/agent/     — run_agent() entry point; assembles context_str for the LLM
+#   rag/pipeline.py — fallback sequential pipeline (pathway + PubMed) until LangGraph is ready
+#
+# Only import from subpackage __init__.py files, not implementation modules directly.

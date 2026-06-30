@@ -1,8 +1,6 @@
 import os
 import json
 import threading
-import base64
-import mimetypes
 import numpy as np
 import tifffile
 from PIL import Image as _PILImage
@@ -104,13 +102,6 @@ def crop_image_by_roi(image_path, roi_path, output_path):
     except Exception as e:
         print(f"Error cropping image: {e}")
         return False
-
-
-def _image_to_data_url(image_path):
-    mime_type = mimetypes.guess_type(image_path)[0] or "image/png"
-    with open(image_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")
-    return f"data:{mime_type};base64,{encoded}"
 
 
 def get_ome_cache_path(path, token):

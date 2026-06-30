@@ -1,4 +1,4 @@
-from niceview.utils.tools import CMAX, CMIN, get_hex_values
+from niceview.utils.colors import CMAX, CMIN, get_hex_values
 import dash_viv_viewer
 from dash import html, dcc
 import urllib.parse

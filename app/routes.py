@@ -462,13 +462,14 @@ def register_chat_routes(server, token, work_dir):
                     _user_message = data.get("prompt", "")
                     if vio.exists(_cluster_path):
                         _cctx = vio.load_json(_cluster_path)
-                        _rag = run_agent(work_dir, message=_user_message, cluster_id=_cctx.get("cluster_id"))
+                        _gene_objects = _cctx.get("gene_objects", [])
+                        _label = f"Cluster {_cctx.get('cluster_id', '?')}"
+                        _rag = run_agent(_gene_objects, message=_user_message, label=_label)
                     elif vio.exists(_roi_path):
                         _rctx = vio.load_json(_roi_path)
-                        _coords = vio.load_json(f'{work_dir}/user/coords.json') if vio.exists(f'{work_dir}/user/coords.json') else None
-                        _rag = run_agent(work_dir, message=_user_message, coords=_coords)
+                        _rag = run_agent(_rctx.get("gene_objects", []), message=_user_message, label="ROI")
                     else:
-                        _rag = run_agent(work_dir, message=_user_message)  # demo fallback
+                        _rag = run_agent([], message=_user_message, label="demo")
 
                     rag_context_str = _rag["context_str"]
                     rag_metadata = _rag["metadata"]

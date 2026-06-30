@@ -16,21 +16,6 @@ from niceview.interface.interface import (
 )
 
 
-def S3Upload(id, label="Upload File"):
-    return html.Div([
-        html.Label(label, className="upload-label"),
-        html.Div(className="s3-upload-container", children=[
-            dcc.Input(type="file", style={"display": "block", "marginBottom": "5px"}),
-            html.Div(className="upload-progress-bar", style={"width": "100%", "backgroundColor": "#e0e0e0", "borderRadius": "5px"}, children=[
-                html.Div(className="upload-progress", style={"width": "0%", "height": "5px", "backgroundColor": "#007eff", "borderRadius": "5px", "transition": "width 0.4s"})
-            ]),
-            html.Div(className="upload-progress-text", style={"fontSize": "10px", "marginTop": "2px", "textAlign": "right"}),
-            html.Div(className="upload-status", style={"fontSize": "12px", "marginTop": "5px", "fontStyle": "italic"}),
-            dcc.Input(id=id, className="upload-result", type="text", style={"display": "none"})
-        ])
-    ])
-
-
 def _spatial_omics_state_path(work_dir, folder_id=""):
     return f'{work_dir}/user{folder_id}/spatial_omics.json'
 

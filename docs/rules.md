@@ -12,7 +12,7 @@
 
 ## 2. Security and Privacy Rules
 
-- Store all API keys (OpenAI, Anthropic, PubMed) in `.env` only — never in code.
+- Store all API keys (OpenAI, PubMed) in `.env` only — never in code.
 - Do not log API keys or user chat content to stdout in production.
 - Do not upload user data or images to external services without explicit opt-in.
 - Treat uploaded tissue images and gene expression files as sensitive research data.
@@ -22,7 +22,7 @@
 
 - **`rag/` is pure analysis** — no HTTP handling, no streaming, no session writes.
 - **`app/` owns the LLM call** — `worker.py` calls `inference.py` directly. No code inside `rag/` should call the LLM or import from `app/`.
-- **One entry point** — `routes.py` and `app.py` only import `run_agent` from `rag.agent`. Never import individual submodules (`rag.deg`, `rag.pathway`, etc.) from outside `rag/`.
+- **One entry point for chat** — only `routes.py` calls `run_agent`. `app.py` calls `rag.deg` directly (for the gene popup on selection). Never import other `rag/` submodules (`rag.pathway`, `rag.pubmed`, etc.) from outside `rag/`.
 - **`run_agent()` owns the output contract** — whatever is inside `rag/agent/graph.py` is JN's business. The output dict format must not change.
 
 ## 4. RAG Module Rules
@@ -31,7 +31,8 @@
 - Output formats are fixed — see `docs/specs.md` section 3 for each module's contract.
 - Adding extra fields to output dicts is allowed; removing or renaming existing fields is not.
 - Return empty lists or `None` on failure — never raise unhandled exceptions from a tool.
-- The agent must call at least one tool before answering a question about a tissue region.
+- DEG extraction is not the agent's decision — it runs automatically when the user selects a cluster or ROI in the UI.
+- The agent decides whether to call pathway_tool and/or pubmed_tool based on the user message.
 - The agent must not invent gene functions, pathway names, or paper citations.
 - Only cite PMIDs that were actually returned by the PubMed tool in that turn.
 - Limit the agent to a maximum of 5 tool calls per turn to prevent infinite loops.

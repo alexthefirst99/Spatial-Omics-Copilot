@@ -1,8 +1,8 @@
 """
 Pathway Enrichment Module
 =========================
-CURRENTLY MOCK — uses a hardcoded 13-pathway database with fake p-values.
-Replace enrich_pathways() with a real ORA against GO / Reactome / KEGG.
+CURRENTLY MOCK — uses a hardcoded 12-pathway database with fake p-values.
+Replace enrich_pathways() with a real ORA against GO / KEGG (e.g. gseapy or g:Profiler).
 
 Input:
     genes  : list[str]  — gene symbols, e.g. ["SNAP25", "TREM2", "GFAP"]

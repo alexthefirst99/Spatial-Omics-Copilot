@@ -47,7 +47,7 @@
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
-| T-020 | Define LangChain tools in `tools.py` wrapping deg, pathway, pubmed | Agent can call all three tools |
+| T-020 | Define LangChain tools in `tools.py`: `pathway_tool` and `pubmed_tool` | Agent can call both tools (DEG is not a tool — it runs automatically before the agent) |
 | T-021 | Implement real LangGraph agent in `graph.py` | Agent dynamically decides which tools to call based on the message |
 | T-022 | Dynamic `trace` field | `metadata.trace` reflects what the agent actually called, not a fixed list |
 | T-023 | Add max-iteration guard | Agent stops after 5 tool calls |

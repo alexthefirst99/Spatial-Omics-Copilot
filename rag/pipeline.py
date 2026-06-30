@@ -1,29 +1,27 @@
 """
-RAG Pipeline Orchestrator
-Single entry point for the full analysis pipeline:
-  1. DEG extraction    (rag/deg_extraction.py)
-  2. Pathway enrichment (rag/pathway_enrichment.py)
-  3. PubMed retrieval  (rag/pubmed_retrieval.py)
-  4. LLM context       (rag/llm_interpretation.py)
+RAG Sequential Fallback Pipeline
+=================================
+Used by run_agent() (rag/agent/graph.py) until the real LangGraph agent
+is implemented. Receives pre-computed gene_objects and runs pathway + PubMed.
 
-Usage:
-    result = run_rag(work_dir, cluster_id="2")
-    result = run_rag(work_dir, coords=[[[x,y], ...]])
-    # result["gene_objects"]  — for popup card
-    # result["metadata"]      — for chat UI (trace, degs, pathways, citations)
-    # result["context_str"]   — for LLM prompt injection
+Pipeline order:
+  1. Pathway enrichment (GO / KEGG)
+  2. PubMed retrieval
+
+DEG is NOT run here — it runs automatically in app.py when the user selects
+a cluster or ROI, and the resulting gene list is passed in as gene_objects.
+
+Note: in the real LangGraph agent, the agent decides whether to call
+pathway_tool and/or pubmed_tool. This fallback always runs both.
 """
 
 from __future__ import annotations
 import math
 from typing import Optional
 
-from rag.deg import get_cluster_high_expression_genes, get_roi_high_expression_genes
 from rag.pathway import enrich_pathways
 from rag.pubmed import retrieve_abstracts
 from rag.agent.prompt import build_prompt_context
-
-import niceview.utils.io as vio
 
 
 # Demo fallback when no h5ad is loaded (mixed brain cell-type profile)
@@ -44,69 +42,39 @@ _DEMO_GENE_OBJECTS = [
 
 
 def _run_sequential(
-    work_dir: str,
-    cluster_id: Optional[str] = None,
-    coords: Optional[list] = None,
-    folder_id: str = "",
-    top_n: int = 25,
+    gene_objects: list,
+    message: str = "",
+    label: str = "selection",
     n_pathways: int = 6,
     n_abstracts: int = 3,
 ) -> dict:
-    """Run the full RAG pipeline.
-
-    Priority: cluster_id → coords → demo fallback.
-
-    Returns:
-        gene_objects  — full DEG list for the popup card UI
-        metadata      — {trace, degs, pathways, citations, label} for chat UI
-        context_str   — formatted text to append to LLM prompt
-    """
-    # --- 1. DEG Extraction ---
-    label = "selection"
-    deg_result = None
-
-    if cluster_id is not None:
-        deg_result = get_cluster_high_expression_genes(
-            work_dir, cluster_id, folder_id=folder_id, top_n=top_n
-        )
-        label = f"Cluster {cluster_id}"
-
-    elif coords:
-        deg_result = get_roi_high_expression_genes(
-            work_dir, coords, folder_id=folder_id, top_n=top_n
-        )
-        label = "ROI"
-
-    if deg_result and deg_result.get("top_genes"):
-        gene_objects = deg_result["top_genes"]
-        n_spots = deg_result.get("selected_spots", 0)
-    else:
+    # Use demo fallback if no genes provided
+    if not gene_objects:
         gene_objects = _DEMO_GENE_OBJECTS
-        label = label + " (demo)" if deg_result is not None else "demo"
-        n_spots = 0
+        label = "demo"
 
     genes = [g["gene"] for g in gene_objects]
 
-    # --- 2. Pathway Enrichment ---
+    # --- 1. Pathway Enrichment ---
     pathways = enrich_pathways(genes, top_n=n_pathways)
 
-    # --- 3. PubMed Retrieval ---
+    # --- 2. PubMed Retrieval ---
     pathway_names = [p["name"] for p in pathways]
     abstracts = retrieve_abstracts(genes, pathways=pathway_names, n=n_abstracts)
 
-    # --- 4. LLM Context ---
+    # --- 3. LLM Context ---
     context_str = build_prompt_context(genes, pathways, abstracts, label=label)
 
     # --- Build UI metadata ---
     trace = [
         {
             "step": "Extracted top DEGs",
-            "detail": f"{len(genes)} genes · {label}" + (f" · {n_spots} spots" if n_spots else ""),
+            "detail": f"{len(genes)} genes · {label}",
             "icon": "deg",
         },
         {
             "step": "Pathway enrichment",
-            "detail": "Reactome · GO · KEGG",
+            "detail": "GO · KEGG",
             "icon": "pathway",
         },
         {
