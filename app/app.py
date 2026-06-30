@@ -140,10 +140,10 @@ def add_token_to_map(token, port):
 gene_chosen = None
 # Import custom interface logic
 from niceview.interface.callback import (
-    upload_image, upload_spatial_h5ad, build_roi_gene_context,
-    get_roi_high_expression_genes, reset, save_roi,
-    clear_cache_forcall
+    upload_image, upload_spatial_h5ad, reset, save_roi, clear_cache_forcall
 )
+from rag.agent import run_agent
+from rag.deg import get_roi_high_expression_genes, get_cluster_high_expression_genes
 
 from niceview.interface.interface import (
     prepare_file_folder, update_data_cache,
@@ -449,29 +449,27 @@ def main():
             if not vio.exists(coords_path):
                 return status, []
             coords = vio.load_json(coords_path)
-            result = get_roi_high_expression_genes(work_dir, coords, folder_id=folder_id, top_n=5)
-            if not result:
+            rag = run_agent(work_dir, coords=coords, folder_id=folder_id)
+            vio.dump_json({"gene_objects": rag["gene_objects"]}, f'{work_dir}/user{folder_id}/roi_context.json')
+
+            gene_objects = rag["gene_objects"]
+            if not gene_objects:
                 return status, html.Div(className="roi-gene-card", children=[
                     html.Div("ROI marker genes", className="roi-gene-title"),
                     html.Div("Upload a spatial .h5ad file to see enriched genes.", className="roi-gene-empty"),
                 ])
-            if result.get("selected_spots", 0) == 0:
-                return status, html.Div(className="roi-gene-card", children=[
-                    html.Div("ROI marker genes", className="roi-gene-title"),
-                    html.Div("No spatial spots overlap this ROI.", className="roi-gene-empty"),
-                ])
 
-            gene_rows = []
-            for gene in result.get("top_genes", [])[:5]:
-                gene_rows.append(html.Div(className="roi-gene-row", children=[
-                    html.Span(gene["gene"], className="roi-gene-name"),
-                    html.Span(f"log2FC {gene['log2_fold_change']:.2g}", className="roi-gene-score"),
-                ]))
-
+            gene_rows = [
+                html.Div(className="roi-gene-row", children=[
+                    html.Span(g["gene"], className="roi-gene-name"),
+                    html.Span(f"log2FC {g['log2_fold_change']:.2g}", className="roi-gene-score"),
+                ]) for g in gene_objects[:25]
+            ]
+            n_spots = rag["metadata"]["trace"][0]["detail"]
             return status, html.Div(className="roi-gene-card", children=[
                 html.Div(className="roi-gene-header", children=[
                     html.Div("ROI marker genes", className="roi-gene-title"),
-                    html.Div(f"{result['selected_spots']} spots", className="roi-gene-count"),
+                    html.Div(n_spots, className="roi-gene-count"),
                 ]),
                 html.Div(gene_rows, className="roi-gene-list"),
             ])
@@ -481,6 +479,54 @@ def main():
                 html.Div("ROI marker genes", className="roi-gene-title"),
                 html.Div("Could not calculate ROI genes.", className="roi-gene-empty"),
             ])
+
+    # Show marker genes when a spatial cluster legend row is clicked.
+    @app.callback(
+        Output('roi-gene-popup', 'children', allow_duplicate=True),
+        Output('map-output', 'selected_cluster', allow_duplicate=True),
+        Input({"type": "cluster-legend-btn", "index": ALL}, "n_clicks"),
+        prevent_initial_call=True
+    )
+    def callback_cluster_gene_popup(n_clicks_list):
+        if not ctx.triggered_id or not any(n_clicks_list or []):
+            return dash.no_update, dash.no_update
+
+        cluster_id = str(ctx.triggered_id["index"])
+
+        try:
+            rag = run_agent(work_dir, cluster_id=cluster_id, folder_id=folder_id)
+            vio.dump_json({
+                "cluster_id": cluster_id,
+                "gene_objects": rag["gene_objects"],
+            }, f'{work_dir}/user{folder_id}/cluster_context.json')
+
+            gene_objects = rag["gene_objects"]
+            if not gene_objects:
+                return html.Div(className="roi-gene-card", children=[
+                    html.Div(f"Cluster {cluster_id} marker genes", className="roi-gene-title"),
+                    html.Div("Upload a spatial .h5ad file and re-visualize to see cluster genes.", className="roi-gene-empty"),
+                ]), cluster_id
+
+            gene_rows = [
+                html.Div(className="roi-gene-row", children=[
+                    html.Span(g["gene"], className="roi-gene-name"),
+                    html.Span(f"log2FC {g['log2_fold_change']:.2g}", className="roi-gene-score"),
+                ]) for g in gene_objects[:25]
+            ]
+            n_spots = rag["metadata"]["trace"][0]["detail"]
+            return html.Div(className="roi-gene-card", children=[
+                html.Div(className="roi-gene-header", children=[
+                    html.Div(f"Cluster {cluster_id} marker genes", className="roi-gene-title"),
+                    html.Div(n_spots, className="roi-gene-count"),
+                ]),
+                html.Div(gene_rows, className="roi-gene-list"),
+            ]), cluster_id
+        except Exception as e:
+            print(f"Cluster gene popup error: {e}")
+            return html.Div(className="roi-gene-card", children=[
+                html.Div(f"Cluster {cluster_id} marker genes", className="roi-gene-title"),
+                html.Div("Could not calculate cluster genes.", className="roi-gene-empty"),
+            ]), cluster_id
 
 
     timer = threading.Timer(7200, clear_cache_forcall, args=(VALID_TOKEN, work_dir))

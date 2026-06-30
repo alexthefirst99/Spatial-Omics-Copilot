@@ -10,7 +10,7 @@ and immediately receive biologically grounded, literature-backed interpretations
 - Interactive gigapixel whole-slide image viewer with ROI drawing.
 - Gene expression overlay from h5ad spatial transcriptomics data.
 - Top differentially expressed genes extracted from any selected tissue region.
-- Biological pathway enrichment via KEGG/Reactome.
+- Biological pathway enrichment via GO and KEGG.
 - PubMed literature retrieval grounded in the selected genes and pathways.
 - Agentic RAG pipeline (LangGraph) that reasons over spatial context and literature.
 - Streaming chat interface for follow-up questions about selected regions.
@@ -35,10 +35,9 @@ OLLAMA_MODEL=llama3          # or any Ollama-hosted model
 ### Optional
 
 ```bash
-OPENAI_API_KEY=...           # enables OpenAI models instead of Ollama
-ANTHROPIC_API_KEY=...        # enables Claude models
+OPENAI_API_KEY=...           # enables OpenAI models (e.g. gpt-4o)
 PUBMED_API_KEY=...           # higher PubMed rate limit (optional but recommended)
-COPILOT_CHAT_DIR=...          # path to store chat sessions (default: ./chat_sessions)
+COPILOT_CHAT_DIR=...         # path to store chat sessions (default: ./chat_sessions)
 COPILOT_WORKDIR_BASE=...     # path to store working directories (default: ~/copilot_workdirs)
 ```
 
@@ -73,26 +72,45 @@ spatial-omics-copilot/
 ├── README.md
 ├── requirements.txt
 ├── setup.py
-├── app/
-│   ├── app.py              # entry point, Dash callbacks
-│   ├── layout.py           # Dash UI layout
-│   ├── routes.py           # Flask routes
-│   ├── session.py          # session read/write with file locking
-│   ├── inference.py        # Ollama / OpenAI streaming
-│   ├── image_utils.py      # ROI crop, OME-TIFF caching
-│   ├── worker.py           # background job queue
-│   ├── status_store.py     # upload progress tracking
-│   └── utils.py            # setup_work_dir
-├── niceview/
-│   ├── interface/          # upload, ROI extraction, actions, visualization
-│   └── utils/              # dataset, io, colors, rendering, cell tools
-├── rag/
-│   ├── agent.py            # LangGraph agentic workflow (orchestrator)
-│   ├── pubmed.py           # PubMed literature retrieval tool
-│   ├── pathways.py         # KEGG/Reactome pathway enrichment tool
-│   ├── vectorstore.py      # embedding store for cached abstracts
-│   └── prompts.py          # synthesis prompt templates
-├── dash_viv_viewer/        # VivViewer Dash component package
+├── app/                         # infrastructure layer
+│   ├── app.py                   # Dash entry point + callbacks
+│   ├── layout.py                # Dash UI layout
+│   ├── routes.py                # Flask HTTP routes
+│   ├── worker.py                # background job queue + LLM streaming
+│   ├── inference.py             # Ollama / OpenAI API wrapper
+│   ├── session.py               # chat session read/write
+│   ├── image_utils.py           # ROI crop, OME-TIFF caching
+│   ├── status_store.py          # upload progress tracking
+│   └── assets/
+│       ├── chat.js              # chat UI: AGENT TRACE, pathway/DEG panels
+│       └── opioid.css           # styles
+├── niceview/                    # UI layer
+│   ├── interface/
+│   │   ├── upload.py            # image + h5ad upload handlers
+│   │   ├── visualization.py     # spot overlay, VivViewer setup
+│   │   ├── actions.py           # re-visualize, save ROI
+│   │   ├── callback.py          # Dash callbacks
+│   │   └── data_io.py           # session data helpers
+│   └── utils/                   # io, colors, rendering helpers
+├── rag/                         # analysis pipeline
+│   ├── pipeline.py              # fallback sequential pipeline (_run_sequential)
+│   ├── preprocessing.py         # QC, normalize, PCA
+│   ├── clustering.py            # Leiden / KMeans spatial clustering
+│   ├── deg/
+│   │   ├── __init__.py          # exposes: get_roi/cluster_high_expression_genes
+│   │   └── extraction.py        # DEG computation
+│   ├── pathway/
+│   │   ├── __init__.py          # exposes: enrich_pathways
+│   │   └── enrichment.py        # ORA against GO / KEGG
+│   ├── pubmed/
+│   │   ├── __init__.py          # exposes: retrieve_abstracts
+│   │   └── retrieval.py         # NCBI E-utilities + vector store
+│   └── agent/
+│       ├── __init__.py          # exposes: run_agent  ← only public entry point
+│       ├── graph.py             # LangGraph agent (currently mock)
+│       ├── tools.py             # LangChain tool definitions
+│       └── prompt.py            # context string formatting
+├── dash_viv_viewer/             # VivViewer React component package
 └── docs/
     ├── PRD.md
     ├── specs.md

@@ -2,13 +2,10 @@ import time
 import uuid
 import os
 import anndata as ad
-import numpy as np
-import pandas as pd
-import scipy
-import scipy.sparse
 from dash import html
 from dash import dcc
 import niceview.utils.io as vio
+from rag.clustering import run_spatial_clustering
 import app.status_store as status_store
 from niceview.interface.interface import (
     get_data_path_cache_path,
@@ -46,86 +43,6 @@ def _spatial_omics_cluster_path(work_dir, folder_id=""):
     return f'{_spatial_omics_dir(work_dir, folder_id)}/spatial_clusters.json'
 
 
-def _cluster_palette(labels):
-    colors = [
-        "#0071e3", "#ff9500", "#34c759", "#af52de", "#ff3b30",
-        "#00c7be", "#5856d6", "#ffcc00", "#5ac8fa", "#ff2d55",
-        "#30d158", "#bf5af2", "#ffd60a", "#64d2ff", "#a2845e",
-    ]
-    return {str(label): colors[i % len(colors)] for i, label in enumerate(sorted(set(map(str, labels))))}
-
-
-def run_spatial_basic_clustering(h5ad_path, cluster_path):
-    """Run a small Scanpy preprocessing workflow and save spatial cluster labels."""
-    import scanpy as sc
-
-    adata = ad.read_h5ad(h5ad_path)
-    if "spatial" not in adata.obsm:
-        raise ValueError('Missing required adata.obsm["spatial"] coordinates.')
-    if adata.n_obs < 3 or adata.n_vars < 3:
-        raise ValueError("Need at least 3 spots and 3 genes for clustering.")
-
-    adata.var_names_make_unique()
-
-    sc.pp.filter_genes(adata, min_cells=1)
-    sc.pp.normalize_total(adata, target_sum=1e4)
-    sc.pp.log1p(adata)
-
-    n_top_genes = min(2000, int(adata.n_vars))
-    if n_top_genes >= 50:
-        try:
-            sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, flavor="seurat", subset=True)
-        except Exception as e:
-            print(f"Spatial clustering HVG step skipped: {e}")
-
-    n_comps = min(50, int(adata.n_obs) - 1, int(adata.n_vars) - 1)
-    if n_comps < 2:
-        raise ValueError("Not enough dimensions for PCA clustering.")
-    sc.pp.pca(adata, n_comps=n_comps)
-    n_pcs = min(30, n_comps)
-
-    if int(adata.n_obs) > 20000:
-        from sklearn.cluster import MiniBatchKMeans
-
-        method = "pca_minibatch_kmeans_over_20k"
-        n_clusters = min(12, max(4, int(round(np.sqrt(float(adata.n_obs) / 3000.0)))))
-        x_pca = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
-        labels = MiniBatchKMeans(
-            n_clusters=n_clusters,
-            random_state=0,
-            batch_size=min(8192, int(adata.n_obs)),
-            n_init=5,
-        ).fit_predict(x_pca)
-        adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
-    else:
-        sc.pp.neighbors(adata, n_neighbors=min(15, max(2, int(adata.n_obs) - 1)), n_pcs=n_pcs)
-
-        method = "scanpy_leiden"
-        try:
-            sc.tl.leiden(adata, key_added="spatial_cluster", resolution=0.8)
-        except Exception as e:
-            print(f"Spatial clustering Leiden failed, using k-means fallback: {e}")
-            from sklearn.cluster import KMeans
-
-            method = "pca_kmeans_fallback"
-            n_clusters = min(8, max(2, int(round(np.sqrt(float(adata.n_obs) / 2.0)))))
-            x_pca = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
-            labels = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit_predict(x_pca)
-            adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
-
-    labels = [str(x) for x in adata.obs["spatial_cluster"].tolist()]
-    palette = _cluster_palette(labels)
-    clusters = {str(obs_name): label for obs_name, label in zip(adata.obs_names, labels)}
-    payload = {
-        "cluster_key": "spatial_cluster",
-        "method": method,
-        "n_spots": int(adata.n_obs),
-        "n_clusters": len(set(labels)),
-        "clusters": clusters,
-        "palette": palette,
-    }
-    vio.dump_json(payload, cluster_path, indent=2)
-    return payload
 
 
 def _upload_job_id_from_path(path):
@@ -321,7 +238,7 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
             if job_id:
                 status_store.update_status(job_id, 70, "Running basic clustering...")
             cluster_path = _spatial_omics_cluster_path(work_dir, folder_id)
-            cluster_summary = run_spatial_basic_clustering(stored_path, cluster_path)
+            cluster_summary = run_spatial_clustering(stored_path, cluster_path)
             state.update({
                 "cluster_path": cluster_path,
                 "cluster_key": cluster_summary.get("cluster_key", "spatial_cluster"),

@@ -270,24 +270,20 @@ html {
   /* Map fills the cell */
 }
 
-/* RIGHT COLUMN (Chat) */
+/* RIGHT COLUMN (Chat) — zero width; chat panel now floats via position:fixed */
 #right-column-temp {
-  flex: 0 0 350px;
-  /* Fixed width sidebar for chat */
-  width: 350px !important;
-  /* Force width override */
+  flex: 0 0 0;
+  width: 0 !important;
   padding: 0;
-  /* Reset padding */
+  overflow: visible;
   background: transparent;
   min-width: unset;
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  /* Animation */
 }
 
 #right-column-temp.collapsed {
-  flex: 0 0 60px;
-  width: 60px !important;
-  min-width: 60px;
+  flex: 0 0 0;
+  width: 0 !important;
+  min-width: 0;
 }
 
 /* ------------------------ Sidebar (Upload) Wrapper ------------------------ */
@@ -756,7 +752,7 @@ h2 {
   z-index: 900;
   width: min(300px, calc(100% - 390px));
   margin: 18px 18px 0 0;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .roi-gene-popup:empty {
@@ -801,6 +797,8 @@ h2 {
 .roi-gene-list {
   display: grid;
   gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .roi-gene-row {
@@ -839,5 +837,251 @@ h2 {
     width: 260px;
     margin-right: 12px;
   }
+}
+
+/* =========================================================================
+   RAG UI COMPONENTS — Agent trace card, DEG bar chart, citation chips
+   ========================================================================= */
+
+/* Shared "MOCK" badge */
+.rag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 179, 0, 0.15);
+  color: #b07800;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 179, 0, 0.3);
+  flex: 0 0 auto;
+}
+
+/* ---- Agent Trace Card ---- */
+.rag-trace-card {
+  background: rgba(245, 245, 247, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: #1d1d1f;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.rag-trace-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rag-trace-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6e6e73;
+}
+
+.rag-trace-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+  line-height: 1.45;
+}
+
+.rag-trace-check {
+  color: #34c759;
+  font-weight: 700;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.rag-trace-text {
+  color: #1d1d1f;
+  font-weight: 500;
+}
+
+.rag-trace-detail {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: #8e8e93;
+}
+
+/* ---- Pathway Enrichment Panel ---- */
+.rag-pathway-panel {
+  background: rgba(245, 245, 247, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  margin-top: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.rag-pathway-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+}
+
+.rag-pathway-source {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: #6e6e73;
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex: 0 0 auto;
+  letter-spacing: 0.02em;
+}
+
+.rag-pathway-name {
+  font-size: 11.5px;
+  color: #1d1d1f;
+  width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+/* Body-level tooltip — appended by JS to escape overflow:hidden parents */
+.pathway-tooltip {
+  position: fixed;
+  background: #1d1d1f;
+  color: #fff;
+  font-size: 11px;
+  font-family: inherit;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border-radius: 7px;
+  pointer-events: none;
+  z-index: 99999;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  transition: opacity 0.12s ease;
+}
+
+.rag-pathway-bar {
+  height: 100%;
+  background: #30a46c;
+  border-radius: 5px;
+  min-width: 4px;
+  transition: width 0.5s ease;
+}
+
+/* ---- DEG Bar Chart Panel ---- */
+.rag-deg-panel {
+  background: rgba(245, 245, 247, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  margin-top: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.rag-deg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.rag-deg-header-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.rag-deg-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #6e6e73;
+}
+
+.rag-deg-fc-label {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: #8e8e93;
+  letter-spacing: 0.03em;
+}
+
+.rag-deg-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin-bottom: 8px;
+}
+
+.rag-deg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.rag-deg-gene {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d1d1f;
+  width: 68px;
+  flex: 0 0 auto;
+}
+
+.rag-deg-bar-wrap {
+  flex: 1;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.rag-deg-bar {
+  height: 100%;
+  background: #1d63c9;
+  border-radius: 5px;
+  min-width: 4px;
+  transition: width 0.5s ease;
+}
+
+.rag-deg-val {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: #3c3c43;
+  width: 30px;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+/* ---- Citation Chips ---- */
+.rag-citation-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.rag-citation-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(29, 99, 201, 0.08);
+  border: 1px solid rgba(29, 99, 201, 0.2);
+  color: #1d63c9;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: default;
+  white-space: nowrap;
 }
 

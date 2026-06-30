@@ -134,22 +134,22 @@ def create_layout(work_dir, folder_id):
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
         ),
 
-        # Hero/Intro Section with Parallax
-        html.Div(
-            id='hero-section',
-            className='hero-parallax',
-            children=[
-                html.Canvas(id='hero-canvas', style={'position': 'absolute', 'top': 0, 'left': 0, 'width': '100%', 'height': '100%', 'zIndex': 1}),
-                html.Div(className='hero-content', style={'zIndex': 2, 'position': 'relative'}, children=[
-                    html.H1('Spatial Omics Copilot', className='hero-title'),
-                    html.P('AI-assisted spatial omics interpretation', className='hero-subtitle'),
-                    html.Button([
-                        'Get Started ',
-                        html.I(className='fa fa-arrow-down')
-                    ], id='scroll-to-app-btn', className='hero-btn')
-                ])
-            ]
-        ),
+        # Hero/Intro Section with Parallax — commented out to save resources
+        # html.Div(
+        #     id='hero-section',
+        #     className='hero-parallax',
+        #     children=[
+        #         html.Canvas(id='hero-canvas', style={'position': 'absolute', 'top': 0, 'left': 0, 'width': '100%', 'height': '100%', 'zIndex': 1}),
+        #         html.Div(className='hero-content', style={'zIndex': 2, 'position': 'relative'}, children=[
+        #             html.H1('Spatial Omics Copilot', className='hero-title'),
+        #             html.P('AI-assisted spatial omics interpretation', className='hero-subtitle'),
+        #             html.Button([
+        #                 'Get Started ',
+        #                 html.I(className='fa fa-arrow-down')
+        #             ], id='scroll-to-app-btn', className='hero-btn')
+        #         ])
+        #     ]
+        # ),
 
         # Main App Section (wrapped)
         html.Div(
@@ -212,9 +212,13 @@ def create_layout(work_dir, folder_id):
                     
                     html.Button("Cancel", className="upload-cancel-btn", style={'display': 'none'})
                 ], className="s3-upload-wrapper"),
-                
-                html.Br(),
-                html.Div(className="upload-data omics-upload-data", children=[
+
+                html.P([
+                        "Click 'Re-visualize Image' to view the tissue image.",
+                    ], className="text upload-instructions", style={"fontSize": "13px", "color": "#666", "lineHeight": "1.4", "marginTop": "8px"}),
+                html.Button('Re-visualize Image', className="button btn-secondary", id="visual-input", n_clicks=0, style={'backgroundColor': '#e5e5ea', 'color': '#1d1d1f'}),
+
+                html.Div(className="upload-data omics-upload-data", style={"marginTop": "24px"}, children=[
                     html.H5("Upload Gene Expression Matrix", className="text", style={"fontWeight": "600", "marginBottom": "5px"}),
                     html.P("Spatial transcriptomics data (.h5ad):", className="text", style={"fontSize": "14px", "marginBottom": "5px"}),
                     S3Upload(
@@ -238,18 +242,6 @@ def create_layout(work_dir, folder_id):
                 # du.Upload(...)
                                         ]),
                                         html.Br(),
-                                        html.P([
-                                                "Click 'Re-visualize Image' to view the tissue image.",
-                                                # html.Br(),
-                                                # "If you could not see the image, use the zoom buttons."
-                                            ], className="text upload-instructions", style={"fontSize": "13px", "color": "#666", "lineHeight": "1.4"}),
-
-                                        html.Button('Re-visualize Image', className="button btn-secondary", id="visual-input", n_clicks=0, style={'backgroundColor': '#e5e5ea', 'color': '#1d1d1f'}),
-                                        html.Br(),
-                                        # Removed commented out code and consolidated Brs
-
-                                        #         ]
-                                        #     ]
                                         html.Br(),
                                         # Removed Direct-to-S3 section as requested
                                         html.Br(),

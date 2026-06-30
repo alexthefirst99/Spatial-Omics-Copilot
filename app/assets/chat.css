@@ -5,32 +5,35 @@
   display: flex;
   flex-direction: column;
   /* Glass Style */
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(25px) saturate(180%);
   -webkit-backdrop-filter: blur(25px) saturate(180%);
   border-radius: 20px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18);
   padding: 20px;
   height: 600px;
   max-height: 80vh;
-  width: 100%;
-  margin-bottom: 20px;
+  width: 420px;
   transition: all 0.3s ease;
-  position: relative;
+  /* Floating over the viewer */
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9000;
   overflow: hidden;
   color: #1d1d1f;
-  /* Dark text */
 }
 
 /* Collapsed State handled by parent layout logic usually, or duplicate here */
 .chatbot-panel.collapsed {
-  height: 60px;
-  padding: 15px 20px;
-  background: transparent;
+  height: 56px;
+  width: 56px;
+  padding: 0;
+  background: #0071e3;
   backdrop-filter: none;
-  box-shadow: none;
-  pointer-events: none;
-  /* Let toggle act */
+  box-shadow: 0 4px 16px rgba(0, 113, 227, 0.4);
+  border-radius: 50%;
+  pointer-events: auto;
 }
 
 .chatbot-panel.collapsed * {
@@ -42,6 +45,11 @@
 .chatbot-panel.collapsed .chat-toggle {
   opacity: 1;
   pointer-events: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  font-size: 22px;
 }
 
 /* Header */

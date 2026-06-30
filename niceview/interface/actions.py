@@ -3,7 +3,7 @@ import shutil
 import dash
 from dash import html
 import niceview.utils.io as vio
-from niceview.interface.interface import visualization_img_input
+from niceview.interface.visualization import visualization_img_input
 
 
 def reset(n_clicks, spot_cell_option, visual_type, folder_id, work_dir):

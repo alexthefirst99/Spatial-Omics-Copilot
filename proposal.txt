@@ -1,83 +1,71 @@
-Project Title: AI-Powered Spatial Omics Copilot — Bridging Tissue Visualization and Biomedical Intelligence
-
-================================================================================
-
-1. INDUSTRY / APPLICATION DOMAIN
-
-Biomedical research and computational pathology. Specifically, the intersection
-of spatial transcriptomics, digital pathology, and AI-assisted scientific discovery.
-
-================================================================================
-
-2. REAL-WORLD PROBLEM STATEMENT
-
-Spatial transcriptomics technology can now capture gene expression across thousands
-of locations within a single tissue sample, producing gigapixel histology images
-paired with rich molecular data. However, interpreting this data requires simultaneous
-expertise in pathology, molecular biology, and the published literature — a bottleneck
-that slows research and limits accessibility.
-
-The core problem: the data and the knowledge exist, but they are disconnected. A
-researcher can visually identify a suspicious tissue region, but cannot instantly know
-what genes are driving it, which pathways are involved, or what published studies have
-said about similar findings. This gap forces researchers to context-switch across
-multiple tools, manually cross-reference databases, and spend hours reading papers
-before forming a biological interpretation.
-
-Our project addresses this by building an AI copilot directly embedded in a spatial
-omics visualization tool. Researchers simply draw a region of interest (ROI) on the
-tissue, and the system immediately returns biologically grounded, literature-backed
-interpretations — without leaving the visualization interface.
-
-================================================================================
-
-3. PUBLIC DATASETS
-
-- Spatial transcriptomics demo data: VisiumHD CytAssist Gene Expression — Human
-  Colorectal Cancer (CRC), 10x Genomics.
-  Gigapixel histopathology images (TIFF/OME-TIFF) paired with gene expression
-  matrices (h5ad format).
-  https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-human-crc
-
-- PubMed biomedical literature: Retrieved via the NCBI E-utilities API
-  (https://www.ncbi.nlm.nih.gov/home/develop/api/)
-  Abstracts used to ground AI responses in peer-reviewed findings.
-
-================================================================================
-
-4. DESIRED OUTCOMES
-
-By the end of the project we aim to deliver:
-
-- An interactive visualization tool where users can load a whole-slide histopathology
-  image, overlay gene expression data, and draw ROIs on tissue regions of interest.
-
-- An AI copilot that, given a selected ROI, automatically:
-    (1) identifies the top differentially expressed genes in that region,
-    (2) maps them to relevant biological pathways, and
-    (3) retrieves and summarizes relevant PubMed abstracts.
-
-- An agentic RAG pipeline (LangChain/LangGraph + Ollama or Claude) that reasons
-  over the spatial gene expression context and retrieved literature to produce a
-  concise biological interpretation.
-
-- A streaming chat interface embedded in the visualization tool so researchers can
-  ask follow-up questions about their selected region in natural language.
-
-The system will be evaluated on biological relevance of generated interpretations,
-retrieval quality (precision of PubMed results), and user experience (response
-latency, clarity of output).
-
-================================================================================
-
-5. TEAM CONCURRENCE
-
-Team members:
-- Quynh
-- Alex
-- Rodney
-- Anh
-- JN
-- Zainab
-
-================================================================================
+Our team would like to share our project proposal.
+1) Industry / Application Domain
+	•	Biomedical research
+	•	Computational pathology
+	•	Spatial transcriptomics
+	•	Digital pathology
+	•	AI-assisted scientific discovery
+Our project focuses on using AI to help researchers better understand spatial omics data from tissue images.
+2) Real-World Problem Statement
+	•	Spatial transcriptomics can measure gene expression across many locations in a tissue sample.
+	•	It also produces large histopathology images that show the structure of the tissue.
+	•	However, interpreting this type of data is difficult because researchers often need to:
+	◦	examine the tissue image,
+	◦	identify important tissue regions,
+	◦	analyze gene expression in those regions,
+	◦	connect genes to biological pathways,
+	◦	search PubMed for related studies, and
+	◦	combine all of this information into a biological explanation.
+The main problem is that the data and the knowledge are disconnected. A researcher may find an interesting region of interest (ROI) in a tissue image, but it is not easy to quickly know which genes are important in that region, what pathways are involved, or what the literature says about similar findings.
+Our project aims to solve this by building an AI-powered Spatial Omics Copilot inside a spatial omics visualization tool. The user can select an ROI on the tissue image, and the system will help generate a biologically grounded explanation using gene expression, pathway information, and PubMed literature.
+The AI copilot will use a Retrieval-Augmented Generation (RAG) workflow. After a user selects an ROI, the system will automatically retrieve relevant pathway information and PubMed abstracts, then provide this retrieved context to a large language model to generate a more reliable interpretation.
+3) Public Datasets
+We plan to use public spatial transcriptomics data and public biomedical knowledge sources.
+	•	Spatial omics demo data
+	◦	Visium HD CytAssist Gene Expression — Human Colorectal Cancer, 10x Genomics
+	◦	https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-human-crc
+	•	General spatial transcriptomics platform reference
+	◦	10x Genomics Visium platform
+	◦	https://www.10xgenomics.com/platforms/visium
+	•	Pathway and gene annotation resources
+	◦	KEGG
+	◦	Gene Ontology
+	•	Biomedical literature source
+	◦	PubMed abstracts through the NCBI E-utilities API
+	◦	https://www.ncbi.nlm.nih.gov/home/develop/api/
+The expected data formats include:
+	•	Gigapixel histopathology images, such as TIFF or OME-TIFF files
+	•	Spatial gene expression matrices, such as h5ad files
+	•	Biomedical text abstracts from PubMed
+4) Desired Outcomes
+By the end of the project, we aim to build a working prototype of an AI-powered spatial omics visualization system.
+The system should allow users to:
+	•	Load and view a whole-slide histopathology image.
+	•	Overlay spatial gene expression data on the tissue image.
+	•	Draw a region of interest (ROI) on a tissue area they want to study.
+	•	Analyze gene expression inside the selected ROI.
+	•	Identify important genes in that region.
+	•	Connect those genes to relevant biological pathways.
+	•	Use an agentic RAG pipeline, managed with LangGraph, to decide which tools to call based on the selected ROI and user question. These tools may include gene expression analysis, pathway enrichment, and PubMed retrieval.
+	•	Pass the retrieved context to an LLM, such as Ollama or ChatGPT, to generate a biologically grounded interpretation.
+	•	Ask follow-up questions through a chat interface.
+The final goal is not just to display spatial omics data, but to help researchers understand what a selected tissue region may mean biologically.
+We plan to use tools such as:
+	•	Dash or Flask for the visualization interface
+	•	LangChain and LangGraph for the RAG workflow
+	•	Ollama or ChatGPT as the large language model
+	•	PubMed API for literature retrieval
+	•	Pathway resources such as KEGG and Gene Ontology
+We will evaluate the system based on:
+	•	Whether the generated biological explanations make sense
+	•	Whether the retrieved PubMed papers are relevant
+	•	Whether the system responds in a reasonable time
+	•	Whether the interface is clear and easy to use
+5) Team Concurrence
+Our team members are:
+	•	Quynh
+	•	Alex
+	•	Rodney
+	•	Anh
+	•	JN
+	•	Zainab

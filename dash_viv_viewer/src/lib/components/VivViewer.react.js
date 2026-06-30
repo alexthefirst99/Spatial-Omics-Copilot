@@ -84,7 +84,7 @@ function spotClusterColor(spot) {
     return SPOT_CLUSTER_COLORS[Math.abs(hash) % SPOT_CLUSTER_COLORS.length];
 }
 
-const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', active_layer = 0, opacity, rois = [], spots = [], selected_spot, setProps }) => {
+const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', active_layer = 0, opacity, rois = [], spots = [], selected_spot, selected_cluster, setProps }) => {
     const containerRef = useRef(null);
     const svgRef = useRef(null);
     const spotCanvasRef = useRef(null);
@@ -107,7 +107,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
         if (typeof opacity === 'object') return opacity[internalActiveLayer] !== undefined ? opacity[internalActiveLayer] : 0.5;
         return opacity; // Support numeric opacity if passed
     });
-    const [clusterOpacity, setClusterOpacity] = useState(1);
+    const [clusterOpacity, setClusterOpacity] = useState(0.5);
     // Sync Dash->local when the prop changes externally
     useEffect(() => {
         if (opacity === undefined || opacity === null) return;
@@ -362,6 +362,9 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
 
     const spotList = Array.isArray(spots) ? spots : [];
     const hasSpots = spotList.length > 0;
+    const selectedClusterId = selected_cluster === undefined || selected_cluster === null || selected_cluster === ''
+        ? null
+        : String(selected_cluster);
 
     const spotGrid = useMemo(() => {
         if (!hasSpots || !spotSelectMode) return null;
@@ -433,8 +436,50 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
             rasterCtx.arc((x - minX) * scale, (y - minY) * scale, r, 0, Math.PI * 2);
             rasterCtx.fill();
         }
-        return { canvas: raster, minX, minY, maxX, maxY };
+        return { canvas: raster, minX, minY, maxX, maxY, scale, rasterWidth, rasterHeight };
     }, [hasSpots, spotList]);
+
+    const selectedClusterRaster = useMemo(() => {
+        if (!selectedClusterId || !spotRaster) return null;
+        const raster = document.createElement('canvas');
+        raster.width = spotRaster.rasterWidth;
+        raster.height = spotRaster.rasterHeight;
+        const rasterCtx = raster.getContext('2d');
+        rasterCtx.clearRect(0, 0, raster.width, raster.height);
+        let drewAny = false;
+
+        for (const spot of spotList) {
+            if (String(spot.cluster) !== selectedClusterId) continue;
+            const x = Number(spot.x);
+            const y = Number(spot.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+            const color = spotClusterColor(spot);
+            const baseRadius = Math.max(1, Number(spot.r || 4) * spotRaster.scale);
+            const cx = (x - spotRaster.minX) * spotRaster.scale;
+            const cy = (y - spotRaster.minY) * spotRaster.scale;
+
+            rasterCtx.fillStyle = 'rgba(255,255,255,0.9)';
+            rasterCtx.beginPath();
+            rasterCtx.arc(cx, cy, baseRadius * 1.42, 0, Math.PI * 2);
+            rasterCtx.fill();
+
+            rasterCtx.fillStyle = colorWithAlpha(color, 1);
+            rasterCtx.beginPath();
+            rasterCtx.arc(cx, cy, baseRadius * 1.16, 0, Math.PI * 2);
+            rasterCtx.fill();
+            drewAny = true;
+        }
+
+        if (!drewAny) return null;
+        return {
+            canvas: raster,
+            minX: spotRaster.minX,
+            minY: spotRaster.minY,
+            maxX: spotRaster.maxX,
+            maxY: spotRaster.maxY,
+        };
+    }, [selectedClusterId, spotList, spotRaster]);
 
     const drawSpotMarker = useCallback((ctx, spot, fill, stroke, scale = 1.2) => {
         const screen = imageToScreen(Number(spot.x), Number(spot.y), 0);
@@ -468,9 +513,9 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
         ctx.clearRect(0, 0, w, h);
         if (!viewState || !hasSpots) return;
 
-        if (spotRaster) {
-            const topLeft = imageToScreen(spotRaster.minX, spotRaster.minY, 0);
-            const bottomRight = imageToScreen(spotRaster.maxX, spotRaster.maxY, 0);
+        const drawRaster = (raster, alpha) => {
+            const topLeft = imageToScreen(raster.minX, raster.minY, 0);
+            const bottomRight = imageToScreen(raster.maxX, raster.maxY, 0);
             if (topLeft && bottomRight) {
                 const dx = topLeft[0];
                 const dy = topLeft[1];
@@ -479,11 +524,18 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                 if (dw > 1 && dh > 1 && dx < w && dy < h && dx + dw > 0 && dy + dh > 0) {
                     ctx.imageSmoothingEnabled = true;
                     ctx.save();
-                    ctx.globalAlpha = clusterOpacity;
-                    ctx.drawImage(spotRaster.canvas, dx, dy, dw, dh);
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(raster.canvas, dx, dy, dw, dh);
                     ctx.restore();
                 }
             }
+        };
+
+        if (spotRaster) {
+            drawRaster(spotRaster, selectedClusterId ? clusterOpacity * 0.2 : clusterOpacity);
+        }
+        if (selectedClusterRaster) {
+            drawRaster(selectedClusterRaster, clusterOpacity);
         }
 
         if (!spotSelectMode) return;
@@ -495,7 +547,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
             const color = spotClusterColor(hoverSpot);
             drawSpotMarker(ctx, hoverSpot, colorWithAlpha(color, 0.64), color, 1.35);
         }
-    }, [clusterOpacity, containerSize, drawSpotMarker, hasSpots, hoverSpot, imageToScreen, selectedSpotId, spotList, spotRaster, spotSelectMode, viewState]);
+    }, [clusterOpacity, containerSize, drawSpotMarker, hasSpots, hoverSpot, imageToScreen, selectedClusterId, selectedClusterRaster, selectedSpotId, spotList, spotRaster, spotSelectMode, viewState]);
 
     useEffect(() => { drawSpotCanvas(); }, [drawSpotCanvas]);
 

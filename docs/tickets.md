@@ -4,67 +4,69 @@
 | --- | --- | --- |
 | Group | Class prototype | June 2026 |
 
-## Milestone 1: Project Setup
+## Milestone 1: Project Setup ✓ (Alex — done)
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-001 | Create `rag/` folder with stub files | High | `rag/agent.py`, `rag/pubmed.py`, `rag/pathways.py`, `rag/vectorstore.py`, `rag/prompts.py` exist with placeholder functions |
-| T-002 | Add RAG dependencies to requirements.txt | High | `langchain`, `langgraph`, `sentence-transformers`, `faiss-cpu` install cleanly |
-| T-003 | Confirm existing app runs end-to-end | High | `python app/app.py --port 8081 --token hello` loads without errors |
+| **ID** | **Task** | **Status** |
+| --- | --- | --- |
+| T-001 | UI — VivViewer, image upload, h5ad upload, spot overlay, ROI drawing | ✓ Done |
+| T-002 | Infrastructure — routes.py, worker.py, inference.py, session.py | ✓ Done |
+| T-003 | Preprocessing — QC, normalize, HVG, PCA (`rag/preprocessing.py`) | ✓ Done |
+| T-004 | Clustering — Leiden / KMeans, saves cluster JSON (`rag/clustering.py`) | ✓ Done |
+| T-005 | Mock RAG pipeline — sequential fallback (`rag/pipeline.py`) | ✓ Done |
+| T-006 | Chat UI — AGENT TRACE card, pathway bar chart, DEG bar chart | ✓ Done |
+| T-007 | Folder structure — `rag/deg/`, `rag/pathway/`, `rag/pubmed/`, `rag/agent/` | ✓ Done |
 
-## Milestone 2: PubMed Retrieval Tool
+## Milestone 2: DEG Extraction (rag/deg/)
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-004 | Implement `search_pubmed(query, max_results)` | High | Returns list of `{title, abstract, pmid, year}` dicts |
-| T-005 | Build query string from gene names and pathways | Medium | Query combines gene symbols and pathway names into a meaningful PubMed search string |
-| T-006 | Handle rate limiting and empty results | Medium | Returns empty list (not error) when no results found; respects API rate limit |
-| T-007 | Write `test_pubmed.py` | High | Tests cover happy path, empty result, and API unavailability |
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-008 | Add Wilcoxon rank-sum test to `_rank_high_expression_genes()` | `pvalue` field present in each gene dict |
+| T-009 | Add Benjamini-Hochberg correction | `adj_pvalue` field present; genes filtered to adj_pvalue < 0.05 |
+| T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset |
+| T-011 | Write `test_deg.py` | Tests cover cluster selection, ROI selection, empty selection |
 
-## Milestone 3: Pathway Enrichment Tool
+## Milestone 3: Pathway Enrichment (rag/pathway/)
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-008 | Implement `get_pathways(genes)` via KEGG REST API | High | Returns `{pathways: [{name, id, p_value}], source}` |
-| T-009 | Add Reactome fallback | Medium | If KEGG fails, Reactome is tried automatically |
-| T-010 | Handle empty gene list and API errors | Medium | Returns empty pathway list with a status message |
-| T-011 | Write `test_pathways.py` | High | Tests cover happy path, fallback, and empty input |
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-012 | Replace mock with real gseapy.enrichr() or g:Profiler API | Returns real GO/KEGG terms with valid adjusted p-values |
+| T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception |
+| T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability |
 
-## Milestone 4: Vector Store
+## Milestone 4: PubMed Retrieval (rag/pubmed/)
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-012 | Implement `search_vectorstore(query, k)` | High | Returns top-k semantically similar abstracts from the store |
-| T-013 | Implement abstract ingestion into the store | High | New PubMed abstracts are embedded and added automatically after retrieval |
-| T-014 | Persist vector store to disk | Medium | Store survives app restarts |
-| T-015 | Write `test_vectorstore.py` | High | Tests cover ingestion, search, and empty store |
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-015 | Implement NCBI esearch + efetch calls | Returns real abstracts for a gene list |
+| T-016 | Build query string from genes and pathways | Query combines gene symbols and pathway names |
+| T-017 | Handle rate limiting and empty results | Returns `[]` without error; respects API rate limits |
+| T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable |
+| T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability |
 
-## Milestone 5: LangGraph Agent
+## Milestone 5: LangGraph Agent (rag/agent/)
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-016 | Define LangGraph state schema | High | State holds gene context, question, history, tool results, and final answer |
-| T-017 | Wire pathway, PubMed, and vectorstore as agent tools | High | Agent can call all three tools during a turn |
-| T-018 | Implement `run_agent(gene_context, question, history)` | High | Generator streams tokens; calls tools before synthesizing |
-| T-019 | Add max-iteration guard | Medium | Agent stops after 5 tool calls and returns partial answer |
-| T-020 | Write `test_agent.py` | High | Agent calls at least one tool and returns non-empty response |
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-020 | Define LangChain tools in `tools.py` wrapping deg, pathway, pubmed | Agent can call all three tools |
+| T-021 | Implement real LangGraph agent in `graph.py` | Agent dynamically decides which tools to call based on the message |
+| T-022 | Dynamic `trace` field | `metadata.trace` reflects what the agent actually called, not a fixed list |
+| T-023 | Add max-iteration guard | Agent stops after 5 tool calls |
+| T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict |
 
-## Milestone 6: Prompt Engineering
+## Milestone 6: Prompt Engineering (rag/agent/prompt.py)
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-021 | Write system prompt template for synthesis | High | Prompt instructs model to cite PMIDs, not hallucinate, and answer in plain language |
-| T-022 | Write tool-result injection template | High | Pathway and abstract results are formatted clearly for the LLM |
-| T-023 | Test prompts against demo dataset | Medium | Responses are biologically relevant for the CRC VisiumHD dataset |
-| T-024 | Add fallback response when LLM unavailable | Medium | User sees a clear message instead of a crash |
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-025 | Improve `build_prompt_context()` with domain framing | LLM identifies cell type, pathway activity, and clinical relevance |
+| T-026 | Add structured citation instructions | LLM cites papers inline as [1], [2] consistently |
+| T-027 | Test prompts against demo dataset | Responses are biologically relevant for the demo data |
 
-## Milestone 7: Integration and Testing
+## Milestone 7: Demo Data & Evaluation
 
-| **ID** | **Task** | **Priority** | **Done When** |
-| --- | --- | --- | --- |
-| T-025 | Replace `run_model_inference` call in `worker.py` with `run_agent` | High | Existing chat flow uses the agentic pipeline end-to-end |
-| T-026 | Verify streaming still works after integration | High | Tokens stream to the browser the same as before |
-| T-027 | Run all unit tests | High | All tests in `docs/rules.md` section 8 pass |
-| T-028 | End-to-end demo with CRC dataset | High | Draw ROI → get genes → agent calls tools → streamed answer with citations |
-| T-029 | Record demo video | Medium | Demo shows ROI selection, tool calls, and streamed response |
-| T-030 | Freeze final submission | High | Repo, docs, and demo are complete and ready for submission |
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-028 | Download and validate spatial omics demo dataset | h5ad loads, spots overlay correctly, clustering runs |
+| T-029 | End-to-end test with real data | Draw ROI → DEG → pathway → PubMed → streamed answer with citations |
+| T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type |
+| T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response |
+| T-032 | Freeze final submission | Repo, docs, and demo complete |

@@ -32,9 +32,9 @@ TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 try:
-    from niceview.interface.callback import build_roi_gene_context
+    from rag.agent import run_agent
 except ImportError:
-    build_roi_gene_context = None
+    run_agent = None
 
 
 def register_chat_routes(server, token, work_dir):
@@ -450,13 +450,31 @@ def register_chat_routes(server, token, work_dir):
             # ----------------------------
 
             prompt = data.get("prompt", "")
+            prompt += "\n\nRespond in 3–4 sentences maximum. Be direct and concise."
+
+            # RAG pipeline — reads cached gene_objects written by popup callbacks
+            rag_metadata = None
             try:
-                if 'roi_json_to_upload' in locals() and roi_json_to_upload:
-                    roi_gene_context = build_roi_gene_context(work_dir, roi_json_to_upload)
-                    if roi_gene_context:
-                        prompt = prompt + roi_gene_context
+                if run_agent:
+                    _cluster_path = f'{work_dir}/user/cluster_context.json'
+                    _roi_path = f'{work_dir}/user/roi_context.json'
+
+                    _user_message = data.get("prompt", "")
+                    if vio.exists(_cluster_path):
+                        _cctx = vio.load_json(_cluster_path)
+                        _rag = run_agent(work_dir, message=_user_message, cluster_id=_cctx.get("cluster_id"))
+                    elif vio.exists(_roi_path):
+                        _rctx = vio.load_json(_roi_path)
+                        _coords = vio.load_json(f'{work_dir}/user/coords.json') if vio.exists(f'{work_dir}/user/coords.json') else None
+                        _rag = run_agent(work_dir, message=_user_message, coords=_coords)
+                    else:
+                        _rag = run_agent(work_dir, message=_user_message)  # demo fallback
+
+                    rag_context_str = _rag["context_str"]
+                    rag_metadata = _rag["metadata"]
+                    print(f"DEBUG: RAG ran for {rag_metadata['label']}")
             except Exception as e:
-                print(f"DEBUG: Failed to add spatial omics context: {e}")
+                print(f"DEBUG: RAG pipeline failed: {e}")
 
             status = enqueue_chat_job(
                 session_id=session_id,
@@ -464,7 +482,8 @@ def register_chat_routes(server, token, work_dir):
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,
-                    roi_path=roi_s3_path # Pass the explicit ROI path
+                roi_path=roi_s3_path,
+                rag_context_str=rag_context_str if 'rag_context_str' in locals() else "",
             )
 
             # Decide what to show as preview:
@@ -480,8 +499,9 @@ def register_chat_routes(server, token, work_dir):
 
             return jsonify({
                 "status": status,
-                "images": images,          # Full image list
-                "roi_image": preview_img   # The Image file (TIFF), not the JSON
+                "images": images,
+                "roi_image": preview_img,
+                "rag_metadata": rag_metadata,
             })
         except Exception as e:
             print(f"ERROR in chat_api: {e}")

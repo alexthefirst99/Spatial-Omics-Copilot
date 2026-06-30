@@ -48,7 +48,10 @@ class VivViewer(Component):
         Spatial transcriptomics spot overlay items. Each item has ``{id, x, y, r}``.
 
     - selected_spot (dict; optional):
-        The spot most recently selected in the viewer."""
+        The spot most recently selected in the viewer.
+
+    - selected_cluster (string; optional):
+        Cluster ID selected from the legend. Matching spatial spots are highlighted."""
 
     _children_props = []
     _base_nodes = ['children']
@@ -68,17 +71,17 @@ class VivViewer(Component):
         rois=Component.UNDEFINED,
         spots=Component.UNDEFINED,
         selected_spot=Component.UNDEFINED,
+        selected_cluster=Component.UNDEFINED,
         **kwargs
     ):
-        self._prop_names = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois', 'spots', 'selected_spot']
+        self._prop_names = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois', 'spots', 'selected_spot', 'selected_cluster']
         self._valid_wildcard_attributes = []
-        self.available_properties = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois', 'spots', 'selected_spot']
+        self.available_properties = ['id', 'image_url', 'height', 'width', 'bg_color', 'active_layer', 'opacity', 'rois', 'spots', 'selected_spot', 'selected_cluster']
         self.available_wildcard_properties = []
         _explicit_args = kwargs.pop('_explicit_args')
         _locals = locals()
         _locals.update(kwargs)
         args = {k: _locals[k] for k in _explicit_args}
         super(VivViewer, self).__init__(**args)
-
 
 

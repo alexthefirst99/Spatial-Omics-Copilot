@@ -61,6 +61,31 @@ function initApp() {
   }
 
   // ---------------------------------------------------------------------------
+  // BODY-LEVEL TOOLTIP (escapes overflow:hidden parents)
+  // ---------------------------------------------------------------------------
+  let _tip = null;
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('.rag-pathway-name');
+    if (!el || !el.dataset.tooltip) return;
+    _tip = document.createElement('div');
+    _tip.className = 'pathway-tooltip';
+    _tip.textContent = el.dataset.tooltip;
+    document.body.appendChild(_tip);
+    const r = el.getBoundingClientRect();
+    const tipW = _tip.offsetWidth;
+    let left = r.left;
+    // keep within viewport
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+    _tip.style.left = left + 'px';
+    _tip.style.top  = (r.top - _tip.offsetHeight - 6) + 'px';
+  });
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest('.rag-pathway-name') && _tip) {
+      _tip.remove(); _tip = null;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // HELPER: Get Session/Token from URL
   // ---------------------------------------------------------------------------
   function getSessionID() {
@@ -134,6 +159,187 @@ function initApp() {
 
       msg.appendChild(thumbs);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // RAG UI BUILDERS
+  // ---------------------------------------------------------------------------
+
+  function buildRagTraceCard(trace, label) {
+    const card = document.createElement("div");
+    card.className = "rag-trace-card";
+
+    const header = document.createElement("div");
+    header.className = "rag-trace-header";
+    const title = document.createElement("span");
+    title.className = "rag-trace-title";
+    title.textContent = "AGENT TRACE";
+    const badge = document.createElement("span");
+    badge.className = "rag-badge";
+    badge.textContent = "MOCK";
+    header.appendChild(title);
+    header.appendChild(badge);
+    card.appendChild(header);
+
+    (trace || []).forEach(step => {
+      const row = document.createElement("div");
+      row.className = "rag-trace-row";
+      const check = document.createElement("span");
+      check.className = "rag-trace-check";
+      check.textContent = "✓";
+      const text = document.createElement("span");
+      text.className = "rag-trace-text";
+      text.textContent = step.step;
+      row.appendChild(check);
+      row.appendChild(text);
+      if (step.detail) {
+        const detail = document.createElement("span");
+        detail.className = "rag-trace-detail";
+        detail.textContent = step.detail;
+        row.appendChild(detail);
+      }
+      card.appendChild(row);
+    });
+
+    return card;
+  }
+
+  function buildPathwayPanel(pathways, label) {
+    if (!pathways || pathways.length === 0) return null;
+
+    const panel = document.createElement("div");
+    panel.className = "rag-pathway-panel";
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "rag-deg-header";
+    const left = document.createElement("div");
+    left.className = "rag-deg-header-left";
+    const labelEl = document.createElement("span");
+    labelEl.className = "rag-deg-label";
+    labelEl.textContent = `ENRICHED PATHWAYS · ${label || "selection"}`;
+    const badge = document.createElement("span");
+    badge.className = "rag-badge";
+    badge.textContent = "MOCK";
+    left.appendChild(labelEl);
+    left.appendChild(badge);
+    const scoreLabel = document.createElement("span");
+    scoreLabel.className = "rag-deg-fc-label";
+    scoreLabel.textContent = "-log₁₀p";
+    header.appendChild(left);
+    header.appendChild(scoreLabel);
+    panel.appendChild(header);
+
+    const divider = document.createElement("div");
+    divider.className = "rag-deg-divider";
+    panel.appendChild(divider);
+
+    const maxScore = Math.max(...pathways.map(p => p.neg_log10p), 1);
+    pathways.forEach(p => {
+      const row = document.createElement("div");
+      row.className = "rag-pathway-row";
+
+      // Source tag (GO / Reactome / KEGG)
+      if (p.source) {
+        const src = document.createElement("span");
+        src.className = "rag-pathway-source";
+        src.textContent = p.source.replace(/^(GO|KEGG):[^\s]+/, m => m.split(':')[0]);
+        row.appendChild(src);
+      }
+
+      const name = document.createElement("span");
+      name.className = "rag-pathway-name";
+      name.textContent = p.name;
+      name.dataset.tooltip = p.name;
+
+      const barWrap = document.createElement("div");
+      barWrap.className = "rag-deg-bar-wrap";
+      const bar = document.createElement("div");
+      bar.className = "rag-pathway-bar";
+      bar.style.width = `${Math.round((p.neg_log10p / maxScore) * 100)}%`;
+      barWrap.appendChild(bar);
+
+      const val = document.createElement("span");
+      val.className = "rag-deg-val";
+      val.textContent = p.neg_log10p.toFixed(1);
+
+      row.appendChild(name);
+      row.appendChild(barWrap);
+      row.appendChild(val);
+      panel.appendChild(row);
+    });
+
+    return panel;
+  }
+
+  function buildDegPanel(degs, label, citations) {
+    if (!degs || degs.length === 0) return null;
+
+    const panel = document.createElement("div");
+    panel.className = "rag-deg-panel";
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "rag-deg-header";
+    const left = document.createElement("div");
+    left.className = "rag-deg-header-left";
+    const labelEl = document.createElement("span");
+    labelEl.className = "rag-deg-label";
+    labelEl.textContent = `TOP DEGs · ${label || "selection"}`;
+    const badge = document.createElement("span");
+    badge.className = "rag-badge";
+    badge.textContent = "MOCK";
+    left.appendChild(labelEl);
+    left.appendChild(badge);
+    const fcLabel = document.createElement("span");
+    fcLabel.className = "rag-deg-fc-label";
+    fcLabel.textContent = "log₂FC";
+    header.appendChild(left);
+    header.appendChild(fcLabel);
+    panel.appendChild(header);
+
+    // Divider
+    const divider = document.createElement("div");
+    divider.className = "rag-deg-divider";
+    panel.appendChild(divider);
+
+    // Bars
+    const maxFc = Math.max(...degs.map(d => d.log2fc), 1);
+    degs.forEach(d => {
+      const row = document.createElement("div");
+      row.className = "rag-deg-row";
+      const gene = document.createElement("span");
+      gene.className = "rag-deg-gene";
+      gene.textContent = d.gene;
+      const barWrap = document.createElement("div");
+      barWrap.className = "rag-deg-bar-wrap";
+      const bar = document.createElement("div");
+      bar.className = "rag-deg-bar";
+      bar.style.width = `${Math.round((d.log2fc / maxFc) * 100)}%`;
+      barWrap.appendChild(bar);
+      const val = document.createElement("span");
+      val.className = "rag-deg-val";
+      val.textContent = d.log2fc.toFixed(1);
+      row.appendChild(gene);
+      row.appendChild(barWrap);
+      row.appendChild(val);
+      panel.appendChild(row);
+    });
+
+    // Citation chips
+    if (citations && citations.length > 0) {
+      const chips = document.createElement("div");
+      chips.className = "rag-citation-row";
+      citations.forEach(c => {
+        const chip = document.createElement("span");
+        chip.className = "rag-citation-chip";
+        chip.textContent = `[${c.id}] ${c.journal} · PMID ${c.pmid}`;
+        chips.appendChild(chip);
+      });
+      panel.appendChild(chips);
+    }
+
+    return panel;
   }
 
   // ---------------------------------------------------------------------------
@@ -216,6 +422,22 @@ function initApp() {
 
       const data = await res.json();
       if (data.status === "error") throw new Error(data.message);
+
+      // RAG: show all data panels immediately (before thinking dots)
+      // Order: 1. AGENT TRACE  2. PATHWAY PANEL  3. DEG PANEL  4. LLM response
+      let ragMetadata = data.rag_metadata || null;
+      if (ragMetadata) {
+        const traceCard = buildRagTraceCard(ragMetadata.trace, ragMetadata.label);
+        chatMessages.insertBefore(traceCard, thinking);
+
+        const pathwayPanel = buildPathwayPanel(ragMetadata.pathways, ragMetadata.label);
+        if (pathwayPanel) chatMessages.insertBefore(pathwayPanel, thinking);
+
+        const degPanel = buildDegPanel(ragMetadata.degs, ragMetadata.label, ragMetadata.citations);
+        if (degPanel) chatMessages.insertBefore(degPanel, thinking);
+
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
 
       // --- NEW: Retroactively add images to User Message if returned by Backend ---
       // The backend now returns 'images' and 'roi_image' which may have been generated server-side.
@@ -334,6 +556,8 @@ function initApp() {
                 });
                 aiMsgElement.appendChild(thumbs);
               }
+
+              ragMetadata = null;
             }
 
           } else if (pollData.status === "error") {
@@ -797,4 +1021,4 @@ function initHero() {
 
 // Start
 setTimeout(initApp, 500);
-setTimeout(initHero, 600);
+// setTimeout(initHero, 600); // Hero section disabled

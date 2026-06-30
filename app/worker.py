@@ -91,6 +91,9 @@ def process_session(session_id):
             try:
                 model_provider = last_msg.get("model_provider", "ollama")
                 selected_model = last_msg.get("model")
+                rag_context_str = last_msg.get("rag_context_str", "")
+                if rag_context_str and inference_messages:
+                    inference_messages[-1]["content"] = inference_messages[-1].get("content", "") + rag_context_str
                 for chunk in run_model_inference(inference_messages, provider=model_provider, model_name=selected_model):
                     full_text += chunk
                     if time.time() - last_write > 0.05:
@@ -158,7 +161,7 @@ def process_session(session_id):
             processing_keys.discard(session_id)
 
 
-def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None, visible=True):
+def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None, visible=True, rag_context_str=""):
     session_file = _session_path(session_id)
 
     existing = _lock_and_read_session(session_file)
@@ -182,6 +185,8 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
 
     if roi_path:
         new_message["roi_path"] = roi_path
+    if rag_context_str:
+        new_message["rag_context_str"] = rag_context_str
 
     session_data["messages"].append(new_message)
     session_data["updated_at"] = time.time()

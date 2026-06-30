@@ -160,14 +160,15 @@ def create_viv_viewer(
         for idx, cluster in enumerate(sorted(cluster_counts.keys(), key=cluster_sort_key)):
             color = cluster_colors.get(cluster, fallback_colors[idx % len(fallback_colors)])
             legend_items.append(
-                html.Div([
+                html.Button([
                     html.Div(style={
                         'width': '12px',
                         'height': '12px',
                         'backgroundColor': color,
                         'marginRight': '8px',
                         'borderRadius': '50%',
-                        'border': '1px solid rgba(0,0,0,0.18)'
+                        'border': '1px solid rgba(0,0,0,0.18)',
+                        'flexShrink': '0',
                     }),
                     html.Span(f"Cluster {cluster}", style={
                         'fontFamily': 'SF Pro Text, sans-serif',
@@ -182,11 +183,23 @@ def create_viv_viewer(
                         'color': '#6e6e73',
                         'marginLeft': 'auto'
                     })
-                ], style={
+                ],
+                id={"type": "cluster-legend-btn", "index": str(cluster)},
+                n_clicks=0,
+                type="button",
+                title=f"Show high-expression genes for Cluster {cluster}",
+                style={
                     'display': 'flex',
                     'alignItems': 'center',
                     'minWidth': '150px',
-                    'marginBottom': '5px'
+                    'marginBottom': '5px',
+                    'width': '100%',
+                    'background': 'transparent',
+                    'border': 'none',
+                    'padding': '3px 4px',
+                    'borderRadius': '6px',
+                    'cursor': 'pointer',
+                    'textAlign': 'left',
                 })
             )
 
@@ -241,7 +254,8 @@ def create_viv_viewer(
             opacity={0: 1.0, 1: 0.5},
             rois=[],
             spots=spots,
-            selected_spot=None
+            selected_spot=None,
+            selected_cluster=None
         ),
         legend_div,
     ], style={'position': 'relative', 'width': '100%', 'height': f'{base_height}px'})
