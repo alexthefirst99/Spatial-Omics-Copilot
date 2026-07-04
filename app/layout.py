@@ -295,7 +295,8 @@ def create_layout(work_dir, folder_id):
                                         className="chat-model-select",
                                         title="Choose model",
                                         children=[
-                                            html.Option("Ollama local  qwen3-vl", value="ollama:qwen3-vl:30b", selected=True),
+                                            html.Option("Ollama local  qwen2.5vl:7b", value="ollama:qwen2.5vl:7b", selected=True),
+                                            html.Option("Ollama local  qwen2.5vl:32b", value="ollama:qwen2.5vl:32b"),
                                             html.Option("ChatGPT  GPT-4o", value="openai:gpt-4o"),
                                         ],
                                     ),

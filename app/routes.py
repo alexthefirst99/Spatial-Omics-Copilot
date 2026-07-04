@@ -479,7 +479,7 @@ def register_chat_routes(server, token, work_dir):
 
             status = enqueue_chat_job(
                 session_id=session_id,
-                model=data.get("model", "qwen2.5vl:72b"),
+                model=data.get("model", "ollama:qwen3-vl:30b"),
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,

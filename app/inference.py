@@ -115,7 +115,7 @@ def run_model_inference(messages, provider=None, model_name=None):
         return
 
     selected_model = model_name or os.environ.get("OLLAMA_MODEL", "qwen3-vl:30b")
-    host = os.environ.get("OLLAMA_HOST", "http://localhost:11435")
+    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
     os.environ["OLLAMA_HOST"] = host
 
     clean_history = []
