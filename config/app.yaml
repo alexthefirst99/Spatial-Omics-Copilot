@@ -2,10 +2,6 @@ ollama:
   host: "http://localhost:11434"
   model: "qwen2.5vl:7b"
 
-openai:
-  model: "gpt-4o"
-  insecure_ssl: false
-
 paths:
   chat_dir: "data/chat_sessions"
   status_dir: "data/status_data"

@@ -177,8 +177,11 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
     new_message["model"] = model
     if isinstance(model, str) and ":" in model:
         provider_name, model_name = model.split(":", 1)
-        new_message["model_provider"] = provider_name if provider_name in ("ollama", "openai") else "ollama"
-        new_message["model"] = model_name
+        new_message["model_provider"] = "ollama"
+        if provider_name == "ollama":
+            new_message["model"] = model_name
+        else:
+            new_message["model"] = None
     else:
         new_message["model_provider"] = "ollama"
 

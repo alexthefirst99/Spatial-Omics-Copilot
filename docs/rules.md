@@ -7,12 +7,12 @@
 - Keep RAG analysis code separate from app infrastructure (routes, session, worker).
 - Do not hard-code local absolute paths; use environment variables or relative paths.
 - Do not commit raw data files, model weights, credentials, or virtual environments.
-- Use deterministic fallbacks when optional external APIs are unavailable.
+- Use deterministic fallbacks when optional external APIs are unavailable, and clearly label them as fallback/demo results.
 - Never claim a result was retrieved unless the API call actually succeeded.
 
 ## 2. Security and Privacy Rules
 
-- Store all API keys (OpenAI, PubMed) in `.env` only — never in code.
+- Store all API keys in `.env` only — never in code.
 - Do not log API keys or user chat content to stdout in production.
 - Do not upload user data or images to external services without explicit opt-in.
 - Treat uploaded tissue images and gene expression files as sensitive research data.

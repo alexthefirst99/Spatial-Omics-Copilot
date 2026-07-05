@@ -100,7 +100,7 @@ Returns:
 Required behavior:
 - Build query from gene symbols and pathway names.
 - Call NCBI E-utilities (esearch + efetch).
-- Always return exactly `n` results; pad with less relevant results if needed.
+- Return up to `n` relevant results. If fewer relevant results are found, return fewer results instead of padding with unrelated papers.
 - Respect rate limits (3 req/s without key, 10 req/s with `PUBMED_API_KEY`).
 
 ### 3.4 Agent Entry Point
@@ -114,11 +114,11 @@ def run_agent(gene_objects, message="", label="selection") -> dict
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| `gene_objects` | `list[dict]` | Pre-computed DEG result from `app.py`. Each dict has `"gene"` (str) and `"log2_fold_change"` (float). Pass `[]` to use the demo fallback (12 brain genes). DEG is **not** run inside `run_agent` — it always runs automatically in `app.py` when the user selects a cluster or ROI. |
+| `gene_objects` | `list[dict]` | Pre-computed DEG result from `app.py`. Each dict has `"gene"` (str) and `"log2_fold_change"` (float). Pass `[]` only when no valid DEG context is available. DEG is **not** run inside `run_agent` — it runs automatically in `app.py` when the user selects a cluster or ROI. |
 | `message` | `str` | User's chat message. The real agent uses this to decide which tools to call and to build smarter PubMed queries. |
 | `label` | `str` | Human-readable region label for UI headers, e.g. `"Cluster 5"`, `"ROI"`, `"demo"`. |
 
-Fallback: if `gene_objects` is empty, the pipeline substitutes demo genes and sets `label = "demo"`.
+Fallback: if `gene_objects` is empty, the system must clearly state that no ROI-specific gene expression context is available. Demo genes may be used only in an explicitly labeled demo mode, never as real ROI analysis.
 
 **Output:**
 
@@ -178,10 +178,10 @@ The LangGraph agent in `src/rag/agent/graph.py`:
 5. Returns the structured result dict above.
 
 Required behavior:
-- `trace` must reflect what the agent actually ran — not a hardcoded list. DEG always appears since it always runs.
+- `trace` must reflect what the agent actually ran — not a hardcoded list. DEG appears when valid DEG context exists; otherwise the trace should clearly show that DEG context is unavailable.
 - Agent decides pathway and/or PubMed based on the user message — both, one, or neither.
 - Must not invent gene functions, pathway names, or citations.
-- If no tools return results, use demo fallback genes and set `label` to `"demo"`.
+- If no tools return results, answer only from the available ROI/gene context and clearly state which evidence sources were unavailable.
 - Limit to 5 tool calls per turn to prevent infinite loops.
 
 ## 5. Chat Interface Behavior
@@ -203,11 +203,11 @@ Required behavior:
 
 | **Edge Case** | **Expected Behavior** |
 | --- | --- |
-| ROI contains no spots | Return empty gene list; agent uses demo fallback |
+| ROI contains no spots | Return empty gene list; explain that no spatial expression spots were found in the ROI |
 | Pathway API unavailable | Return empty list; agent answers from gene context only |
 | PubMed returns no results | Return empty list; inform user |
 | LLM unavailable | Show error message; do not stream partial answer |
 | h5ad missing spatial coordinates | Reject with clear error on upload |
-| No h5ad loaded | Agent uses demo gene list (12 brain genes) |
+| No h5ad loaded | Show a clear “No gene expression data loaded” message; do not present demo genes as ROI analysis |
 | Image too large for memory | Use pyvips streaming |
 | Session file corrupted | Start fresh session; log error |

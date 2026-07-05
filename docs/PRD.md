@@ -19,7 +19,7 @@ and an agentic LLM pipeline in a single interface.
 | G1 | Demonstrate spatial omics visualization | Researcher can load a whole-slide image and h5ad file and view gene expression overlays |
 | G2 | Enable region-level gene analysis | Drawing an ROI returns the top differentially expressed genes for that region |
 | G3 | Provide pathway context | Top genes map to enriched biological pathways via GO and KEGG |
-| G4 | Ground responses in literature | Relevant PubMed abstracts are retrieved and summarized for each query |
+| G4 | Ground responses in literature | Relevant PubMed abstracts are retrieved and summarized when literature evidence is needed |
 | G5 | Deliver agentic reasoning | LangGraph agent decides which tools to call and synthesizes a coherent interpretation |
 | G6 | Support conversational follow-up | Researcher can ask follow-up questions about the selected region in the chat interface |
 | G7 | Stream responses in real time | LLM responses appear token by token without full-page refresh |
@@ -32,9 +32,9 @@ and an agentic LLM pipeline in a single interface.
 - h5ad spatial gene expression file upload and spot/cell overlay.
 - ROI drawing on the tissue and top-gene extraction from the selected region.
 - ORA pathway enrichment against GO and KEGG via gseapy.
-- PubMed NCBI E-utilities retrieval based on genes and pathways.
+- PubMed NCBI E-utilities retrieval based on genes and pathways when literature evidence is needed.
 - LangGraph agentic loop that dynamically decides which tools to call.
-- Vector store for semantic search over fetched PubMed abstracts.
+- Optional vector store for semantic search over fetched PubMed abstracts, tracked as a planned enhancement.
 - Streaming chat interface with AGENT TRACE, pathway, and DEG panels.
 - Session persistence so chat history survives page reloads.
 
@@ -53,7 +53,7 @@ and an agentic LLM pipeline in a single interface.
 | Image rendering | Gigapixel OME-TIFF loads and tiles correctly in the viewer |
 | ROI gene extraction | Top N genes returned for any drawn region within 5 seconds |
 | Pathway enrichment | GO / KEGG returns at least one enriched pathway for a valid gene list |
-| PubMed retrieval | At least 3 relevant abstracts returned per query |
-| Agent tool use | Agent calls at least pathway and PubMed tools before synthesizing an answer |
+| PubMed retrieval | Up to 3 relevant abstracts returned when literature evidence is requested; no unrelated padding |
+| Agent tool use | Agent calls the appropriate tools based on the user question, and the trace reflects the tools actually used |
 | Response streaming | First token appears within 3 seconds of submitting a query |
 | Chat history | Messages persist across page reloads within the same session |

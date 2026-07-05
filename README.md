@@ -10,10 +10,10 @@ and immediately receive biologically grounded, literature-backed interpretations
 - Interactive gigapixel whole-slide image viewer with ROI drawing.
 - Gene expression overlay from h5ad spatial transcriptomics data.
 - Top differentially expressed genes extracted from any selected tissue region.
-- Biological pathway enrichment via GO and KEGG.
-- PubMed literature retrieval grounded in the selected genes and pathways.
-- Agentic RAG pipeline (LangGraph) that reasons over spatial context and literature.
-- Streaming chat interface for follow-up questions about selected regions.
+- Prototype pathway enrichment over GO/KEGG-labeled gene sets.
+- Curated PubMed-style literature retrieval grounded in selected genes and pathways, with live PubMed E-utilities tracked as planned work.
+- RAG pipeline with a LangGraph-compatible entry point and sequential fallback.
+- Streaming Ollama chat interface for follow-up questions about selected regions; this is the conversational UI for the copilot, not a general-purpose medical chatbot.
 
 ## Supported Data Formats
 
@@ -52,15 +52,22 @@ paths:
   workspace_map: "data/workspace_map.json"
   workdir_base: "tmp_data/workdirs"
   tmp_base: "tmp_data"
+  tutorial_image: "tutorial/loki_tutorial_hskin_melanoma_downsampled.ome.tif"
+
+app:
+  hot_reload: false
 ```
 
 Secrets stay in a local `.env` file. Use `.env.example` as a starting point.
 
 ```bash
-PUBMED_API_KEY=...
+PUBMED_API_KEY=...   # planned for future live PubMed E-utilities support
 ```
 
-Environment variables can still override YAML settings for deployment.
+Environment variables can override YAML settings for deployment. Common
+overrides include `OLLAMA_HOST`, `OLLAMA_MODEL`, `COPILOT_CHAT_DIR`,
+`COPILOT_STATUS_DIR`, `COPILOT_WORKSPACE_MAP`, `COPILOT_WORKDIR_BASE`,
+`COPILOT_TMP_BASE`, `COPILOT_TUTORIAL_IMAGE`, and `COPILOT_HOT_RELOAD`.
 
 ## Ollama Setup
 
@@ -101,7 +108,7 @@ ollama:
   model: "qwen2.5vl:7b"
 ```
 
-The chat UI also includes Ollama model choices such as `qwen2.5vl:7b` and
+The chat UI includes Ollama model choices such as `qwen2.5vl:7b` and
 `qwen2.5vl:32b`; make sure the selected model has been pulled locally.
 
 ## Quick Start
@@ -145,7 +152,7 @@ spatial-omics-copilot/
 │   ├── layout.py                # Dash UI layout
 │   ├── routes.py                # Flask HTTP routes
 │   ├── worker.py                # background job queue + LLM streaming
-│   ├── inference.py             # Ollama / OpenAI API wrapper
+│   ├── inference.py             # Ollama API wrapper
 │   ├── session.py               # chat session read/write
 │   ├── image_utils.py           # ROI crop, OME-TIFF caching
 │   ├── status_store.py          # upload progress tracking

@@ -14,7 +14,7 @@ spatial-omics-copilot/
 │   ├── layout.py                 # Dash UI layout
 │   ├── routes.py                 # Flask HTTP routes
 │   ├── worker.py                 # background job queue + LLM streaming
-│   ├── inference.py              # Ollama / OpenAI API wrapper
+│   ├── inference.py              # Ollama API wrapper
 │   ├── session.py                # thread-safe chat session read/write
 │   ├── image_utils.py            # ROI crop, OME-TIFF cache
 │   ├── status_store.py           # upload progress tracking
@@ -104,7 +104,7 @@ Current fallback:
 | `app/layout.py` | Dash UI layout definition (components, IDs) |
 | `app/routes.py` | Flask HTTP handlers — `/chat`, `/chat/poll`, `/chat/clear`, `/ome_tiff`, `/preview`; calls `run_agent()`, enqueues jobs |
 | `app/worker.py` | Background job queue — injects RAG context into messages, calls `inference.py`, writes stream |
-| `app/inference.py` | Ollama and OpenAI streaming LLM wrapper |
+| `app/inference.py` | Ollama streaming LLM wrapper |
 | `app/session.py` | Thread-safe chat session read/write (fcntl locking, atomic writes) |
 | `app/image_utils.py` | ROI image crop and OME-TIFF pyramidal cache management |
 | `app/status_store.py` | File-based upload progress tracking (progress bar state) |
@@ -197,7 +197,7 @@ worker.py  → appends context_str to messages → inference.py → streams toke
 | Image | pyvips/OME-TIFF conversion path, tifffile, Pillow, opencv-python | — |
 | Spatial data | anndata, scanpy, scipy, scikit-learn | — |
 | Visualization | local `dash_viv_viewer`, Plotly/Dash components | — |
-| LLM | Ollama Python client, OpenAI Chat Completions HTTP call | — |
+| LLM | Ollama Python client | — |
 | RAG / Agents | `_run_sequential()` fallback | LangGraph + LangChain tools |
 | Pathway | Hardcoded mock gene-set enrichment | gseapy / GO / KEGG ORA |
 | Literature | Hardcoded mock curated abstracts | PubMed E-utilities API |
@@ -212,9 +212,6 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 | --- | --- | --- |
 | `ollama.model` / `OLLAMA_MODEL` | No | Local Ollama model; defaults to `qwen2.5vl:7b` |
 | `ollama.host` / `OLLAMA_HOST` | No | Ollama server URL; defaults to `http://localhost:11434` |
-| `.env: OPENAI_API_KEY` | Yes if using OpenAI provider | Enables OpenAI chat responses |
-| `openai.model` / `OPENAI_MODEL` | No | OpenAI model; defaults to `gpt-4o` |
-| `openai.insecure_ssl` / `OPENAI_INSECURE_SSL` | No | Local-dev escape hatch; disables OpenAI SSL verification retry |
 | `paths.chat_dir` / `COPILOT_CHAT_DIR` | No | Chat session path |
 | `paths.workdir_base` / `COPILOT_WORKDIR_BASE` | No | Working directory base path |
 | `paths.tmp_base` / `COPILOT_TMP_BASE` | No | Temporary upload/OME-TIFF cache path |
