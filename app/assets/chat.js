@@ -86,15 +86,21 @@ function initApp() {
   });
 
   // ---------------------------------------------------------------------------
-  // HELPER: Get Session/Token from URL
+  // HELPER: Get workspace/session from URL
   // ---------------------------------------------------------------------------
   function getSessionID() {
-    // URL format: /app/{token}/...
+    // URL format: /workspaces/{workspace}/...
+    // Legacy format: /app/{workspace}/...
     const parts = window.location.pathname.split('/');
-    // parts -> ["", "app", "{token}", ...]
-    if (parts.length > 2 && parts[2]) return parts[2];
-    console.error("Could not find token in URL Path!", window.location.pathname);
+    if (parts.length > 2 && (parts[1] === "workspaces" || parts[1] === "app") && parts[2]) {
+      return parts[2];
+    }
+    console.error("Could not find workspace in URL path.", window.location.pathname);
     return "default";
+  }
+
+  function getAppBasePath() {
+    return `/workspaces/${getSessionID()}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -151,7 +157,7 @@ function initApp() {
         const token = getSessionID();
         const img = document.createElement("img");
         // Cache-bust so the browser always fetches the latest crop file
-        const freshSrc = `/app/${token}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
+        const freshSrc = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
         img.src = freshSrc;
         img.onclick = () => window.open(freshSrc, "_blank");
         thumbs.appendChild(img);
@@ -412,7 +418,7 @@ function initApp() {
         active_layer: getActiveLayerName() // Send active layer to backend
       };
 
-      const res = await fetch(`/app/${token}/chat`, {
+      const res = await fetch(`${getAppBasePath()}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -468,7 +474,7 @@ function initApp() {
 
             returnedImages.forEach(path => {
               const img = document.createElement("img");
-              img.src = `/app/${token}/preview?path=${encodeURIComponent(path)}`;
+              img.src = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}`;
               img.style.width = "60px";
               img.style.height = "60px";
               img.style.borderRadius = "4px";
@@ -496,7 +502,7 @@ function initApp() {
 
       const pollInterval = setInterval(async () => {
         try {
-          const pollRes = await fetch(`/app/${token}/chat/poll`);
+          const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
           const pollData = await pollRes.json();
           // console.log("Poll status:", pollData.status, "Length:", pollData.response ? pollData.response.length : 0);
 
@@ -549,7 +555,7 @@ function initApp() {
                 thumbs.className = "roi-thumbs";
                 pollData.images.forEach((path) => {
                   const img = document.createElement("img");
-                  const freshSrc = `/app/${token}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
+                  const freshSrc = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
                   img.src = freshSrc;
                   img.onclick = () => window.open(freshSrc, "_blank");
                   thumbs.appendChild(img);
@@ -626,7 +632,7 @@ function initApp() {
 
       const token = getSessionID();
       try {
-        const res = await fetch(`/app/${token}/chat/clear`, {
+        const res = await fetch(`${getAppBasePath()}/chat/clear`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_id: token })
@@ -656,7 +662,7 @@ function initApp() {
       // Actually, separate logic is fine, but we need to deduplicate.
 
       try {
-        const res = await fetch(`/app/${token}/chat/poll`);
+        const res = await fetch(`${getAppBasePath()}/chat/poll`);
         const data = await res.json();
 
         if (data.status === "done") {

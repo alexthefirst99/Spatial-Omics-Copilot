@@ -170,7 +170,7 @@ Fallback: if `gene_objects` is empty, the pipeline substitutes demo genes and se
 
 **DEG extraction is not the agent's decision.** It runs automatically when the user clicks a cluster or draws an ROI in the UI (`app.py`), before any chat message is sent. The gene list is already available by the time the agent runs.
 
-The LangGraph agent in `rag/agent/graph.py`:
+The LangGraph agent in `src/rag/agent/graph.py`:
 1. Receives the pre-computed gene list (from DEG) along with the user message.
 2. Decides whether to call **pathway_tool** (GO / KEGG enrichment) based on the question.
 3. Decides whether to call **pubmed_tool** (NCBI abstract retrieval) based on the question.
@@ -186,7 +186,7 @@ Required behavior:
 
 ## 5. Chat Interface Behavior
 
-- One session per token; stored in `chat_sessions/<session_id>/session.json`.
+- One session per workspace; stored in `data/chat_sessions/<session_id>/session.json`.
 - LLM responses stream token by token.
 - Chat UI renders in order: AGENT TRACE → PATHWAY panel → DEG panel → LLM text.
 - ROI thumbnails attach to the relevant assistant message.

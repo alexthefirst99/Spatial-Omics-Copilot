@@ -1,33 +1,33 @@
 
 # Python / temp / cache
 tmp_data/
+data/chat_sessions/
+data/status_data/
+data/workspace_map.json
+!data/
+!data/.gitkeep
+!data/chat_sessions/
+!data/chat_sessions/.gitkeep
+!data/status_data/
+!data/status_data/.gitkeep
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
 
 # Node / frontend build artifacts
 node_modules/
-dash_viv_viewer/node_modules/
+packages/dash_viv_viewer/node_modules/
 dist/
 build/
 
 # Large image/data files
-dash_viv_viewer/demo_data/
+packages/dash_viv_viewer/demo_data/
 *.ome.tiff
 *.tiff
 *.tif
 *.svs
 *.ndpi
-
-tmp_data/
-dash_viv_viewer/demo_data/
-dash_viv_viewer/node_modules/
-*.ome.tiff
-*.tiff
-*.tif
-
-tmp_data/
-dash_viv_viewer/demo_data/
-dash_viv_viewer/node_modules/
-*.ome.tiff
-*.tiff
-*.tif

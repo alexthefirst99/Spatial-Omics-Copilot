@@ -27,18 +27,18 @@ spatial-omics-copilot/
 │       ├── tutorial.js           # tutorial button/client behavior
 │       ├── tutorial.css          # tutorial controls styling
 │       └── font.css              # font imports
-├── niceview/                     # UI layer
+├── src/niceview/                     # UI layer
 │   ├── interface/
 │   │   ├── upload.py             # image + h5ad upload handlers
 │   │   ├── visualization.py      # WSI client, spatial spot overlay, VivViewer setup
 │   │   ├── actions.py            # re-visualize, save ROI, clear session/cache
 │   │   ├── callback.py           # Dash callbacks
-│   │   ├── interface.py          # compatibility exports + token mapping
+│   │   ├── interface.py          # compatibility exports + workspace mapping
 │   │   └── data_io.py            # session data helpers
 │   ├── pyplot/
 │   │   └── leaflet.py            # Dash VivViewer component builder + cluster legend
 │   └── utils/                    # io, dataset, path/viewer helper dependencies
-├── rag/                          # analysis layer
+├── src/rag/                          # analysis layer
 │   ├── pipeline.py               # fallback sequential pipeline (_run_sequential)
 │   ├── preprocessing.py          # QC, normalize, PCA
 │   ├── clustering.py             # Leiden / KMeans spatial clustering
@@ -56,11 +56,13 @@ spatial-omics-copilot/
 │       ├── graph.py              # run_agent wrapper; target: LangGraph agent
 │       ├── tools.py              # planned LangChain tools placeholder
 │       └── prompt.py             # context string formatting
-├── dash_viv_viewer/              # VivViewer React component
+├── packages/dash_viv_viewer/              # VivViewer React component
 └── docs/
 ```
 
-Run command: `python app/app.py --port 8081 --token hello`
+Run command: `python app/app.py --port 8081 --workspace demo`
+
+Open `http://localhost:8081/workspaces/demo`.
 
 ## 2. Architecture
 
@@ -74,17 +76,17 @@ Browser (Dash + VivViewer)
       → run_agent(gene_objects, message, label)   ← only call into rag/
       → routes.py enqueues job with {rag_context_str, rag_metadata}
       → worker.py injects context_str into messages → inference.py streams tokens
-      → session.py writes to chat_sessions/
+      → session.py writes to data/chat_sessions/
       → browser polls and renders streamed response
 
-Target run_agent() internals (rag/agent/graph.py):
-  → pathway tool (rag/pathway/)   — GO / KEGG ORA
-  → pubmed tool  (rag/pubmed/)    — NCBI abstract retrieval
+Target run_agent() internals (src/rag/agent/graph.py):
+  → pathway tool (src/rag/pathway/)   — GO / KEGG ORA
+  → pubmed tool  (src/rag/pubmed/)    — NCBI abstract retrieval
   → prompt.py   formats context string
   → returns {gene_objects, context_str, metadata}
 
 Current fallback:
-  → rag/agent/graph.py calls rag/pipeline._run_sequential()
+  → src/rag/agent/graph.py calls src/rag/pipeline._run_sequential()
   → _run_sequential() always runs mock pathway + mock PubMed retrieval
 ```
 
@@ -107,42 +109,42 @@ Current fallback:
 | `app/assets/s3_upload.js` | Browser-side upload handling and progress updates |
 | `app/assets/*.css` | Layout, chat, upload, tutorial, and spinner styling |
 
-### niceview/interface/
+### src/niceview/interface/
 
 | **Module** | **Responsibility** |
 | --- | --- |
-| `niceview/interface/callback.py` | Dash callback aggregator — re-exports all callbacks from `upload.py` and `actions.py` |
-| `niceview/interface/upload.py` | Image and h5ad upload handlers; validates spatial coordinates; triggers clustering |
-| `niceview/interface/visualization.py` | WSI client setup, spatial spot extraction, optional cluster overlay image, VivViewer assembly |
-| `niceview/interface/actions.py` | Re-visualize callback helper, ROI JSON/coordinate persistence, session/cache cleanup |
-| `niceview/interface/interface.py` | Compatibility exports from `data_io.py`/`visualization.py` plus token mapping |
-| `niceview/interface/data_io.py` | Session data read/write helpers using `ThorQuery` |
+| `src/niceview/interface/callback.py` | Dash callback aggregator — re-exports all callbacks from `upload.py` and `actions.py` |
+| `src/niceview/interface/upload.py` | Image and h5ad upload handlers; validates spatial coordinates; triggers clustering |
+| `src/niceview/interface/visualization.py` | WSI client setup, spatial spot extraction, optional cluster overlay image, VivViewer assembly |
+| `src/niceview/interface/actions.py` | Re-visualize callback helper, ROI JSON/coordinate persistence, session/cache cleanup |
+| `src/niceview/interface/interface.py` | Compatibility exports from `data_io.py`/`visualization.py` plus workspace mapping |
+| `src/niceview/interface/data_io.py` | Session data read/write helpers using `ThorQuery` |
 
-### niceview/utils/ and niceview/pyplot/
+### src/niceview/utils/ and src/niceview/pyplot/
 
 `app.py` directly imports only `niceview.utils.io`. The other files below are reached indirectly through `niceview.interface.*` helpers.
 
 | **Module** | **Current app call path** | **Responsibility** |
 | --- | --- | --- |
-| `niceview/utils/io.py` | Direct: `app.py` and `routes.py` import `niceview.utils.io as vio` | File I/O wrapper for JSON, TOML, paths, images, arrays, and cache files |
-| `niceview/utils/dataset.py` | Indirect: `app.py` → `niceview.interface.interface/data_io.py` → `ThorQuery` | Data/cache client currently used for WSI generation and viewer tile clients |
-| `niceview/utils/aristotle.py` | Indirect: `ThorQuery` → `AristotleDataset` | Constructs data/cache filenames from sample IDs and field names |
-| `niceview/utils/colors.py` | Indirect: `leaflet.py` imports viewer constants and color helpers from it | Provides colormap constants and helper functions used by viewer legend code |
-| `niceview/pyplot/leaflet.py` | Indirect but active: `app.py` → `reset()`/viewer callbacks → `visualization.py` → `create_viv_viewer()` | Builds `VivViewer`, image URLs, ROI props, and clickable cluster legend |
+| `src/niceview/utils/io.py` | Direct: `app.py` and `routes.py` import `niceview.utils.io as vio` | File I/O wrapper for JSON, TOML, paths, images, arrays, and cache files |
+| `src/niceview/utils/dataset.py` | Indirect: `app.py` → `niceview.interface.interface/data_io.py` → `ThorQuery` | Data/cache client currently used for WSI generation and viewer tile clients |
+| `src/niceview/utils/aristotle.py` | Indirect: `ThorQuery` → `AristotleDataset` | Constructs data/cache filenames from sample IDs and field names |
+| `src/niceview/utils/colors.py` | Indirect: `leaflet.py` imports viewer constants and color helpers from it | Provides colormap constants and helper functions used by viewer legend code |
+| `src/niceview/pyplot/leaflet.py` | Indirect but active: `app.py` → `reset()`/viewer callbacks → `visualization.py` → `create_viv_viewer()` | Builds `VivViewer`, image URLs, ROI props, and clickable cluster legend |
 
-### rag/
+### src/rag/
 
 | **Module** | **Responsibility** |
 | --- | --- |
-| `rag/pipeline.py` | Current fallback sequential pipeline — always runs pathway + PubMed context assembly |
-| `rag/preprocessing.py` | QC, normalization, HVG selection, PCA on h5ad |
-| `rag/clustering.py` | Leiden / KMeans spatial clustering, saves cluster JSON |
-| `rag/deg/extraction.py` | DEG extraction from cluster or ROI selection |
-| `rag/pathway/enrichment.py` | Current mock pathway enrichment over hardcoded gene sets; target: real ORA against GO / KEGG |
-| `rag/pubmed/retrieval.py` | Current mock PubMed retrieval over curated abstracts; target: NCBI E-utilities retrieval |
-| `rag/agent/graph.py` | Current `run_agent()` wrapper around `_run_sequential()`; target: LangGraph tool-selection agent |
-| `rag/agent/tools.py` | Placeholder for planned LangChain tools: `pathway_tool`, `pubmed_tool` |
-| `rag/agent/prompt.py` | Formats RAG evidence into LLM context string |
+| `src/rag/pipeline.py` | Current fallback sequential pipeline — always runs pathway + PubMed context assembly |
+| `src/rag/preprocessing.py` | QC, normalization, HVG selection, PCA on h5ad |
+| `src/rag/clustering.py` | Leiden / KMeans spatial clustering, saves cluster JSON |
+| `src/rag/deg/extraction.py` | DEG extraction from cluster or ROI selection |
+| `src/rag/pathway/enrichment.py` | Current mock pathway enrichment over hardcoded gene sets; target: real ORA against GO / KEGG |
+| `src/rag/pubmed/retrieval.py` | Current mock PubMed retrieval over curated abstracts; target: NCBI E-utilities retrieval |
+| `src/rag/agent/graph.py` | Current `run_agent()` wrapper around `_run_sequential()`; target: LangGraph tool-selection agent |
+| `src/rag/agent/tools.py` | Placeholder for planned LangChain tools: `pathway_tool`, `pubmed_tool` |
+| `src/rag/agent/prompt.py` | Formats RAG evidence into LLM context string |
 
 ## 4. Single Entry Point Contract
 
@@ -175,7 +177,7 @@ See `docs/specs.md` section 3.4 for the full `run_agent` input/output contract.
 
 ## 5. LLM Flow
 
-The `rag/` layer does **not** call the LLM. It returns `context_str` as data.
+The `src/rag/` layer does **not** call the LLM. It returns `context_str` as data.
 The LLM call happens in `app/`:
 
 ```text
@@ -211,6 +213,7 @@ worker.py  → appends context_str to messages → inference.py → streams toke
 | `COPILOT_WORKDIR_BASE` | No | Override working directory path |
 | `COPILOT_TMP_BASE` | No | Override temporary upload/OME-TIFF cache path |
 | `COPILOT_STATUS_DIR` | No | Override upload status JSON path |
+| `COPILOT_WORKSPACE_MAP` | No | Override workspace-to-port map path |
 | `COPILOT_TUTORIAL_IMAGE` | No | Override local tutorial OME-TIFF path |
 | `PUBMED_API_KEY` | Planned, not active | Intended for future live PubMed E-utilities rate limits |
 

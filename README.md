@@ -33,7 +33,9 @@ OLLAMA_MODEL=...             # override Ollama model (default: qwen3-vl:30b)
 OLLAMA_HOST=...              # override Ollama server URL (default: http://localhost:11435)
 OPENAI_API_KEY=...           # enables OpenAI models (e.g. gpt-4o)
 PUBMED_API_KEY=...           # higher PubMed rate limit (optional but recommended)
-COPILOT_CHAT_DIR=...         # path to store chat sessions (default: ./chat_sessions)
+COPILOT_CHAT_DIR=...         # path to store chat sessions (default: ./data/chat_sessions)
+COPILOT_STATUS_DIR=...       # path to store upload status files (default: ./data/status_data)
+COPILOT_WORKSPACE_MAP=...    # workspace-to-port map path (default: ./data/workspace_map.json)
 COPILOT_WORKDIR_BASE=...     # path to store working directories (default: ~/copilot_workdirs)
 ```
 
@@ -44,16 +46,12 @@ Python 3.11 is recommended. pyvips is required for OME-TIFF pyramid generation.
 ```bash
 conda create -n spatial-copilot python=3.11 -y
 conda activate spatial-copilot
-
-# system dependency for image processing
-brew install vips            # macOS
-# sudo apt-get install libvips-dev  # Ubuntu/Linux
-
-pip install -r requirements.txt   # includes -e ./dash_viv_viewer
-python app/app.py --port 8081 --token hello
+conda install -c conda-forge libvips
+pip install -r requirements.txt   # includes -e ./packages/dash_viv_viewer
+python app/app.py --port 8081 --workspace demo
 ```
 
-Open `http://localhost:8081/app/hello` in your browser.
+Open `http://localhost:8081/workspaces/demo` in your browser.
 
 ## Demo Dataset
 
@@ -67,7 +65,7 @@ spatial-omics-copilot/
 ├── README.md
 ├── requirements.txt
 ├── setup.py
-├── app/                         # infrastructure layer
+├── app/                         # Dash/Flask application layer
 │   ├── app.py                   # Dash entry point + callbacks
 │   ├── layout.py                # Dash UI layout
 │   ├── routes.py                # Flask HTTP routes
@@ -87,42 +85,39 @@ spatial-omics-copilot/
 │       ├── tutorial.js          # tutorial button behavior
 │       ├── tutorial.css         # tutorial controls styling
 │       └── font.css             # font imports
-├── niceview/                    # UI layer
-│   ├── interface/
-│   │   ├── upload.py            # image + h5ad upload handlers
-│   │   ├── visualization.py     # spot overlay, VivViewer setup
-│   │   ├── actions.py           # re-visualize, save ROI
-│   │   ├── callback.py          # Dash callbacks
-│   │   ├── interface.py         # shared interface state
-│   │   └── data_io.py           # session data helpers
-│   ├── pyplot/
-│   │   └── leaflet.py           # VivViewer component builder + cluster legend
-│   └── utils/                   # io, colors, dataset, aristotle helpers
-├── rag/                         # analysis pipeline
-│   ├── pipeline.py              # fallback sequential pipeline (_run_sequential)
-│   ├── preprocessing.py         # QC, normalize, PCA
-│   ├── clustering.py            # Leiden / KMeans spatial clustering
-│   ├── deg/
-│   │   ├── __init__.py          # exposes: get_roi/cluster_high_expression_genes
-│   │   └── extraction.py        # DEG computation
-│   ├── pathway/
-│   │   ├── __init__.py          # exposes: enrich_pathways
-│   │   └── enrichment.py        # ORA against GO / KEGG
-│   ├── pubmed/
-│   │   ├── __init__.py          # exposes: retrieve_abstracts
-│   │   └── retrieval.py         # mock retrieval; target: NCBI E-utilities
-│   └── agent/
-│       ├── __init__.py          # exposes: run_agent  ← only public entry point
-│       ├── graph.py             # LangGraph agent (currently mock)
-│       ├── tools.py             # LangChain tool definitions
-│       └── prompt.py            # context string formatting
-├── dash_viv_viewer/             # VivViewer React component package
+├── src/                         # installable Python packages
+│   ├── niceview/                # UI/domain helpers
+│   │   ├── interface/
+│   │   │   ├── upload.py        # image + h5ad upload handlers
+│   │   │   ├── visualization.py # spot overlay, VivViewer setup
+│   │   │   ├── actions.py       # re-visualize, save ROI
+│   │   │   ├── callback.py      # Dash callbacks
+│   │   │   ├── interface.py     # shared interface state
+│   │   │   └── data_io.py       # session data helpers
+│   │   ├── pyplot/
+│   │   │   └── leaflet.py       # VivViewer component builder + cluster legend
+│   │   └── utils/               # io, colors, dataset, aristotle helpers
+│   └── rag/                     # analysis pipeline
+│       ├── pipeline.py          # fallback sequential pipeline (_run_sequential)
+│       ├── preprocessing.py     # QC, normalize, PCA
+│       ├── clustering.py        # Leiden / KMeans spatial clustering
+│       ├── deg/                 # DEG computation
+│       ├── pathway/             # GO / KEGG enrichment
+│       ├── pubmed/              # PubMed retrieval
+│       └── agent/               # run_agent entry point + prompt/tool wiring
+├── packages/
+│   └── dash_viv_viewer/         # VivViewer React component package
+├── data/                        # local runtime files
+│   ├── chat_sessions/
+│   ├── status_data/
+│   └── workspace_map.json       # generated at runtime
 └── docs/
     ├── PRD.md
     ├── specs.md
     ├── tech.md
     ├── rules.md
-    └── tickets.md
+    ├── tickets.md
+    └── planning/
 ```
 
 ## More Docs

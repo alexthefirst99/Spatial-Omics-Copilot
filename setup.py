@@ -11,7 +11,7 @@ def read_requirements(file_name):
             if not line or line.startswith('#'):
                 continue
             # requirements.txt may contain pip-only local installs such as
-            # "-e ./dash_viv_viewer"; those are valid for pip but not for
+            # "-e ./packages/dash_viv_viewer"; those are valid for pip but not for
             # setup.py install_requires.
             if line.startswith(('-e ', '--editable ', '-r ', '--requirement ')):
                 continue
@@ -27,7 +27,11 @@ additional_requirements = read_requirements(requirements_file)
 setup(
     name='niceview',
     version='0.3.0',
-    packages=find_packages(),
+    packages=find_packages(where='src') + find_packages(include=['app', 'app.*']),
+    package_dir={
+        '': 'src',
+        'app': 'app',
+    },
     entry_points={
         'console_scripts': [
             'mjolnir=app.app:main',

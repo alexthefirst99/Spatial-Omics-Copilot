@@ -3,7 +3,7 @@
 ## 1. General Coding Standards
 
 - Keep functions small and single-purpose.
-- Each `rag/` submodule owns exactly one responsibility.
+- Each `src/rag/` submodule owns exactly one responsibility.
 - Keep RAG analysis code separate from app infrastructure (routes, session, worker).
 - Do not hard-code local absolute paths; use environment variables or relative paths.
 - Do not commit raw data files, model weights, credentials, or virtual environments.
@@ -20,10 +20,10 @@
 
 ## 3. Architecture Rules
 
-- **`rag/` is pure analysis** — no HTTP handling, no streaming, no session writes.
-- **`app/` owns the LLM call** — `worker.py` calls `inference.py` directly. No code inside `rag/` should call the LLM or import from `app/`.
-- **One entry point for chat** — only `routes.py` calls `run_agent`. `app.py` calls `rag.deg` directly (for the gene popup on selection). Never import other `rag/` submodules (`rag.pathway`, `rag.pubmed`, etc.) from outside `rag/`.
-- **`run_agent()` owns the output contract** — whatever is inside `rag/agent/graph.py` is JN's business. The output dict format must not change.
+- **`src/rag/` is pure analysis** — no HTTP handling, no streaming, no session writes.
+- **`app/` owns the LLM call** — `worker.py` calls `inference.py` directly. No code inside `src/rag/` should call the LLM or import from `app/`.
+- **One entry point for chat** — only `routes.py` calls `run_agent`. `app.py` calls `rag.deg` directly (for the gene popup on selection). Never import other RAG submodules (`rag.pathway`, `rag.pubmed`, etc.) from outside the RAG layer.
+- **`run_agent()` owns the output contract** — whatever is inside `src/rag/agent/graph.py` is JN's business. The output dict format must not change.
 
 ## 4. RAG Module Rules
 
@@ -45,7 +45,7 @@
 
 ## 6. Session and State Rules
 
-- One session per token; stored in `chat_sessions/<session_id>/`.
+- One session per workspace; stored in `data/chat_sessions/<session_id>/`.
 - Use fcntl file locking for all session reads and writes.
 - Write atomically using a `.tmp` file and `os.replace()`.
 - Clear the session only when the user explicitly clicks Reset.

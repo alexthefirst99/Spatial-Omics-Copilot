@@ -1,7 +1,7 @@
 # Local Dash component used by the website.
 # Keep this near the top so `pip install -r requirements.txt` installs the
 # viewer package and its bundled dash_viv_viewer.min.js.
--e ./dash_viv_viewer
+-e ./packages/dash_viv_viewer
 
 # Web app
 dash==2.14.1

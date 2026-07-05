@@ -24,6 +24,14 @@ document.addEventListener('DOMContentLoaded', function () {
 // Configuration
 const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB chunks
 
+function getAppBasePath() {
+    const parts = window.location.pathname.split('/');
+    if (parts.length > 2 && (parts[1] === 'workspaces' || parts[1] === 'app') && parts[2]) {
+        return `/workspaces/${parts[2]}`;
+    }
+    return '';
+}
+
 function generateUploadId() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         const r = Math.random() * 16 | 0;
@@ -125,7 +133,7 @@ function attachUploadListener(wrapper) {
 
     async function uploadChunk(uploadId, filename, chunk, partIndex, totalParts) {
         const action = partIndex === 0 ? 'overwrite' : 'append';
-        const response = await fetch('upload_chunk', {
+        const response = await fetch(`${getAppBasePath()}/upload_chunk`, {
             method: 'POST',
             headers: {
                 'x-filename': filename,
@@ -230,7 +238,7 @@ function attachUploadListener(wrapper) {
 
     function pollStatus(jobId) {
         const pollInterval = setInterval(() => {
-            fetch(`upload_status/${jobId}`)
+            fetch(`${getAppBasePath()}/upload_status/${jobId}`)
                 .then(r => r.json())
                 .then(data => {
                     let p = data.progress || 0;

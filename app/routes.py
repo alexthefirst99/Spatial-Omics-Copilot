@@ -37,19 +37,18 @@ except ImportError:
     run_agent = None
 
 
-def register_chat_routes(server, token, work_dir):
+def register_chat_routes(server, workspace_id, work_dir, base_path=None):
+    base_path = base_path or f"/workspaces/{workspace_id}"
 
-    # Register purely STATIC routes using the provided token.
+    # Register static routes before Dash's internal wildcard routes.
     # Checks priority over Dash's internal wildcard routes.
 
-    @server.route(f"/app/{token}/chat", methods=["POST"])
+    @server.route(f"{base_path}/chat", methods=["POST"])
     def chat_api():
-        # NOTE: 'token' arg is removed because it is hardcoded in route
-        print(f"DEBUG: chat_api called for token={token}")
+        print(f"DEBUG: chat_api called for workspace={workspace_id}")
         try:
             data = request.get_json(force=True)
-            # FORCE session_id to be calculation token (from command line)
-            session_id = token
+            session_id = workspace_id
 
             # --- ROI & Image Handling ---
             images = []
@@ -508,10 +507,10 @@ def register_chat_routes(server, token, work_dir):
             print(f"ERROR in chat_api: {e}")
             return jsonify({"status": "error", "message": str(e)})
 
-    @server.route(f"/app/{token}/chat/poll", methods=["GET"])
+    @server.route(f"{base_path}/chat/poll", methods=["GET"])
     def chat_poll_api():
         try:
-            session_id = token
+            session_id = workspace_id
             session_file = _session_path(session_id)
             try:
                 current_data = _lock_and_read_session(session_file)
@@ -546,10 +545,10 @@ def register_chat_routes(server, token, work_dir):
         except Exception as e:
             return jsonify({"status": "error", "message": f"API Error: {str(e)}"})
 
-    @server.route(f"/app/{token}/chat/clear", methods=["POST"])
+    @server.route(f"{base_path}/chat/clear", methods=["POST"])
     def clear_session_api():
         try:
-            session_id = token
+            session_id = workspace_id
             errors = []
 
             # ── 1. Local chat session dir ──
@@ -563,10 +562,10 @@ def register_chat_routes(server, token, work_dir):
 
             # ── 2. OME-TIFF conversion cache ──
             try:
-                user_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache", token)
+                user_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache", workspace_id)
                 if os.path.exists(user_cache_dir):
                     shutil.rmtree(user_cache_dir)
-                    print(f"[chat/clear] OME-TIFF cache wiped for {token}")
+                    print(f"[chat/clear] OME-TIFF cache wiped for {workspace_id}")
             except Exception as e:
                 errors.append(f"OME-TIFF cache: {e}")
 
@@ -580,7 +579,7 @@ def register_chat_routes(server, token, work_dir):
                             os.remove(entry_path)
                         elif os.path.isdir(entry_path):
                             shutil.rmtree(entry_path)
-                    print(f"[chat/clear] work_dir/user/ wiped for {token}")
+                    print(f"[chat/clear] work_dir/user/ wiped for {workspace_id}")
             except Exception as e:
                 errors.append(f"work_dir/user/: {e}")
 
@@ -590,7 +589,7 @@ def register_chat_routes(server, token, work_dir):
                 if os.path.isdir(tmp_upload_dir):
                     shutil.rmtree(tmp_upload_dir)
                     os.makedirs(tmp_upload_dir, exist_ok=True)
-                    print(f"[chat/clear] Upload tmp dir wiped for {token}")
+                    print(f"[chat/clear] Upload tmp dir wiped for {workspace_id}")
             except Exception as e:
                 errors.append(f"upload tmp: {e}")
 
@@ -625,7 +624,7 @@ def register_chat_routes(server, token, work_dir):
         except Exception as e:
             print(f"[ome_tiff] Global pruning error: {e}")
 
-    @server.route(f"/app/{token}/ome_tiff")
+    @server.route(f"{base_path}/ome_tiff")
     def serve_ome_tiff():
         path = request.args.get("path")
         if not path:
@@ -635,7 +634,7 @@ def register_chat_routes(server, token, work_dir):
         try:
             parent_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache")
             prune_ome_tiff_cache(parent_cache_dir, max_gb=10)
-            ome_local_path = ensure_ome_tiff_cached(path, token)
+            ome_local_path = ensure_ome_tiff_cached(path, workspace_id)
             return send_file(ome_local_path, conditional=True, mimetype='image/tiff')
         except FileNotFoundError:
             return f"Not found: {path}", 404
@@ -644,7 +643,7 @@ def register_chat_routes(server, token, work_dir):
             import traceback; traceback.print_exc()
             return f"Error reading file: {str(e)}", 500
 
-    @server.route(f"/app/{token}/preview")
+    @server.route(f"{base_path}/preview")
     def preview_image():
         import cv2
         import numpy as np

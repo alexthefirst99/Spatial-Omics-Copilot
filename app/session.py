@@ -4,8 +4,9 @@ import fcntl
 import time
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+_DATA_DIR = os.path.join(_PROJECT_ROOT, 'data')
 
-CHAT_DIR = os.environ.get('COPILOT_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))
+CHAT_DIR = os.environ.get('COPILOT_CHAT_DIR', os.path.join(_DATA_DIR, 'chat_sessions'))
 os.makedirs(CHAT_DIR, exist_ok=True)
 
 

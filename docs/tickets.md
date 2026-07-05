@@ -10,13 +10,13 @@
 | --- | --- | --- |
 | T-001 | UI — VivViewer, image upload, h5ad upload, spot overlay, ROI drawing | ✓ Done |
 | T-002 | Infrastructure — routes.py, worker.py, inference.py, session.py | ✓ Done |
-| T-003 | Preprocessing — QC, normalize, HVG, PCA (`rag/preprocessing.py`) | ✓ Done |
-| T-004 | Clustering — Leiden / KMeans, saves cluster JSON (`rag/clustering.py`) | ✓ Done |
-| T-005 | Mock RAG pipeline — sequential fallback (`rag/pipeline.py`) | ✓ Done |
+| T-003 | Preprocessing — QC, normalize, HVG, PCA (`src/rag/preprocessing.py`) | ✓ Done |
+| T-004 | Clustering — Leiden / KMeans, saves cluster JSON (`src/rag/clustering.py`) | ✓ Done |
+| T-005 | Mock RAG pipeline — sequential fallback (`src/rag/pipeline.py`) | ✓ Done |
 | T-006 | Chat UI — AGENT TRACE card, pathway bar chart, DEG bar chart | ✓ Done |
-| T-007 | Folder structure — `rag/deg/`, `rag/pathway/`, `rag/pubmed/`, `rag/agent/` | ✓ Done |
+| T-007 | Folder structure — `src/rag/deg/`, `src/rag/pathway/`, `src/rag/pubmed/`, `src/rag/agent/` | ✓ Done |
 
-## Milestone 2: Preprocessing (rag/preprocessing.py)
+## Milestone 2: Preprocessing (src/rag/preprocessing.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -25,7 +25,7 @@
 | T-035 | Cache preprocessed adata to disk | Re-running on same h5ad skips preprocessing and loads cached result in < 1s |
 | T-036 | Write `test_preprocessing.py` | Tests cover: valid h5ad processes without error, missing spatial key raises ValueError, HVG selection reduces gene count, PCA components present in result |
 
-## Milestone 3: Clustering (rag/clustering.py)
+## Milestone 3: Clustering (src/rag/clustering.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -35,7 +35,7 @@
 | T-040 | Cache cluster results | Skip re-clustering if cluster JSON already exists and h5ad modification time has not changed |
 | T-041 | Write `test_clustering.py` | Tests cover: Leiden runs on small h5ad, KMeans fallback triggers on Leiden failure, palette has correct number of colors, cluster JSON schema is valid |
 
-## Milestone 4: DEG Extraction (rag/deg/)
+## Milestone 4: DEG Extraction (src/rag/deg/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -44,7 +44,7 @@
 | T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset |
 | T-011 | Write `test_deg.py` | Tests cover cluster selection, ROI selection, empty selection |
 
-## Milestone 5: Pathway Enrichment (rag/pathway/)
+## Milestone 5: Pathway Enrichment (src/rag/pathway/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -52,7 +52,7 @@
 | T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception |
 | T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability |
 
-## Milestone 6: PubMed Retrieval (rag/pubmed/)
+## Milestone 6: PubMed Retrieval (src/rag/pubmed/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -62,7 +62,7 @@
 | T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable |
 | T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability |
 
-## Milestone 7: LangGraph Agent (rag/agent/)
+## Milestone 7: LangGraph Agent (src/rag/agent/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -72,7 +72,7 @@
 | T-023 | Add max-iteration guard | Agent stops after 5 tool calls |
 | T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict |
 
-## Milestone 8: Prompt Engineering (rag/agent/prompt.py)
+## Milestone 8: Prompt Engineering (src/rag/agent/prompt.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
