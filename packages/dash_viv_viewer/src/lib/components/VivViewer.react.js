@@ -153,6 +153,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
     const [rectDraft, setRectDraft] = useState(null);
     const [polyDraft, setPolyDraft] = useState([]);
     const [cursor, setCursor] = useState(null);
+    const isDrawing = drawMode !== null;
 
     /* Sync roiList → Dash prop */
     useEffect(() => {
@@ -618,8 +619,6 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
     const onMouseMove = useCallback((e) => { onRectMove(e); onPolyMove(e); }, [onRectMove, onPolyMove]);
     const onMouseUp = drawMode === 'rect' ? onRectUp : onPolyUp;
 
-    const isDrawing = drawMode !== null;
-
     const overlayViewerConfig = useMemo(() => {
         if (viewMode !== 'single' || loaders.length < 2) return null;
         
@@ -858,7 +857,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
 
                     {/* Leaflet-style floating toolbar */}
                     <div style={{
-                        position: 'absolute', top: 12, left: 12, zIndex: 500,
+                        position: 'absolute', top: 12, left: 12, zIndex: 750,
                         display: 'flex', flexDirection: 'column',
                         border: '2px solid rgba(0,0,0,0.25)', borderRadius: 4,
                         boxShadow: '0 1px 5px rgba(0,0,0,0.4)', overflow: 'hidden',

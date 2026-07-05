@@ -8,18 +8,31 @@ import plotly.graph_objs as go
 from dash import html, dcc
 
 # Custom spinner helper function
-def custom_spinner(children, spinner_type="ring"):
-    """Create a custom CSS-based loading spinner.
-    
-    Args:
-        children: The component to wrap with spinner
-        spinner_type: 'ring' or 'pulse' (default: 'ring')
-    """
+def custom_spinner(children, spinner_type="orbit", label="Loading visualization"):
+    """Create a custom CSS-based loading indicator."""
     return dcc.Loading(
         type="circle",  # Use built-in type, we'll hide it with CSS
         children=html.Div(
             className="custom-loading-wrapper",
-            children=children
+            children=[
+                html.Div(
+                    className=f"custom-loader custom-loader-{spinner_type}",
+                    role="status",
+                    **{"aria-live": "polite"},
+                    children=[
+                        html.Div(className="custom-loader-orbit", children=[
+                            html.Span(),
+                            html.Span(),
+                            html.Span(),
+                        ]),
+                        html.Div(className="custom-loader-copy", children=[
+                            html.Span(label, className="custom-loader-title"),
+                            html.Span("Preparing a clear view", className="custom-loader-subtitle"),
+                        ]),
+                    ],
+                ),
+                html.Div(className="custom-loading-content", children=children),
+            ],
         ),
         className="custom-spinner-container",
         color="#0071e3",

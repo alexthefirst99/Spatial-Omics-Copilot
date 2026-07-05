@@ -110,6 +110,9 @@ def enrich_pathways(genes: list[str], top_n: int = 6) -> list[dict]:
     """
     # TODO (teammate): replace body with gseapy.enrichr() or g:Profiler REST call
     input_set = set(g.upper() for g in genes)
+    if not input_set:
+        return []
+
     results = []
 
     # Deterministic jitter seeded from the gene set so same input → same output

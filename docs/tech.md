@@ -7,7 +7,8 @@ spatial-omics-copilot/
 ├── README.md
 ├── pyproject.toml
 ├── requirements.txt
-├── setup.py                      # compatibility shim for older tooling
+├── config/
+│   └── app.yaml                  # general app settings
 ├── app/                          # Dash/Flask application layer
 │   ├── app.py                    # Dash entry point + callbacks
 │   ├── layout.py                 # Dash UI layout
@@ -203,22 +204,24 @@ worker.py  → appends context_str to messages → inference.py → streams toke
 | Vector store | Not active in current code | chromadb or faiss-cpu |
 | Session | fcntl, json | — |
 
-## 7. Environment Variables
+## 7. Configuration
 
-| **Variable** | **Required** | **Purpose** |
+General settings live in `config/app.yaml`. Secrets live in `.env`.
+
+| **YAML key / env override** | **Required** | **Purpose** |
 | --- | --- | --- |
-| `OLLAMA_MODEL` | No | Override local Ollama model; defaults to `qwen3-vl:30b` |
-| `OLLAMA_HOST` | No | Override Ollama server URL; defaults to `http://localhost:11435` |
-| `OPENAI_API_KEY` | Yes if using OpenAI provider | Enables OpenAI chat responses |
-| `OPENAI_MODEL` | No | Override OpenAI model; defaults to `gpt-4o` |
-| `OPENAI_INSECURE_SSL` | No | Local-dev escape hatch; `1` disables OpenAI SSL verification retry |
-| `COPILOT_CHAT_DIR` | No | Override chat session path |
-| `COPILOT_WORKDIR_BASE` | No | Override working directory path |
-| `COPILOT_TMP_BASE` | No | Override temporary upload/OME-TIFF cache path |
-| `COPILOT_STATUS_DIR` | No | Override upload status JSON path |
-| `COPILOT_WORKSPACE_MAP` | No | Override workspace-to-port map path |
-| `COPILOT_TUTORIAL_IMAGE` | No | Override local tutorial OME-TIFF path |
-| `PUBMED_API_KEY` | Planned, not active | Intended for future live PubMed E-utilities rate limits |
+| `ollama.model` / `OLLAMA_MODEL` | No | Local Ollama model; defaults to `qwen2.5vl:7b` |
+| `ollama.host` / `OLLAMA_HOST` | No | Ollama server URL; defaults to `http://localhost:11434` |
+| `.env: OPENAI_API_KEY` | Yes if using OpenAI provider | Enables OpenAI chat responses |
+| `openai.model` / `OPENAI_MODEL` | No | OpenAI model; defaults to `gpt-4o` |
+| `openai.insecure_ssl` / `OPENAI_INSECURE_SSL` | No | Local-dev escape hatch; disables OpenAI SSL verification retry |
+| `paths.chat_dir` / `COPILOT_CHAT_DIR` | No | Chat session path |
+| `paths.workdir_base` / `COPILOT_WORKDIR_BASE` | No | Working directory base path |
+| `paths.tmp_base` / `COPILOT_TMP_BASE` | No | Temporary upload/OME-TIFF cache path |
+| `paths.status_dir` / `COPILOT_STATUS_DIR` | No | Upload status JSON path |
+| `paths.workspace_map` / `COPILOT_WORKSPACE_MAP` | No | Workspace-to-port map path |
+| `paths.tutorial_image` / `COPILOT_TUTORIAL_IMAGE` | No | Local tutorial OME-TIFF path |
+| `.env: PUBMED_API_KEY` | Planned, not active | Intended for future live PubMed E-utilities rate limits |
 
 ## 8. Technical Risks
 

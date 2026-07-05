@@ -1,0 +1,18 @@
+ollama:
+  host: "http://localhost:11434"
+  model: "qwen2.5vl:7b"
+
+openai:
+  model: "gpt-4o"
+  insecure_ssl: false
+
+paths:
+  chat_dir: "data/chat_sessions"
+  status_dir: "data/status_data"
+  workspace_map: "data/workspace_map.json"
+  workdir_base: "tmp_data/workdirs"
+  tmp_base: "tmp_data"
+  tutorial_image: "tutorial/loki_tutorial_hskin_melanoma_downsampled.ome.tif"
+
+app:
+  hot_reload: false

@@ -22,22 +22,87 @@ Whole-slide image:  .tiff, .ome.tiff, .svs
 Gene expression:    .h5ad
 ```
 
-## Configuration
+### Convert 10x Visium HD Feature Slice H5
 
-Create a local `.env` file.
-
-### Optional
+The app upload accepts `.h5ad`. If you have a 10x Visium HD
+`feature_slice.h5`, convert it first:
 
 ```bash
-OLLAMA_MODEL=...             # override Ollama model (default: qwen3-vl:30b)
-OLLAMA_HOST=...              # override Ollama server URL (default: http://localhost:11435)
-OPENAI_API_KEY=...           # enables OpenAI models (e.g. gpt-4o)
-PUBMED_API_KEY=...           # higher PubMed rate limit (optional but recommended)
-COPILOT_CHAT_DIR=...         # path to store chat sessions (default: ./data/chat_sessions)
-COPILOT_STATUS_DIR=...       # path to store upload status files (default: ./data/status_data)
-COPILOT_WORKSPACE_MAP=...    # workspace-to-port map path (default: ./data/workspace_map.json)
-COPILOT_WORKDIR_BASE=...     # path to store working directories (default: ~/copilot_workdirs)
+python src/convert_feature_slice_h5.py \
+  Visium_HD_Human_Colon_Cancer_feature_slice.h5 \
+  Visium_HD_Human_Colon_Cancer_feature_slice.h5ad
 ```
+
+By default, the converter bins 2 um feature-slice data into 16 um bins
+(`--binning-scale 8`) and writes sparse AnnData with `obsm["spatial"]`.
+Upload the generated `.h5ad` file in the Gene Expression Matrix box.
+
+## Configuration
+
+General app settings live in `config/app.yaml`.
+
+```yaml
+ollama:
+  host: "http://localhost:11434"
+  model: "qwen2.5vl:7b"
+
+paths:
+  chat_dir: "data/chat_sessions"
+  status_dir: "data/status_data"
+  workspace_map: "data/workspace_map.json"
+  workdir_base: "tmp_data/workdirs"
+  tmp_base: "tmp_data"
+```
+
+Secrets stay in a local `.env` file. Use `.env.example` as a starting point.
+
+```bash
+PUBMED_API_KEY=...
+```
+
+Environment variables can still override YAML settings for deployment.
+
+## Ollama Setup
+
+The default local model provider is Ollama. Install and start Ollama before
+launching the app if you want local chat responses.
+
+Install Ollama:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Start the Ollama server:
+
+```bash
+ollama serve
+```
+
+In another terminal, pull the default vision-language model:
+
+```bash
+ollama pull qwen2.5vl:7b
+ollama pull qwen2.5vl:32b
+```
+
+Verify Ollama is reachable:
+
+```bash
+ollama list
+curl http://localhost:11434/api/tags
+```
+
+To change the Ollama host or default model, edit `config/app.yaml`:
+
+```yaml
+ollama:
+  host: "http://localhost:11434"
+  model: "qwen2.5vl:7b"
+```
+
+The chat UI also includes Ollama model choices such as `qwen2.5vl:7b` and
+`qwen2.5vl:32b`; make sure the selected model has been pulled locally.
 
 ## Quick Start
 
@@ -49,6 +114,7 @@ conda activate spatial-copilot
 conda install -c conda-forge libvips
 pip install -r requirements.txt   # includes -e ./packages/dash_viv_viewer
 pip install -e .
+cp .env.example .env              # add API keys here if needed
 spatial-copilot --port 8081 --workspace demo
 ```
 
@@ -72,7 +138,8 @@ spatial-omics-copilot/
 ├── README.md
 ├── pyproject.toml
 ├── requirements.txt
-├── setup.py                      # compatibility shim for older tooling
+├── config/
+│   └── app.yaml                  # general app settings
 ├── app/                         # Dash/Flask application layer
 │   ├── app.py                   # Dash entry point + callbacks
 │   ├── layout.py                # Dash UI layout

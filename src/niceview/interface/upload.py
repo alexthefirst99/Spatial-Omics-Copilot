@@ -28,8 +28,6 @@ def _spatial_omics_cluster_path(work_dir, folder_id=""):
     return f'{_spatial_omics_dir(work_dir, folder_id)}/spatial_clusters.json'
 
 
-
-
 def _upload_job_id_from_path(path):
     marker = "data_input_temp/tmp/"
     if marker not in path:
@@ -191,6 +189,9 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
         spatial_dir = _spatial_omics_dir(work_dir, folder_id)
         vio.ensure_dir(spatial_dir)
         stored_path = vio.join_path(spatial_dir, "spatial_expression.h5ad")
+
+        if os.path.splitext(source_path)[1].lower() != ".h5ad":
+            raise ValueError("Upload expects a .h5ad file. Convert .h5 files first with src/convert_feature_slice_h5.py.")
 
         if job_id:
             status_store.update_status(job_id, 20, "Saving h5ad file...")

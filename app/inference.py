@@ -7,6 +7,12 @@ import base64
 import mimetypes
 import ollama
 
+from app.config import get_bool, get_config, load_dotenv
+
+DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+DEFAULT_OLLAMA_MODEL = "qwen2.5vl:7b"
+DEFAULT_OPENAI_MODEL = "gpt-4o"
+
 
 def _image_to_data_url(image_path):
     mime_type = mimetypes.guess_type(image_path)[0] or "image/png"
@@ -38,6 +44,7 @@ def _openai_messages_from_history(messages):
 
 
 def _stream_openai_chat(messages, model_name):
+    load_dotenv()
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         yield "OpenAI API key is not set. Please set OPENAI_API_KEY before using ChatGPT API."
@@ -79,7 +86,7 @@ def _stream_openai_chat(messages, model_name):
 
     try:
         ssl_context = None
-        if os.environ.get("OPENAI_INSECURE_SSL") == "1":
+        if get_bool("openai.insecure_ssl", default=False, env="OPENAI_INSECURE_SSL"):
             print("WARNING: OPENAI_INSECURE_SSL=1, SSL certificate verification is disabled for OpenAI requests.")
             ssl_context = ssl._create_unverified_context()
         else:
@@ -105,17 +112,37 @@ def _stream_openai_chat(messages, model_name):
         yield f"Error querying OpenAI: {e}"
 
 
+def _format_ollama_error(error, host, model_name):
+    message = str(error)
+    connection_markers = (
+        "connection refused",
+        "failed to connect",
+        "could not connect",
+        "connect error",
+        "errno 61",
+        "errno 111",
+    )
+    if any(marker in message.lower() for marker in connection_markers):
+        return (
+            "Ollama is not reachable at "
+            f"{host}. Start Ollama with `ollama serve`, or set OLLAMA_HOST to the "
+            "server URL. Then make sure the selected model is available with "
+            f"`ollama pull {model_name}`."
+        )
+    return f"Error querying Ollama: {message}"
+
+
 def run_model_inference(messages, provider=None, model_name=None):
     provider = (provider or "ollama").lower()
 
     if provider == "openai":
-        selected_model = model_name or os.environ.get("OPENAI_MODEL", "gpt-4o")
+        selected_model = model_name or get_config("openai.model", DEFAULT_OPENAI_MODEL, env="OPENAI_MODEL")
         print(f"DEBUG: Calling OpenAI (model={selected_model}, history={len(messages)})")
         yield from _stream_openai_chat(messages, selected_model)
         return
 
-    selected_model = model_name or os.environ.get("OLLAMA_MODEL", "qwen3-vl:30b")
-    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+    selected_model = model_name or get_config("ollama.model", DEFAULT_OLLAMA_MODEL, env="OLLAMA_MODEL")
+    host = get_config("ollama.host", DEFAULT_OLLAMA_HOST, env="OLLAMA_HOST")
     os.environ["OLLAMA_HOST"] = host
 
     clean_history = []
@@ -139,4 +166,4 @@ def run_model_inference(messages, provider=None, model_name=None):
         print(f"DEBUG: Ollama stream finished. Chunks={chunk_count}")
     except Exception as e:
         print(f"Ollama Error: {e}")
-        yield f"(Offline mode) Error querying model: {e}"
+        yield _format_ollama_error(e, host, selected_model)

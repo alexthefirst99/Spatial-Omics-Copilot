@@ -165,6 +165,8 @@ function initApp() {
 
       msg.appendChild(thumbs);
     }
+
+    return msg;
   }
 
   // ---------------------------------------------------------------------------
@@ -357,16 +359,25 @@ function initApp() {
 
     // 1. Thinking Indicator
     const thinking = document.createElement("div");
-    thinking.classList.add("chat-message", "ai");
-    thinking.textContent = "…";
+    thinking.classList.add("chat-message", "ai", "chat-thinking");
+    thinking.setAttribute("role", "status");
+    thinking.setAttribute("aria-live", "polite");
+
+    const thinkingDots = document.createElement("span");
+    thinkingDots.className = "chat-thinking-dots";
+    for (let i = 0; i < 3; i += 1) {
+      const dot = document.createElement("span");
+      thinkingDots.appendChild(dot);
+    }
+
+    const thinkingLabel = document.createElement("span");
+    thinkingLabel.className = "chat-thinking-label";
+    thinkingLabel.textContent = "Analyzing context";
+
+    thinking.appendChild(thinkingDots);
+    thinking.appendChild(thinkingLabel);
     chatMessages.appendChild(thinking);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    let dotCount = 0;
-    const anim = setInterval(() => {
-      dotCount = (dotCount + 1) % 4;
-      thinking.textContent = ".".repeat(dotCount || 1);
-    }, 350);
 
     // HELPER: Detect Active Viewer Layer
     function getActiveLayerName() {
@@ -408,7 +419,7 @@ function initApp() {
     try {
       // 2. Send Request
       const modelSelect = document.getElementById("chatModelSelect");
-      const selectedModel = modelSelect && modelSelect.value ? modelSelect.value : "ollama:qwen3-vl:30b";
+      const selectedModel = modelSelect && modelSelect.value ? modelSelect.value : "ollama:qwen2.5vl:7b";
 
       const payload = {
         model: selectedModel,
@@ -500,96 +511,85 @@ function initApp() {
       // Use the state passed from handleSend (captured BEFORE disabling)
       const lokiBtn = document.getElementById("start-loki-analysis-btn");
 
-      const pollInterval = setInterval(async () => {
-        try {
-          const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
-          const pollData = await pollRes.json();
-          // console.log("Poll status:", pollData.status, "Length:", pollData.response ? pollData.response.length : 0);
+      await new Promise((resolve) => {
+        const pollInterval = setInterval(async () => {
+          try {
+            const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
+            const pollData = await pollRes.json();
+            // console.log("Poll status:", pollData.status, "Length:", pollData.response ? pollData.response.length : 0);
 
-          if (pollData.status === "streaming" || pollData.status === "done") {
+            if (pollData.status === "streaming" || pollData.status === "done") {
 
-            // 1. Initialize Message Bubble if needed
-            if (!aiMsgElement) {
-              clearInterval(anim); // Stop thinking dots
-              thinking.remove();   // Remove thinking bubble
-
-              // Create actual AI message bubble
-              // We use a modified version of addMessage logic here inline for control, 
-              // or we can modify addMessage to return the element.
-              // Let's use addMessage and assume it puts it at the end.
-              addMessage("", "ai", pollData.images);
-              const allMsgs = chatMessages.querySelectorAll(".chat-message.ai");
-              aiMsgElement = allMsgs[allMsgs.length - 1]; // Get the one we just added
-            }
-
-            // Keep Loki button disabled during streaming
-            if (lokiBtn && pollData.status === "streaming") {
-              lokiBtn.disabled = true;
-            }
-
-            // 2. Update Content
-            if (pollData.response && pollData.response.length > lastContentLength) {
-              // Only update if content changed/grew
-              aiMsgElement.textContent = cleanMarkdownText(pollData.response);
-              lastContentLength = pollData.response.length;
-              chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-
-            // 3. Handle Completion
-            if (pollData.status === "done") {
-              clearInterval(pollInterval);
-              // Ensure final content is set
-              aiMsgElement.textContent = cleanMarkdownText(pollData.response);
-
-              // Re-enable Loki button ONLY if it was enabled before the chat
-              if (lokiBtn && wasLokiBtnEnabled) {
-                lokiBtn.disabled = false;
+              // 1. Initialize Message Bubble if needed
+              if (!aiMsgElement) {
+                thinking.remove();   // Remove thinking bubble
+                aiMsgElement = addMessage("", "ai", pollData.images);
               }
 
-              // Always replace thumbs on done so we show the final correct crop,
-              // not whatever stale path was present during the streaming phase.
-              if (pollData.images && pollData.images.length > 0) {
-                const existing = aiMsgElement.querySelector(".roi-thumbs");
-                if (existing) existing.remove();
-                const thumbs = document.createElement("div");
-                thumbs.className = "roi-thumbs";
-                pollData.images.forEach((path) => {
-                  const img = document.createElement("img");
-                  const freshSrc = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
-                  img.src = freshSrc;
-                  img.onclick = () => window.open(freshSrc, "_blank");
-                  thumbs.appendChild(img);
-                });
-                aiMsgElement.appendChild(thumbs);
+              // Keep Loki button disabled during streaming
+              if (lokiBtn && pollData.status === "streaming") {
+                lokiBtn.disabled = true;
               }
 
-              ragMetadata = null;
-            }
+              // 2. Update Content
+              if (pollData.response && pollData.response.length > lastContentLength) {
+                // Only update if content changed/grew
+                aiMsgElement.textContent = cleanMarkdownText(pollData.response);
+                lastContentLength = pollData.response.length;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+              }
 
-          } else if (pollData.status === "error") {
-            throw new Error(pollData.message);
-          }
-        } catch (pollErr) {
-          console.error("Polling Error:", pollErr);
-          // Only stop if it's a hard error or too many retries (not implemented here)
-          // For now, we don't stop looking for the stream unless it's a catastrophic failure
-          if (pollErr.message.includes("backend unavailable")) {
-            // Maybe wait?
-          } else {
-            // If we haven't started streaming yet, show error
+              // 3. Handle Completion
+              if (pollData.status === "done") {
+                clearInterval(pollInterval);
+                // Ensure final content is set
+                aiMsgElement.textContent = cleanMarkdownText(pollData.response);
+
+                // Re-enable Loki button ONLY if it was enabled before the chat
+                if (lokiBtn && wasLokiBtnEnabled) {
+                  lokiBtn.disabled = false;
+                }
+
+                // Always replace thumbs on done so we show the final correct crop,
+                // not whatever stale path was present during the streaming phase.
+                if (pollData.images && pollData.images.length > 0) {
+                  const existing = aiMsgElement.querySelector(".roi-thumbs");
+                  if (existing) existing.remove();
+                  const thumbs = document.createElement("div");
+                  thumbs.className = "roi-thumbs";
+                  pollData.images.forEach((path) => {
+                    const img = document.createElement("img");
+                    const freshSrc = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
+                    img.src = freshSrc;
+                    img.onclick = () => window.open(freshSrc, "_blank");
+                    thumbs.appendChild(img);
+                  });
+                  aiMsgElement.appendChild(thumbs);
+                }
+
+                ragMetadata = null;
+                resolve();
+              }
+
+            } else if (pollData.status === "error") {
+              throw new Error(pollData.message);
+            }
+          } catch (pollErr) {
+            console.error("Polling Error:", pollErr);
+            clearInterval(pollInterval);
+            thinking.remove();
             if (!aiMsgElement) {
-              clearInterval(anim);
-              clearInterval(pollInterval);
-              thinking.remove();
               addMessage(`(error) ${pollErr.message}`, "ai");
+            } else {
+              aiMsgElement.textContent = `(error) ${pollErr.message}`;
             }
+            resolve();
           }
-        }
-      }, 100); // Super fast polling (100ms) for smooth streaming
+        }, 100); // Super fast polling (100ms) for smooth streaming
+      });
 
     } catch (err) {
       console.error("Chat Error:", err);
-      clearInterval(anim);
       thinking.remove();
       addMessage(`(error) ${err.message}`, "ai");
     }
@@ -598,9 +598,16 @@ function initApp() {
   // ---------------------------------------------------------------------------
   // EVENT HANDLERS
   // ---------------------------------------------------------------------------
+  let sendInFlight = false;
+
   async function handleSend() {
+    if (sendInFlight) return;
+
     const text = chatInput.value.trim();
     if (!text) return;
+
+    sendInFlight = true;
+    sendBtn.disabled = true;
 
     // Capture Loki button state BEFORE disabling
     const lokiBtn = document.getElementById("start-loki-analysis-btn");
@@ -611,9 +618,15 @@ function initApp() {
       lokiBtn.disabled = true;
     }
 
-    addMessage(text, "user");
-    chatInput.value = "";
-    await aiRespond(text, wasEnabled);
+    try {
+      addMessage(text, "user");
+      chatInput.value = "";
+      await aiRespond(text, wasEnabled);
+    } finally {
+      sendInFlight = false;
+      sendBtn.disabled = false;
+      chatInput.focus();
+    }
   }
 
   sendBtn.addEventListener("click", handleSend);

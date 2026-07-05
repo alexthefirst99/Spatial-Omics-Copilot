@@ -18,6 +18,7 @@ dependencies = [
     "boto3==1.28.17",
     "s3fs==2023.9.2",
     "anndata==0.10.3",
+    "h5py>=3.10",
     "matplotlib==3.8.1",
     "numpy==1.26.1",
     "pandas==2.1.1",
@@ -46,11 +47,20 @@ dependencies = [
     "ipyleaflet==0.17.4",
     "ollama",
     "packaging>=24.0",
+    "PyYAML>=6.0",
     "toml==0.10.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
 ]
 
 [project.scripts]
 spatial-copilot = "app.app:main"
+
+[tool.pytest.ini_options]
+testpaths = ["src/tests"]
 
 [tool.setuptools]
 packages = [

@@ -58,20 +58,23 @@ _LOCAL_DASH_VIV_VIEWER = os.path.join(_PROJECT_ROOT, 'packages', 'dash_viv_viewe
 if _LOCAL_DASH_VIV_VIEWER not in sys.path:
     sys.path.insert(0, _LOCAL_DASH_VIV_VIEWER)
 
+from app.config import get_bool, get_config, get_path
+
 # Directory for chat session JSON files
-CHAT_DIR = os.environ.get('COPILOT_CHAT_DIR', os.path.join(_DATA_DIR, 'chat_sessions'))
+CHAT_DIR = get_path('paths.chat_dir', os.path.join(_DATA_DIR, 'chat_sessions'), env='COPILOT_CHAT_DIR')
 os.makedirs(CHAT_DIR, exist_ok=True)
 
-# Tutorial image — set COPILOT_TUTORIAL_IMAGE env var to point to a local file
-TUTORIAL_IMAGE_PATH = os.environ.get(
-    'COPILOT_TUTORIAL_IMAGE',
-    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif')
+# Tutorial image path is configured in config/app.yaml.
+TUTORIAL_IMAGE_PATH = get_path(
+    'paths.tutorial_image',
+    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif'),
+    env='COPILOT_TUTORIAL_IMAGE',
 )
 TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 # Base directory for temp/cache files (use /tmp or a configurable path)
-TMP_BASE = os.environ.get('COPILOT_TMP_BASE', os.path.join(_PROJECT_ROOT, 'tmp_data'))
+TMP_BASE = get_path('paths.tmp_base', os.path.join(_PROJECT_ROOT, 'tmp_data'), env='COPILOT_TMP_BASE')
 os.makedirs(TMP_BASE, exist_ok=True)
 
 # Import custom layout and utilities
@@ -87,7 +90,7 @@ except ImportError:
 
 # Import sub-modules
 try:
-    from app.inference import run_model_inference
+    from app.inference import DEFAULT_OLLAMA_MODEL, run_model_inference
     from app.session import (
         CHAT_DIR as _CHAT_DIR_mod,
         _session_path,
@@ -107,7 +110,7 @@ try:
     )
     from app.routes import register_chat_routes
 except ImportError:
-    from inference import run_model_inference
+    from inference import DEFAULT_OLLAMA_MODEL, run_model_inference
     from session import (
         CHAT_DIR as _CHAT_DIR_mod,
         _session_path,
@@ -132,7 +135,7 @@ except ImportError:
 
 def add_workspace_to_map(workspace, port):
     os.makedirs(_DATA_DIR, exist_ok=True)
-    map_path = os.environ.get('COPILOT_WORKSPACE_MAP', os.path.join(_DATA_DIR, "workspace_map.json"))
+    map_path = get_path('paths.workspace_map', os.path.join(_DATA_DIR, "workspace_map.json"), env='COPILOT_WORKSPACE_MAP')
     try:
         with open(map_path) as f:
             data = json.load(f)
@@ -164,8 +167,10 @@ parser.add_argument('--port', type=int, default=8080, help='Port to run the app 
 parser.add_argument('--wd', type=str, default=workdir, help='Working directory for the app')
 parser.add_argument("--workspace", type=str, default=None, help='Workspace slug used in the app URL')
 parser.add_argument("--token", type=str, default=None, help='Deprecated alias for --workspace')
+parser.add_argument("--hot-reload", action="store_true", help="Enable Dash hot reload while developing")
 args = parser.parse_args()
 args.workspace = args.workspace or args.token or "demo"
+args.hot_reload = args.hot_reload or get_bool("app.hot_reload", default=False, env="COPILOT_HOT_RELOAD")
 add_workspace_to_map(args.workspace, args.port)
 
 
@@ -505,7 +510,7 @@ def main():
         try:
              enqueue_chat_job(
                 session_id=WORKSPACE_ID,
-                model="qwen2.5vl:72b",
+                model=f"ollama:{get_config('ollama.model', DEFAULT_OLLAMA_MODEL, env='OLLAMA_MODEL')}",
                 prompt="hi",
                 images=[],
                 work_dir=work_dir,
@@ -524,7 +529,7 @@ def main():
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
 
     # Launch browser and run app
-    app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=True)
+    app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=args.hot_reload)
 
 
 

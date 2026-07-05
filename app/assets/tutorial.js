@@ -242,7 +242,7 @@
     backdrop.innerHTML = `
       <div class="tutorial-prompt" role="dialog" aria-modal="true" aria-labelledby="tutorial-prompt-title">
         <h3 id="tutorial-prompt-title">Want a quick tutorial?</h3>
-        <p>A short step-by-step walkthrough will point to image upload, h5ad upload, viewer, layers, opacity, and chatbot controls.</p>
+        <p>A short step-by-step walkthrough will point to image upload, spatial expression upload, viewer, layers, opacity, and chatbot controls.</p>
         <div class="tutorial-prompt-actions">
           <button type="button" class="tutorial-btn tutorial-btn-secondary" data-tutorial-answer="no">No, skip</button>
           <button type="button" class="tutorial-btn tutorial-btn-primary" data-tutorial-answer="yes">Yes, show me</button>

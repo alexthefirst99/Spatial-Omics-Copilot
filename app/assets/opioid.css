@@ -650,19 +650,16 @@ h2 {
 
 /* ------------------------ Hover Instructions ------------------------ */
 #submit-wrapper #submit-container .upload-instructions {
-  opacity: 0 !important;
-  /* Override generic child opacity */
-  transform: translateY(5px);
-  transition: all 0.3s ease !important;
-  /* Ensure this timing wins */
-  pointer-events: none;
-  /* Can't click invisible text */
+  opacity: 1 !important;
+  transform: none;
+  transition: color 0.2s ease !important;
+  pointer-events: auto;
+  white-space: normal;
 }
 
-#submit-wrapper #submit-container:hover .upload-instructions {
-  opacity: 1 !important;
-  transform: translateY(0);
-  pointer-events: auto;
+#submit-wrapper.collapsed #submit-container .upload-instructions {
+  opacity: 0 !important;
+  pointer-events: none;
 }
 
 /* ------------------------ Progress Bar Animation ------------------------ */
@@ -1084,4 +1081,3 @@ h2 {
   cursor: default;
   white-space: nowrap;
 }
-

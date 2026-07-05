@@ -10,6 +10,7 @@ try:
     from app.session import (
         CHAT_DIR, _read_session, _write_session, _session_path,
         _lock_and_read_session, _lock_and_write_session,
+        _lock_and_update_session,
         safe_update_session, safe_update_streaming_message,
         safe_update_last_assistant_image,
     )
@@ -19,6 +20,7 @@ except ImportError:
     from session import (
         CHAT_DIR, _read_session, _write_session, _session_path,
         _lock_and_read_session, _lock_and_write_session,
+        _lock_and_update_session,
         safe_update_session, safe_update_streaming_message,
         safe_update_last_assistant_image,
     )
@@ -164,9 +166,6 @@ def process_session(session_id):
 def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None, visible=True, rag_context_str=""):
     session_file = _session_path(session_id)
 
-    existing = _lock_and_read_session(session_file)
-    session_data = existing if existing else {"session_id": session_id, "messages": []}
-
     new_message = {
         "role": "user",
         "content": prompt,
@@ -188,10 +187,27 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
     if rag_context_str:
         new_message["rag_context_str"] = rag_context_str
 
-    session_data["messages"].append(new_message)
-    session_data["updated_at"] = time.time()
+    duplicate = False
 
-    _lock_and_write_session(session_file, session_data)
+    def append_message(session_data):
+        nonlocal duplicate
+        session_data = session_data if session_data else {"session_id": session_id, "messages": []}
+        messages = session_data.setdefault("messages", [])
+        if messages:
+            last_msg = messages[-1]
+            is_recent = (new_message["timestamp"] - last_msg.get("timestamp", 0)) < 2.0
+            is_same_prompt = last_msg.get("role") == "user" and last_msg.get("content") == prompt
+            if is_recent and is_same_prompt:
+                duplicate = True
+                return session_data
+        messages.append(new_message)
+        session_data["updated_at"] = time.time()
+        return session_data
+
+    _lock_and_update_session(session_file, append_message)
+
+    if duplicate:
+        return "duplicate"
 
     # Dispatch directly — no separate polling loop needed
     with processing_lock:

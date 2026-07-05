@@ -7,6 +7,8 @@ from flask import request, jsonify, send_file, redirect
 import cv2
 import numpy as np
 
+from app.config import get_path
+
 try:
     from app.session import (
         CHAT_DIR, _session_path, _lock_and_read_session,
@@ -24,9 +26,10 @@ except ImportError:
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-TUTORIAL_IMAGE_PATH = os.environ.get(
-    'COPILOT_TUTORIAL_IMAGE',
-    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif')
+TUTORIAL_IMAGE_PATH = get_path(
+    'paths.tutorial_image',
+    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif'),
+    env='COPILOT_TUTORIAL_IMAGE',
 )
 TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
@@ -478,7 +481,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
 
             status = enqueue_chat_job(
                 session_id=session_id,
-                model=data.get("model", "ollama:qwen3-vl:30b"),
+                model=data.get("model", "ollama:qwen2.5vl:7b"),
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,
