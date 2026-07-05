@@ -48,10 +48,17 @@ conda create -n spatial-copilot python=3.11 -y
 conda activate spatial-copilot
 conda install -c conda-forge libvips
 pip install -r requirements.txt   # includes -e ./packages/dash_viv_viewer
-python app/app.py --port 8081 --workspace demo
+pip install -e .
+spatial-copilot --port 8081 --workspace demo
 ```
 
 Open `http://localhost:8081/workspaces/demo` in your browser.
+
+For local development, the app can also be launched directly:
+
+```bash
+python app/app.py --port 8081 --workspace demo
+```
 
 ## Demo Dataset
 
@@ -63,8 +70,9 @@ Open `http://localhost:8081/workspaces/demo` in your browser.
 ```text
 spatial-omics-copilot/
 ├── README.md
+├── pyproject.toml
 ├── requirements.txt
-├── setup.py
+├── setup.py                      # compatibility shim for older tooling
 ├── app/                         # Dash/Flask application layer
 │   ├── app.py                   # Dash entry point + callbacks
 │   ├── layout.py                # Dash UI layout

@@ -5,9 +5,10 @@
 ```text
 spatial-omics-copilot/
 ├── README.md
+├── pyproject.toml
 ├── requirements.txt
-├── setup.py
-├── app/                          # infrastructure layer
+├── setup.py                      # compatibility shim for older tooling
+├── app/                          # Dash/Flask application layer
 │   ├── app.py                    # Dash entry point + callbacks
 │   ├── layout.py                 # Dash UI layout
 │   ├── routes.py                 # Flask HTTP routes
@@ -63,6 +64,8 @@ spatial-omics-copilot/
 Run command: `python app/app.py --port 8081 --workspace demo`
 
 Open `http://localhost:8081/workspaces/demo`.
+
+Installed command: `spatial-copilot --port 8081 --workspace demo`
 
 ## 2. Architecture
 
