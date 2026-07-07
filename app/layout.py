@@ -320,7 +320,6 @@ def create_layout(work_dir, folder_id):
                                         id="chatInput",
                                         type="text",
                                         placeholder="Type your message...",
-                                        debounce=True,
                                         autoComplete="off",
                                         spellCheck=False,
                                     ),

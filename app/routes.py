@@ -37,9 +37,9 @@ TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 def _chat_stream_timeout_seconds():
     try:
-        return int(os.environ.get("COPILOT_CHAT_STREAM_TIMEOUT") or os.environ.get("OLLAMA_TIMEOUT") or 75)
+        return int(os.environ.get("COPILOT_CHAT_STREAM_TIMEOUT") or os.environ.get("OLLAMA_TIMEOUT") or 120)
     except (TypeError, ValueError):
-        return 75
+        return 120
 
 try:
     from rag.agent import run_agent
@@ -461,7 +461,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
             # ----------------------------
 
             prompt = data.get("prompt", "")
-            prompt += "\n\nRespond in 3–4 sentences maximum. Be direct and concise."
+            prompt += "\n\nRespond in 1-2 concise sentences. Be direct."
 
             # RAG pipeline — reads cached gene_objects written by popup callbacks
             rag_metadata = None
@@ -535,6 +535,8 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 current_data = _lock_and_read_session(session_file)
                 if current_data:
                     messages = current_data.get("messages", [])
+                    if not messages:
+                        return jsonify({"status": "idle"})
                     if messages:
                         last_msg = messages[-1]
                         if last_msg.get("role") == "assistant":

@@ -44,7 +44,11 @@ General app settings live in `config/app.yaml`.
 ```yaml
 ollama:
   host: "http://localhost:11434"
-  model: "qwen2.5vl:7b"
+  model: "qwen2.5:0.5b"
+  vision_model: "qwen2.5vl:7b"
+  timeout: 120
+  num_predict: 48
+  keep_alive: "10m"
 
 paths:
   chat_dir: "data/chat_sessions"
@@ -86,11 +90,18 @@ Start the Ollama server:
 ollama serve
 ```
 
-In another terminal, pull the default vision-language model:
+In another terminal, pull the default fast text model:
+
+```bash
+ollama pull qwen2.5:0.5b
+```
+
+Optional: pull the vision-language model only if you want the chat model to
+inspect ROI crops/images directly. This model is much heavier and can be slow
+on CPU-only machines.
 
 ```bash
 ollama pull qwen2.5vl:7b
-ollama pull qwen2.5vl:32b
 ```
 
 Verify Ollama is reachable:
@@ -105,11 +116,12 @@ To change the Ollama host or default model, edit `config/app.yaml`:
 ```yaml
 ollama:
   host: "http://localhost:11434"
-  model: "qwen2.5vl:7b"
+  model: "qwen2.5:0.5b"
+  vision_model: "qwen2.5vl:7b"
 ```
 
-The chat UI includes Ollama model choices such as `qwen2.5vl:7b` and
-`qwen2.5vl:32b`; make sure the selected model has been pulled locally.
+The chat UI includes a fast text model (`qwen2.5:0.5b`) and a heavier vision
+model (`qwen2.5vl:7b`); make sure the selected model has been pulled locally.
 
 ## Quick Start
 

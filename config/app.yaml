@@ -2,6 +2,9 @@ ollama:
   host: "http://localhost:11434"
   model: "qwen2.5:0.5b"
   vision_model: "qwen2.5vl:7b"
+  timeout: 120
+  num_predict: 48
+  keep_alive: "10m"
 
 paths:
   chat_dir: "data/chat_sessions"

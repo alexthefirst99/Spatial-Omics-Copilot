@@ -513,12 +513,12 @@ function initApp() {
 
       await new Promise((resolve) => {
         const pollStartedAt = Date.now();
-        const maxPollMs = 75000;
+        const maxPollMs = 120000;
         const pollEveryMs = 500;
         const pollInterval = setInterval(async () => {
           try {
             if (Date.now() - pollStartedAt > maxPollMs) {
-              throw new Error("Chat is still running after 75 seconds. Retry with a smaller ROI or restart Ollama.");
+              throw new Error("Chat is still running after 120 seconds. Retry with a smaller ROI or restart Ollama.");
             }
 
             const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
@@ -608,6 +608,13 @@ function initApp() {
   // ---------------------------------------------------------------------------
   let sendInFlight = false;
 
+  function setChatInputValue(value) {
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    valueSetter.call(chatInput, value);
+    chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+    chatInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
   async function handleSend() {
     if (sendInFlight) return;
 
@@ -616,6 +623,7 @@ function initApp() {
 
     sendInFlight = true;
     sendBtn.disabled = true;
+    setChatInputValue("");
 
     // Capture Loki button state BEFORE disabling
     const lokiBtn = document.getElementById("start-loki-analysis-btn");
@@ -628,7 +636,6 @@ function initApp() {
 
     try {
       addMessage(text, "user");
-      chatInput.value = "";
       await aiRespond(text, wasEnabled);
     } finally {
       sendInFlight = false;
