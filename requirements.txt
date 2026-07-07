@@ -1,7 +1,7 @@
 # Local Dash component used by the website.
 # Keep this near the top so `pip install -r requirements.txt` installs the
 # viewer package and its bundled dash_viv_viewer.min.js.
--e ./dash_viv_viewer
+-e ./packages/dash_viv_viewer
 
 # Web app
 dash==2.14.1
@@ -12,11 +12,12 @@ plotly==5.18.0
 requests
 
 # AWS / S3
-boto3
-s3fs
+boto3==1.28.17
+s3fs==2023.9.2
 
 # Data science
 anndata==0.10.3
+h5py>=3.10
 matplotlib==3.8.1
 numpy==1.26.1
 pandas==2.1.1
@@ -24,6 +25,10 @@ scanpy==1.9.6
 scikit-image==0.22.0
 scikit_learn==1.3.2
 scipy==1.11.3
+# Keep numba/llvmlite paired to wheel-backed Python 3.11 builds. Without these
+# pins pip can choose a source build and fail while compiling llvmlite.
+numba==0.59.1
+llvmlite==0.42.0
 
 # Image / geospatial
 # `pyvips` is the Python binding. The native `libvips` library must be
@@ -44,16 +49,16 @@ tifffile==2024.8.30
 langchain>=0.2.0
 langchain-community>=0.2.0
 langchain-ollama>=0.1.0
-langchain-openai>=0.1.0
 langgraph>=0.1.0
 
 # Bioinformatics tools
-gseapy>=1.1.0         # pathway enrichment — Quynh
+gseapy==1.1.2         # pathway enrichment; newest macOS x86_64 cp311 wheel
 biopython>=1.83       # PubMed/NCBI API — Rodney
 
 # Utilities
 ipyleaflet==0.17.4
 ollama
 packaging>=24.0
+PyYAML>=6.0
 setuptools>=68.0.0
 toml==0.10.2

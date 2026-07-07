@@ -10,13 +10,13 @@
 | --- | --- | --- |
 | T-001 | UI — VivViewer, image upload, h5ad upload, spot overlay, ROI drawing | ✓ Done |
 | T-002 | Infrastructure — routes.py, worker.py, inference.py, session.py | ✓ Done |
-| T-003 | Preprocessing — QC, normalize, HVG, PCA (`rag/preprocessing.py`) | ✓ Done |
-| T-004 | Clustering — Leiden / KMeans, saves cluster JSON (`rag/clustering.py`) | ✓ Done |
-| T-005 | Mock RAG pipeline — sequential fallback (`rag/pipeline.py`) | ✓ Done |
+| T-003 | Preprocessing — QC, normalize, HVG, PCA (`src/rag/preprocessing.py`) | ✓ Done |
+| T-004 | Clustering — Leiden / KMeans, saves cluster JSON (`src/rag/clustering.py`) | ✓ Done |
+| T-005 | Mock RAG pipeline — sequential fallback (`src/rag/pipeline.py`) | ✓ Done |
 | T-006 | Chat UI — AGENT TRACE card, pathway bar chart, DEG bar chart | ✓ Done |
-| T-007 | Folder structure — `rag/deg/`, `rag/pathway/`, `rag/pubmed/`, `rag/agent/` | ✓ Done |
+| T-007 | Folder structure — `src/rag/deg/`, `src/rag/pathway/`, `src/rag/pubmed/`, `src/rag/agent/` | ✓ Done |
 
-## Milestone 2: Preprocessing (rag/preprocessing.py)
+## Milestone 2: Preprocessing (src/rag/preprocessing.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -25,7 +25,7 @@
 | T-035 | Cache preprocessed adata to disk | Re-running on same h5ad skips preprocessing and loads cached result in < 1s |
 | T-036 | Write `test_preprocessing.py` | Tests cover: valid h5ad processes without error, missing spatial key raises ValueError, HVG selection reduces gene count, PCA components present in result |
 
-## Milestone 3: Clustering (rag/clustering.py)
+## Milestone 3: Clustering (src/rag/clustering.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -35,7 +35,7 @@
 | T-040 | Cache cluster results | Skip re-clustering if cluster JSON already exists and h5ad modification time has not changed |
 | T-041 | Write `test_clustering.py` | Tests cover: Leiden runs on small h5ad, KMeans fallback triggers on Leiden failure, palette has correct number of colors, cluster JSON schema is valid |
 
-## Milestone 4: DEG Extraction (rag/deg/)
+## Milestone 4: DEG Extraction (src/rag/deg/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -44,7 +44,7 @@
 | T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset |
 | T-011 | Write `test_deg.py` | Tests cover cluster selection, ROI selection, empty selection |
 
-## Milestone 5: Pathway Enrichment (rag/pathway/)
+## Milestone 5: Pathway Enrichment (src/rag/pathway/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -52,7 +52,35 @@
 | T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception |
 | T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability |
 
-## Milestone 6: PubMed Retrieval (rag/pubmed/)
+### T-012 — Real Pathway Enrichment Backend
+
+**Status:** Todo
+
+**Current behavior:** `src/rag/pathway/enrichment.py` uses a hardcoded gene-set dictionary, mock p-values, deterministic jitter, and synthetic padding so the UI always has pathway bars.
+
+**Desired behavior:** Replace mock and synthetic pathway output with a documented real enrichment backend for GO and KEGG terms, such as `gseapy.enrichr()`, g:Profiler, Enrichr, or another backend selected by the team.
+
+**Implementation notes:**
+- Preserve `enrich_pathways(genes: list[str], top_n: int = 6) -> list[dict]` where possible.
+- Preserve existing output keys: `name`, `gene_count`, `set_size`, `pvalue`, and `overlap`.
+- Treat p-values as adjusted p-values when the backend provides FDR / BH values.
+- Remove fake pathway padding once real enrichment is enabled.
+- Keep backend configuration local-dev friendly and document any network/API requirements in the ticket implementation notes or follow-up docs.
+
+**Acceptance criteria:**
+- Empty input returns `[]`.
+- No enriched terms returns `[]` instead of synthetic pathway bars.
+- Successful enrichment returns real GO/KEGG pathway names and valid adjusted p-values sorted ascending.
+- API/backend failures are caught and return `[]` without crashing callers.
+- Existing RAG metadata formatting in `src/rag/pipeline.py` continues to work.
+
+**Suggested tests:**
+- `test_pathway_empty_gene_list_returns_empty()`
+- `test_pathway_no_enrichment_returns_empty_without_padding()`
+- `test_pathway_success_maps_backend_rows_to_public_schema()`
+- `test_pathway_backend_failure_returns_empty()`
+
+## Milestone 6: PubMed Retrieval (src/rag/pubmed/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -62,7 +90,62 @@
 | T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable |
 | T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability |
 
-## Milestone 7: LangGraph Agent (rag/agent/)
+### T-015 — Real PubMed / Literature Retrieval Backend
+
+**Status:** Todo
+
+**Current behavior:** `src/rag/pubmed/retrieval.py` ranks and returns a hardcoded list of curated abstracts, then pads from that list until `n` results are returned.
+
+**Desired behavior:** Replace curated mock abstracts with live PubMed/NCBI retrieval or a documented retrieval backend that returns real literature records for the selected genes and pathway terms.
+
+**Implementation notes:**
+- Preserve `retrieve_abstracts(genes: list[str], pathways: list[str] | None = None, n: int = 3) -> list[dict]` where possible.
+- Preserve existing output keys: `pmid`, `title`, `journal`, `year`, and `snippet`.
+- Implement NCBI E-utilities `esearch` + `efetch` or document an equivalent backend.
+- Use `PUBMED_API_KEY` when available and respect unauthenticated/authenticated rate limits.
+- Return up to `n` relevant live PubMed results. If fewer relevant hits are available, return fewer results instead of padding with unrelated or mock papers.
+
+**Acceptance criteria:**
+- Normal retrieval returns real PubMed-backed abstracts with PMIDs.
+- No-result queries return `[]` and do not silently substitute unrelated papers.
+- Fewer-than-`n` live results are returned without unrelated padding and documented in the code/test names.
+- API errors, timeouts, malformed responses, and missing API keys are handled without crashing callers.
+
+**Suggested tests:**
+- `test_pubmed_no_results_returns_empty()`
+- `test_pubmed_fewer_than_n_results_behavior_is_documented()`
+- `test_pubmed_success_maps_ncbi_records_to_public_schema()`
+- `test_pubmed_backend_failure_returns_empty()`
+
+### T-018 — Vector Store Integration for Literature Evidence
+
+**Status:** Todo
+
+**Current behavior:** The technical design lists vector search as a planned target, but no active vector store indexes fetched PubMed abstracts or other evidence.
+
+**Desired behavior:** Implement or wire an optional vector store for semantic search over literature evidence if vector retrieval remains part of the desired RAG architecture.
+
+**Implementation notes:**
+- Choose and document the backend, such as Chroma, FAISS, or another local-friendly store.
+- Clarify what is indexed: fetched PubMed abstracts, snippets, titles, pathway descriptions, or a combination.
+- Store enough metadata to preserve PMID/citation provenance in responses.
+- Make the vector store optional/configurable for local development and CI.
+- Define rebuild behavior when abstracts change, cached data is missing, or the index schema changes.
+
+**Acceptance criteria:**
+- Fetched literature can be indexed and queried semantically.
+- Retrieval returns records with stable source metadata, including PMID when available.
+- Index persistence and rebuild behavior are deterministic and documented in implementation notes.
+- Disabling the vector store leaves pathway/PubMed retrieval usable.
+- Vector retrieval does not invent citations or detach snippets from source records.
+
+**Suggested tests:**
+- `test_vector_store_indexes_pubmed_records_with_metadata()`
+- `test_vector_store_retrieves_relevant_record_for_query()`
+- `test_vector_store_rebuilds_when_index_missing()`
+- `test_vector_store_disabled_falls_back_without_error()`
+
+## Milestone 7: LangGraph Agent (src/rag/agent/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -72,7 +155,61 @@
 | T-023 | Add max-iteration guard | Agent stops after 5 tool calls |
 | T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict |
 
-## Milestone 8: Prompt Engineering (rag/agent/prompt.py)
+### T-021 — Agentic RAG and Dynamic Tool Selection
+
+**Status:** Todo
+
+**Current behavior:** `src/rag/agent/graph.py` calls `_run_sequential()`, and `_run_sequential()` always runs pathway enrichment and PubMed retrieval regardless of the user query.
+
+**Desired behavior:** Replace the fixed sequential fallback with LangGraph or equivalent agentic routing so the agent decides whether to call pathway enrichment, PubMed retrieval, both, or neither based on the user query and available DEG/context inputs.
+
+**Implementation notes:**
+- Preserve `run_agent(gene_objects, message="", label="selection") -> dict`.
+- Keep `_run_sequential()` only as an explicit fallback if it remains useful for local/offline operation.
+- DEG remains pre-computed by the UI; do not move DEG into the agent as a tool unless the specs change.
+- `metadata.trace` must reflect actual tool calls, not a hardcoded list.
+- Maintain the max-tool-call / max-iteration guard from the desired architecture.
+
+**Acceptance criteria:**
+- Irrelevant/general chat queries can return a valid response context without unnecessary pathway or PubMed calls.
+- Pathway-specific queries call pathway enrichment.
+- Literature/citation-specific queries call PubMed retrieval.
+- Questions that need both biological pathway context and literature can call both.
+- The returned dict keeps `gene_objects`, `context_str`, and `metadata` compatible with `routes.py`, `worker.py`, and the chat UI.
+
+**Suggested tests:**
+- `test_agent_irrelevant_query_skips_pathway_and_pubmed_tools()`
+- `test_agent_pathway_query_calls_pathway_tool_only_when_literature_not_needed()`
+- `test_agent_literature_query_calls_pubmed_tool()`
+- `test_agent_combined_query_calls_pathway_and_pubmed_tools()`
+- `test_agent_trace_matches_actual_tool_calls()`
+- `test_agent_respects_max_tool_call_guard()`
+
+### T-024 — Agent Test Coverage
+
+**Status:** Todo
+
+**Current behavior:** The ticket list names `test_agent.py`, but the current test suite uses pipeline-level tests for the sequential fallback and does not prove dynamic routing behavior.
+
+**Desired behavior:** Add focused agent tests that verify the public `run_agent()` contract and tool-selection behavior after T-021 is implemented.
+
+**Implementation notes:**
+- Mock pathway and PubMed tools so tests prove routing without requiring network calls.
+- Keep separate tests for schema compatibility and routing decisions.
+- Include fallback-mode tests only if `_run_sequential()` remains a supported fallback.
+
+**Acceptance criteria:**
+- `test_agent.py` or an equivalent clearly named agent test file exists.
+- Tests fail if pathway/PubMed are called for irrelevant queries.
+- Tests fail if pathway or literature queries skip the required tool.
+- Tests verify trace, citations, pathways, and DEG metadata remain UI-compatible.
+
+**Suggested tests:**
+- `test_agent_output_schema_matches_routes_contract()`
+- `test_agent_no_gene_objects_uses_demo_fallback_when_configured()`
+- `test_agent_tool_errors_do_not_crash_turn()`
+
+## Milestone 8: Prompt Engineering (src/rag/agent/prompt.py)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -89,3 +226,77 @@
 | T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type |
 | T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response |
 | T-032 | Freeze final submission | Repo, docs, and demo complete |
+| T-044 | Replace domain-inappropriate demo fallback genes | Empty ROI/no h5ad paths clearly say no gene context, or use only explicitly labeled CRC/demo-dataset genes |
+
+## Milestone 10: RAG Runtime Boundary and Test Hygiene
+
+| **ID** | **Task** | **Done When** |
+| --- | --- | --- |
+| T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status |
+| T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup |
+
+### T-042 — Async / Background Execution Boundary for Real RAG APIs
+
+**Status:** Todo
+
+**Current behavior:** `routes.py` calls `run_agent()` before enqueueing the chat job. This is acceptable for mock/fallback code but will block the request path once real PubMed, pathway, or vector APIs are enabled.
+
+**Desired behavior:** Move real external RAG calls out of the main Flask request path and align execution with the background-worker expectations in the architecture rules.
+
+**Implementation notes:**
+- Decide whether `run_agent()` runs inside `worker.py`, a dedicated RAG executor, or another background task abstraction.
+- Return meaningful UI/API status while RAG retrieval and LLM generation are pending.
+- Add timeouts, bounded retries, and clear failure messages for PubMed, enrichment, and vector-store operations.
+- Preserve existing chat session persistence and streaming behavior.
+- Avoid indefinitely blocking `/chat` responses when external services are slow.
+
+**Acceptance criteria:**
+- `/chat` does not synchronously wait on live PubMed/enrichment/vector API calls.
+- RAG failures produce usable metadata/status and do not prevent a chat response from being recorded.
+- Timeouts and retries are bounded and configurable.
+- The UI can distinguish queued, processing, failed, and completed RAG states where needed.
+- Existing mock/fallback mode remains usable for local demos.
+
+**Suggested tests:**
+- `test_chat_enqueue_does_not_block_on_slow_rag_backend()`
+- `test_rag_background_timeout_records_failure_metadata()`
+- `test_rag_background_retry_is_bounded()`
+- `test_worker_injects_rag_context_after_background_retrieval()`
+
+### T-043 — RAG Test Documentation Cleanup
+
+**Status:** Todo
+
+**Current behavior:** Some ticket/rule references name test files that are not currently present, including `test_agent.py` and `test_upload.py`, while related coverage lives in files such as `test_pipeline.py`, `test_inference.py`, and `test_feature_slice_upload.py`.
+
+**Desired behavior:** Reconcile stale test references after the implementation tickets above are completed, without weakening the desired product/spec/rule targets.
+
+**Implementation notes:**
+- Do not modify `docs/rules.md` as part of this ticket unless that later task explicitly allows docs cleanup.
+- Prefer adding the missing tests when the referenced behavior is still desired.
+- If a test file has been intentionally renamed, update ticket/planning references in a dedicated docs-cleanup change.
+- Keep implementation-gap tickets separate from docs-cleanup tickets.
+
+**Acceptance criteria:**
+- `test_agent.py` exists or ticket/planning docs consistently point to the actual agent test file.
+- `test_upload.py` exists or ticket/planning docs consistently point to the actual upload test file.
+- The distinction between desired target behavior and incomplete implementation remains clear.
+- No PRD/spec/rules/tech behavior is downgraded to match current mocks.
+
+**Suggested tests:**
+- No runtime test required for the docs cleanup itself.
+- Run the full existing pytest suite after adding or renaming tests.
+
+
+### T-044 — Remove or Relabel Demo Gene Fallback
+
+**Status:** Todo
+
+**Current behavior:** Some fallback paths may substitute a small demo gene list when no valid ROI/h5ad DEG context is available.
+
+**Desired behavior:** Empty ROI or missing h5ad cases should not appear as real ROI-specific biology. The system should either show a clear no-gene-context message or use only explicitly labeled demo-mode genes appropriate for the selected demo dataset.
+
+**Acceptance criteria:**
+- No h5ad loaded returns a clear message instead of silently using demo genes.
+- ROI with no spots returns an empty gene list and explanatory status.
+- Demo fallback, if enabled, is explicitly labeled and not presented as ROI evidence.

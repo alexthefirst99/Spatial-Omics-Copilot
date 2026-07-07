@@ -1,0 +1,166 @@
+Our team would like to share our project proposal.
+
+1) Industry / Application Domain
+
+- Biomedical research
+- Computational pathology
+- Spatial transcriptomics
+- Digital pathology
+- AI-assisted scientific discovery
+
+Our project focuses on using AI to help researchers better understand spatial omics data from tissue images.
+
+2) Real-World Problem Statement
+
+Spatial transcriptomics can measure gene expression across many locations in a tissue sample. It also produces large histopathology images that show the structure of the tissue. However, interpreting this type of data is difficult because researchers often need to:
+
+- examine the tissue image,
+- identify important tissue regions,
+- analyze gene expression in those regions,
+- connect genes to biological pathways,
+- search PubMed for related studies, and
+- combine all of this information into a biological explanation.
+
+The main problem is that the data and knowledge are disconnected. A researcher may find an interesting region of interest (ROI) in a tissue image, but it is not easy to quickly know which genes are important in that region, what pathways are involved, or what the literature says about similar findings.
+
+Our project aims to solve this by building an AI-powered Spatial Omics Copilot inside a spatial omics visualization tool. The user can select an ROI on the tissue image, and the system will help generate a biologically grounded explanation using gene expression, pathway information, and PubMed literature.
+
+The AI copilot will use an agentic Retrieval-Augmented Generation (RAG) workflow. After a user selects a tissue region by clicking a cluster or drawing an ROI, the system will identify important genes from that region. Then, a LangGraph agent will decide which external evidence tools to use, such as pathway analysis with GO/KEGG or PubMed article search through the NCBI API. The retrieved information, together with the ROI tissue image crop and gene expression results, will be given to a large language model, which will generate a biologically grounded explanation and show it in the chat interface.
+
+3) Public Datasets
+
+We plan to use public spatial transcriptomics data and public biomedical knowledge sources.
+
+Spatial omics demo data:
+- Visium HD CytAssist Gene Expression — Human Colorectal Cancer, 10x Genomics
+- https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-human-crc
+
+General spatial transcriptomics platform reference:
+- 10x Genomics Visium platform
+- https://www.10xgenomics.com/platforms/visium
+
+Pathway and gene annotation resources:
+- KEGG
+- Gene Ontology
+
+Biomedical literature source:
+- PubMed abstracts through the NCBI E-utilities API
+- https://www.ncbi.nlm.nih.gov/home/develop/api/
+
+The expected data formats include:
+- Gigapixel histopathology images, such as TIFF or OME-TIFF files
+- Spatial gene expression matrices, such as h5ad files
+- Biomedical text abstracts from PubMed
+
+4) Desired Outcomes
+
+By the end of the project, we aim to build a working prototype of an AI-powered spatial omics visualization system.
+
+The system should allow users to:
+- Load and view a whole-slide histopathology image.
+- Overlay spatial gene expression data on the tissue image.
+- Draw a region of interest (ROI) on a tissue area they want to study.
+- Analyze gene expression inside the selected ROI.
+- Identify important genes in that region.
+- Connect those genes to relevant biological pathways.
+- Use an agentic RAG pipeline, managed with LangGraph, to decide which external evidence tools to call based on the selected ROI and user question. The gene expression analysis runs automatically after ROI selection; the agent decides whether pathway enrichment, PubMed retrieval, or both are needed.
+- Pass the retrieved context, selected tissue image crop, gene expression results, pathway results, and PubMed evidence to an LLM, such as Ollama or ChatGPT, to generate a biologically grounded interpretation.
+- Ask follow-up questions through a chat interface.
+
+The final goal is not just to display spatial omics data, but to help researchers understand what a selected tissue region may mean biologically.
+
+We plan to use tools such as:
+- Dash or Flask for the visualization interface
+- LangChain and LangGraph for the RAG workflow
+- Ollama as the default local LLM backend for the prototype; ChatGPT may be used as an optional external LLM backend if allowed by the project setting
+- PubMed API for literature retrieval
+- Pathway resources such as KEGG and Gene Ontology
+
+We will evaluate the system based on:
+- Whether the generated biological explanations make sense
+- Whether the retrieved PubMed papers are relevant
+- Whether the system responds in a reasonable time
+- Whether the interface is clear and easy to use
+
+5) Persona
+
+Our target end users are biomedical researchers, computational pathologists, and spatial transcriptomics analysts who study tissue samples and need to interpret spatial gene expression patterns.
+
+These users need a faster way to move from a selected tissue region to a biological explanation by connecting tissue images, real sequenced gene expression data, pathway information, and biomedical literature.
+
+The purpose of our project is to bridge visual tissue information, molecular gene expression data, and supporting biomedical evidence so users can gain biological insight from a selected tissue region more quickly.
+
+6) Gen AI Concepts Covered
+
+Our project covers both RAG and Agentic AI.
+
+RAG: The system retrieves relevant PubMed abstracts, pathway information, and gene annotations to support the generated biological explanation.
+
+Agentic AI: A LangGraph agent decides which tools to call based on the selected ROI and the user's question. For example, the agent may call pathway analysis, PubMed retrieval, or both.
+
+Text data: Text data will include PubMed abstracts, pathway descriptions, and gene annotations.
+
+7) Evaluation Plan
+
+7.1 Business Evaluation
+
+We will evaluate whether the system helps users solve their research task more efficiently and confidently.
+
+Planned business metrics include:
+- Time saved: Compare the time needed to move from ROI selection to biological interpretation using our system versus a manual workflow.
+- Workflow efficiency: Count how many separate tools or manual steps the user no longer needs to perform.
+- Hypothesis usefulness: Evaluate whether the generated explanation helps users form reasonable biological hypotheses.
+- Decision quality: Check whether the explanation helps users better understand which genes, pathways, or papers are relevant to the selected ROI.
+- Trust and adoption: Collect user feedback on whether the explanation is clear, useful, and trustworthy enough for exploratory research.
+
+7.2 Technical Evaluation
+
+We will evaluate whether the system retrieves relevant information and generates grounded, reliable answers.
+
+Planned technical metrics include:
+- PubMed retrieval relevance: Check whether the retrieved papers are related to the selected genes, pathways, disease context, or tissue region.
+- Pathway relevance: Check whether the pathway analysis results are related to the highly expressed genes in the selected ROI.
+- Image-gene connection: Evaluate whether the explanation connects the selected tissue image region with the gene expression results in a meaningful way.
+- Groundedness: Measure whether the generated explanation is supported by retrieved PubMed abstracts, gene annotations, or pathway sources.
+- Hallucination rate: Identify unsupported biological claims that are not backed by the retrieved context.
+- Answer quality: Review whether the generated explanation is biologically reasonable, specific, and understandable.
+- Response time: Measure how long the system takes to return an explanation after the user selects an ROI or asks a question.
+
+8) Key Slides and Charts for Milestone Presentations
+
+For this milestone, our presentation will focus on the domain, problem, proposed solution, workflow design, and success criteria.
+
+Planned slides and visuals include:
+- Team members and roles
+- Domain background explained simply enough for an 11th grader
+- One slide for the business problem
+- One simple slide for the tech stack
+- Spatial transcriptomics workflow overview
+- Tissue image and spatial gene expression overlay examples
+- ROI selection concept
+- Agentic RAG workflow diagram
+- Evaluation plan
+- Definition of success
+
+9) Definition of Success
+
+A successful system should:
+- Support ROI-based exploration of spatial omics data.
+- Crop the selected tissue image region after ROI selection.
+- Identify highly expressed genes from the selected region using code-based analysis.
+- Use pathway databases and PubMed as external evidence sources.
+- Use an agentic workflow to decide whether pathway analysis, PubMed retrieval, or both are needed based on the user's question.
+- Provide the cropped tissue image, gene expression results, pathway analysis results, and PubMed evidence to the LLM.
+- Generate explanations that connect tissue image information, gene expression data, and supporting biomedical evidence.
+- Reduce the manual effort needed to interpret spatial transcriptomics data.
+- Provide a clear visualization interface and a usable chat-based explanation workflow.
+
+10) Team Concurrence
+
+Our team members are:
+- Quynh
+- Alex
+- Rodney
+- Anh
+- JN
+- Zainab

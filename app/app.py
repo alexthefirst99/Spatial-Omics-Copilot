@@ -10,7 +10,12 @@ os.environ["GDAL_HTTP_MERGE_CONSECUTIVE_RANGES"] = "YES"
 os.environ['GDAL_ALLOW_LARGE_LIBJPEG_MEM_ALLOC'] = 'YES'
 
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+_APP_DIR_FOR_PATHS = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT_FOR_PATHS = os.path.abspath(os.path.join(_APP_DIR_FOR_PATHS, '..'))
+_SRC_DIR_FOR_PATHS = os.path.join(_PROJECT_ROOT_FOR_PATHS, 'src')
+for _path in (_PROJECT_ROOT_FOR_PATHS, _SRC_DIR_FOR_PATHS):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 import uuid
 import time
@@ -48,24 +53,28 @@ import ssl
 # ----------------------------------------------------------------------------
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_APP_DIR, '..'))
-_LOCAL_DASH_VIV_VIEWER = os.path.join(_PROJECT_ROOT, 'dash_viv_viewer')
+_DATA_DIR = os.path.join(_PROJECT_ROOT, 'data')
+_LOCAL_DASH_VIV_VIEWER = os.path.join(_PROJECT_ROOT, 'packages', 'dash_viv_viewer')
 if _LOCAL_DASH_VIV_VIEWER not in sys.path:
     sys.path.insert(0, _LOCAL_DASH_VIV_VIEWER)
 
+from app.config import get_bool, get_config, get_path
+
 # Directory for chat session JSON files
-CHAT_DIR = os.environ.get('COPILOT_CHAT_DIR', os.path.join(_PROJECT_ROOT, 'chat_sessions'))
+CHAT_DIR = get_path('paths.chat_dir', os.path.join(_DATA_DIR, 'chat_sessions'), env='COPILOT_CHAT_DIR')
 os.makedirs(CHAT_DIR, exist_ok=True)
 
-# Tutorial image — set COPILOT_TUTORIAL_IMAGE env var to point to a local file
-TUTORIAL_IMAGE_PATH = os.environ.get(
-    'COPILOT_TUTORIAL_IMAGE',
-    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif')
+# Tutorial image path is configured in config/app.yaml.
+TUTORIAL_IMAGE_PATH = get_path(
+    'paths.tutorial_image',
+    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif'),
+    env='COPILOT_TUTORIAL_IMAGE',
 )
 TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
 # Base directory for temp/cache files (use /tmp or a configurable path)
-TMP_BASE = os.environ.get('COPILOT_TMP_BASE', os.path.join(_PROJECT_ROOT, 'tmp_data'))
+TMP_BASE = get_path('paths.tmp_base', os.path.join(_PROJECT_ROOT, 'tmp_data'), env='COPILOT_TMP_BASE')
 os.makedirs(TMP_BASE, exist_ok=True)
 
 # Import custom layout and utilities
@@ -81,7 +90,7 @@ except ImportError:
 
 # Import sub-modules
 try:
-    from app.inference import run_model_inference
+    from app.inference import DEFAULT_OLLAMA_MODEL, run_model_inference
     from app.session import (
         CHAT_DIR as _CHAT_DIR_mod,
         _session_path,
@@ -101,7 +110,7 @@ try:
     )
     from app.routes import register_chat_routes
 except ImportError:
-    from inference import run_model_inference
+    from inference import DEFAULT_OLLAMA_MODEL, run_model_inference
     from session import (
         CHAT_DIR as _CHAT_DIR_mod,
         _session_path,
@@ -124,14 +133,15 @@ except ImportError:
 # Import tile server
 # localtileserver removed - VivViewer serves OME-TIFFs directly
 
-def add_token_to_map(token, port):
-    map_path = os.path.join(_PROJECT_ROOT, "proxy_map.json")
+def add_workspace_to_map(workspace, port):
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    map_path = get_path('paths.workspace_map', os.path.join(_DATA_DIR, "workspace_map.json"), env='COPILOT_WORKSPACE_MAP')
     try:
         with open(map_path) as f:
             data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         data = {}
-    data[token] = port
+    data[workspace] = port
     tmp_path = map_path + '.tmp'
     with open(tmp_path, 'w') as f:
         json.dump(data, f, indent=2)
@@ -146,7 +156,7 @@ from rag.deg import get_roi_high_expression_genes, get_cluster_high_expression_g
 
 from niceview.interface.interface import (
     prepare_file_folder, update_data_cache,
-    dump_default_para_arg, add_token_mapping
+    dump_default_para_arg, add_workspace_mapping
 )
 
 # Parse arguments
@@ -155,9 +165,13 @@ workdir = setup_work_dir()
 parser = argparse.ArgumentParser(description='Run Dash app.')
 parser.add_argument('--port', type=int, default=8080, help='Port to run the app on')
 parser.add_argument('--wd', type=str, default=workdir, help='Working directory for the app')
-parser.add_argument("--token", type=str, required=True, help='Token to access')
+parser.add_argument("--workspace", type=str, default=None, help='Workspace slug used in the app URL')
+parser.add_argument("--token", type=str, default=None, help='Deprecated alias for --workspace')
+parser.add_argument("--hot-reload", action="store_true", help="Enable Dash hot reload while developing")
 args = parser.parse_args()
-add_token_to_map(args.token,args.port)
+args.workspace = args.workspace or args.token or "demo"
+args.hot_reload = args.hot_reload or get_bool("app.hot_reload", default=False, env="COPILOT_HOT_RELOAD")
+add_workspace_to_map(args.workspace, args.port)
 
 
 # ----------------------------------------------------------------------------
@@ -167,7 +181,8 @@ add_token_to_map(args.token,args.port)
 
 def main():
     # Setup paths and IDs
-    VALID_TOKEN = args.token
+    WORKSPACE_ID = args.workspace
+    APP_BASE_PATH = f"/workspaces/{WORKSPACE_ID}"
     work_dir = args.wd
     folder_id = ""
     app_dir = os.path.dirname(os.path.realpath(__file__))
@@ -177,17 +192,25 @@ def main():
     server = Flask(__name__)
     CORS(server) # Enable CORS for all routes (Fixes Tile Loading Status 0)
 
-    # Register Chat Routes BEFORE Dash
-    # Pass server AND specific token AND work_dir
-    register_chat_routes(server, VALID_TOKEN, work_dir)
+    @server.route(f"/app/{WORKSPACE_ID}")
+    @server.route(f"/app/{WORKSPACE_ID}/")
+    def redirect_legacy_app_root():
+        return redirect(f"{APP_BASE_PATH}/", code=308)
+
+    @server.route(f"/app/{WORKSPACE_ID}/<path:subpath>")
+    def redirect_legacy_app_path(subpath):
+        return redirect(f"{APP_BASE_PATH}/{subpath}", code=308)
+
+    # Register Chat Routes BEFORE Dash.
+    register_chat_routes(server, WORKSPACE_ID, work_dir, base_path=APP_BASE_PATH)
 
     # Initialize Dash app
     app = dash.Dash(
         __name__,
         server=server,
         meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
-        requests_pathname_prefix=f"/app/{VALID_TOKEN}/",
-        routes_pathname_prefix=f"/app/{VALID_TOKEN}/",
+        requests_pathname_prefix=f"{APP_BASE_PATH}/",
+        routes_pathname_prefix=f"{APP_BASE_PATH}/",
         suppress_callback_exceptions=True
     )
 
@@ -200,20 +223,19 @@ def main():
     update_data_cache(folder_id, work_dir)
     dump_default_para_arg(folder_id, work_dir)
 
-    # Save token mapping
+    # Save workspace mapping. Keep the legacy keys because niceview reads them.
     user_token_info = {
         "user-port": args.port,
-        "user-token": args.token,
+        "user-token": WORKSPACE_ID,
+        "workspace": WORKSPACE_ID,
         "tile-port": int(args.port)+1,
     }
-    add_token_mapping(work_dir, folder_id, user_token_info)
-
-    add_token_mapping(work_dir, folder_id, user_token_info)
+    add_workspace_mapping(work_dir, folder_id, user_token_info)
 
     app.layout = create_layout(work_dir, folder_id)
 
     # ----------------------- Local Chunked Upload -----------------------
-    @app.server.route(f"/app/{args.token}/upload_chunk", methods=['POST'])
+    @app.server.route(f"{APP_BASE_PATH}/upload_chunk", methods=['POST'])
     def upload_chunk():
         try:
             filename = request.headers.get('x-filename')
@@ -243,13 +265,12 @@ def main():
             return jsonify({"error": str(e)}), 500
 
 
-    @app.server.route(f"/app/{args.token}/upload_status/<job_id>", methods=["GET"])
+    @app.server.route(f"{APP_BASE_PATH}/upload_status/<job_id>", methods=["GET"])
     def get_upload_status(job_id):
         return jsonify(status_store.get_status(job_id))
 
     # ----------------------- Upload Callbacks -----------------------
 
-    # Callback to handle upload of H&E image
     # Callback to handle upload of H&E image
     # Callback to handle upload of H&E image
     @app.callback(
@@ -463,7 +484,7 @@ def main():
             ]), cluster_id
 
 
-    timer = threading.Timer(7200, clear_cache_forcall, args=(VALID_TOKEN, work_dir))
+    timer = threading.Timer(7200, clear_cache_forcall, args=(WORKSPACE_ID, work_dir))
     timer.daemon = True
     timer.start()
 
@@ -479,7 +500,7 @@ def main():
         if n_clicks > 0:
             print("DEBUG: Executing clear_cache_forcall...")
             # We don't check for existence anymore, we just force exit
-            clear_cache_forcall(VALID_TOKEN, work_dir)
+            clear_cache_forcall(WORKSPACE_ID, work_dir)
             return None
         return dash.no_update
 
@@ -488,8 +509,8 @@ def main():
         print("DEBUG: Sending Warmup 'hi' to Ollama...")
         try:
              enqueue_chat_job(
-                session_id=VALID_TOKEN,
-                model="qwen2.5vl:72b",
+                session_id=f"{WORKSPACE_ID}__warmup",
+                model=f"ollama:{get_config('ollama.model', DEFAULT_OLLAMA_MODEL, env='OLLAMA_MODEL')}",
                 prompt="hi",
                 images=[],
                 work_dir=work_dir,
@@ -500,15 +521,15 @@ def main():
         except Exception as e:
             print(f"DEBUG: Warmup failed: {e}")
 
-    # Start Warmup in background thread so it doesn't block app launch
-    threading.Thread(target=warmup_ollama, daemon=True).start()
+    if get_bool("ollama.warmup", default=False, env="OLLAMA_WARMUP"):
+        threading.Thread(target=warmup_ollama, daemon=True).start()
 
     # Open browser after a short delay to let the server start
-    url = f"http://localhost:{args.port}/app/{args.token}"
+    url = f"http://localhost:{args.port}{APP_BASE_PATH}"
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
 
     # Launch browser and run app
-    app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=True)
+    app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=args.hot_reload)
 
 
 

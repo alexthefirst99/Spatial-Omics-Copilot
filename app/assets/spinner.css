@@ -1,47 +1,8 @@
-/* Hide default Dash loading spinner, use our custom one */
+/* Hide Dash's default spinner; the app supplies a calmer branded loader. */
 .custom-spinner-container ._dash-loading-callback {
     display: none !important;
 }
 
-/* Custom spinner overlay */
-.custom-spinner-container::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 64px;
-    height: 64px;
-    border: 6px solid transparent;
-    border-radius: 50%;
-    border-top-color: #0071e3;
-    border-right-color: #0071e3;
-    border-bottom-color: rgba(0, 113, 227, 0.3);
-    border-left-color: rgba(0, 113, 227, 0.3);
-    animation: custom-spinner-rotate 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    z-index: 1000;
-}
-
-/* Only show spinner when loading */
-.custom-spinner-container:not(._dash-loading) {
-    position: relative;
-}
-
-.custom-spinner-container._dash-loading::before {
-    display: block;
-}
-
-@keyframes custom-spinner-rotate {
-    0% {
-        transform: translate(-50%, -50%) rotate(0deg);
-    }
-
-    100% {
-        transform: translate(-50%, -50%) rotate(360deg);
-    }
-}
-
-/* Spinner container positioning */
 .custom-spinner-container {
     position: relative;
     min-height: 80px;
@@ -50,52 +11,169 @@
     align-items: center;
 }
 
-/* Alternative pulse design (not used by default, but available) */
-.custom-spinner-pulse {
-    display: inline-block;
+.custom-loading-wrapper,
+.custom-loading-content {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 100%;
+    height: 100%;
+    min-height: inherit;
 }
 
-.custom-spinner-pulse-dot {
+.custom-loader {
     position: absolute;
-    width: 20px;
-    height: 20px;
+    left: 50%;
+    top: 50%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 238px;
+    max-width: min(320px, calc(100% - 32px));
+    padding: 13px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.82);
+    color: #1d1d1f;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.18),
+        0 3px 12px rgba(0, 113, 227, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+    transition:
+        opacity 180ms ease,
+        transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.custom-spinner-container._dash-loading .custom-loader {
+    opacity: 1;
+    visibility: visible !important;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.custom-spinner-container._dash-loading .custom-loading-wrapper {
+    visibility: visible !important;
+}
+
+.custom-spinner-container._dash-loading .custom-loading-content {
+    filter: saturate(0.94);
+}
+
+.custom-loader::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background:
+        linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.7) 34%, transparent 68%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent);
+    background-size: 220% 100%, 100% 100%;
+    opacity: 0.48;
+    pointer-events: none;
+    animation: custom-loader-sheen 1.8s ease-in-out infinite;
+}
+
+.custom-loader-orbit {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(0, 113, 227, 0.12) 0 35%, transparent 38%),
+        conic-gradient(from 90deg, rgba(0, 113, 227, 0.05), rgba(0, 113, 227, 0.88), rgba(48, 209, 88, 0.52), rgba(0, 113, 227, 0.05));
+    animation: custom-loader-orbit 920ms linear infinite;
+}
+
+.custom-loader-orbit::after {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.08);
+}
+
+.custom-loader-orbit span {
+    position: absolute;
+    z-index: 1;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
     background: #0071e3;
-    animation: custom-spinner-pulse 1.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    box-shadow: 0 0 12px rgba(0, 113, 227, 0.45);
 }
 
-.custom-spinner-pulse-dot:nth-child(1) {
-    left: 8px;
-    animation-delay: 0s;
+.custom-loader-orbit span:nth-child(1) {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
-.custom-spinner-pulse-dot:nth-child(2) {
-    left: 8px;
-    animation-delay: -0.4s;
+.custom-loader-orbit span:nth-child(2) {
+    right: 3px;
+    bottom: 6px;
+    width: 5px;
+    height: 5px;
+    opacity: 0.72;
 }
 
-.custom-spinner-pulse-dot:nth-child(3) {
-    left: 32px;
-    animation-delay: -0.8s;
+.custom-loader-orbit span:nth-child(3) {
+    left: 4px;
+    bottom: 7px;
+    width: 4px;
+    height: 4px;
+    opacity: 0.42;
 }
 
-.custom-spinner-pulse-dot:nth-child(4) {
-    left: 56px;
-    animation-delay: -1.2s;
+.custom-loader-copy {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
 }
 
-@keyframes custom-spinner-pulse {
+.custom-loader-title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0;
+}
+
+.custom-loader-subtitle {
+    color: #6e6e73;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.25;
+}
+
+@keyframes custom-loader-orbit {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes custom-loader-sheen {
     0% {
-        top: 8px;
-        height: 64px;
+        background-position: 150% 0, 0 0;
     }
 
-    50%,
     100% {
-        top: 24px;
-        height: 32px;
+        background-position: -70% 0, 0 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .custom-loader,
+    .custom-loader::before,
+    .custom-loader-orbit {
+        animation: none;
+        transition: none;
     }
 }

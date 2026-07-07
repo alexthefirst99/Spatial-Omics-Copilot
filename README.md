@@ -10,10 +10,10 @@ and immediately receive biologically grounded, literature-backed interpretations
 - Interactive gigapixel whole-slide image viewer with ROI drawing.
 - Gene expression overlay from h5ad spatial transcriptomics data.
 - Top differentially expressed genes extracted from any selected tissue region.
-- Biological pathway enrichment via GO and KEGG.
-- PubMed literature retrieval grounded in the selected genes and pathways.
-- Agentic RAG pipeline (LangGraph) that reasons over spatial context and literature.
-- Streaming chat interface for follow-up questions about selected regions.
+- Prototype pathway enrichment over GO/KEGG-labeled gene sets.
+- Curated PubMed-style literature retrieval grounded in selected genes and pathways, with live PubMed E-utilities tracked as planned work.
+- RAG pipeline with a LangGraph-compatible entry point and sequential fallback.
+- Streaming Ollama chat interface for follow-up questions about selected regions; this is the conversational UI for the copilot, not a general-purpose medical chatbot.
 
 ## Supported Data Formats
 
@@ -22,20 +22,106 @@ Whole-slide image:  .tiff, .ome.tiff, .svs
 Gene expression:    .h5ad
 ```
 
-## Configuration
+### Convert 10x Visium HD Feature Slice H5
 
-Create a local `.env` file.
-
-### Optional
+The app upload accepts `.h5ad`. If you have a 10x Visium HD
+`feature_slice.h5`, convert it first:
 
 ```bash
-OLLAMA_MODEL=...             # override Ollama model (default: qwen3-vl:30b)
-OLLAMA_HOST=...              # override Ollama server URL (default: http://localhost:11435)
-OPENAI_API_KEY=...           # enables OpenAI models (e.g. gpt-4o)
-PUBMED_API_KEY=...           # higher PubMed rate limit (optional but recommended)
-COPILOT_CHAT_DIR=...         # path to store chat sessions (default: ./chat_sessions)
-COPILOT_WORKDIR_BASE=...     # path to store working directories (default: ~/copilot_workdirs)
+python src/convert_feature_slice_h5.py \
+  Visium_HD_Human_Colon_Cancer_feature_slice.h5 \
+  Visium_HD_Human_Colon_Cancer_feature_slice.h5ad
 ```
+
+By default, the converter bins 2 um feature-slice data into 16 um bins
+(`--binning-scale 8`) and writes sparse AnnData with `obsm["spatial"]`.
+Upload the generated `.h5ad` file in the Gene Expression Matrix box.
+
+## Configuration
+
+General app settings live in `config/app.yaml`.
+
+```yaml
+ollama:
+  host: "http://localhost:11434"
+  model: "qwen2.5:0.5b"
+  vision_model: "qwen2.5vl:7b"
+  timeout: 120
+  num_predict: 48
+  keep_alive: "10m"
+
+paths:
+  chat_dir: "data/chat_sessions"
+  status_dir: "data/status_data"
+  workspace_map: "data/workspace_map.json"
+  workdir_base: "tmp_data/workdirs"
+  tmp_base: "tmp_data"
+  tutorial_image: "tutorial/loki_tutorial_hskin_melanoma_downsampled.ome.tif"
+
+app:
+  hot_reload: false
+```
+
+Secrets stay in a local `.env` file. Use `.env.example` as a starting point.
+
+```bash
+PUBMED_API_KEY=...   # planned for future live PubMed E-utilities support
+```
+
+Environment variables can override YAML settings for deployment. Common
+overrides include `OLLAMA_HOST`, `OLLAMA_MODEL`, `COPILOT_CHAT_DIR`,
+`COPILOT_STATUS_DIR`, `COPILOT_WORKSPACE_MAP`, `COPILOT_WORKDIR_BASE`,
+`COPILOT_TMP_BASE`, `COPILOT_TUTORIAL_IMAGE`, and `COPILOT_HOT_RELOAD`.
+
+## Ollama Setup
+
+The default local model provider is Ollama. Install and start Ollama before
+launching the app if you want local chat responses.
+
+Install Ollama:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Start the Ollama server:
+
+```bash
+ollama serve
+```
+
+In another terminal, pull the default fast text model:
+
+```bash
+ollama pull qwen2.5:0.5b
+```
+
+Optional: pull the vision-language model only if you want the chat model to
+inspect ROI crops/images directly. This model is much heavier and can be slow
+on CPU-only machines.
+
+```bash
+ollama pull qwen2.5vl:7b
+```
+
+Verify Ollama is reachable:
+
+```bash
+ollama list
+curl http://localhost:11434/api/tags
+```
+
+To change the Ollama host or default model, edit `config/app.yaml`:
+
+```yaml
+ollama:
+  host: "http://localhost:11434"
+  model: "qwen2.5:0.5b"
+  vision_model: "qwen2.5vl:7b"
+```
+
+The chat UI includes a fast text model (`qwen2.5:0.5b`) and a heavier vision
+model (`qwen2.5vl:7b`); make sure the selected model has been pulled locally.
 
 ## Quick Start
 
@@ -44,16 +130,20 @@ Python 3.11 is recommended. pyvips is required for OME-TIFF pyramid generation.
 ```bash
 conda create -n spatial-copilot python=3.11 -y
 conda activate spatial-copilot
-
-# system dependency for image processing
-brew install vips            # macOS
-# sudo apt-get install libvips-dev  # Ubuntu/Linux
-
-pip install -r requirements.txt   # includes -e ./dash_viv_viewer
-python app/app.py --port 8081 --token hello
+conda install -c conda-forge libvips
+pip install -r requirements.txt   
+pip install -e .
+cp .env.example .env              
+spatial-copilot --port 8081 --workspace demo
 ```
 
-Open `http://localhost:8081/app/hello` in your browser.
+Open `http://localhost:8081/workspaces/demo` in your browser.
+
+For local development, the app can also be launched directly:
+
+```bash
+python app/app.py --port 8081 --workspace demo
+```
 
 ## Demo Dataset
 
@@ -65,14 +155,16 @@ Open `http://localhost:8081/app/hello` in your browser.
 ```text
 spatial-omics-copilot/
 ├── README.md
+├── pyproject.toml
 ├── requirements.txt
-├── setup.py
-├── app/                         # infrastructure layer
+├── config/
+│   └── app.yaml                  # general app settings
+├── app/                         # Dash/Flask application layer
 │   ├── app.py                   # Dash entry point + callbacks
 │   ├── layout.py                # Dash UI layout
 │   ├── routes.py                # Flask HTTP routes
 │   ├── worker.py                # background job queue + LLM streaming
-│   ├── inference.py             # Ollama / OpenAI API wrapper
+│   ├── inference.py             # Ollama API wrapper
 │   ├── session.py               # chat session read/write
 │   ├── image_utils.py           # ROI crop, OME-TIFF caching
 │   ├── status_store.py          # upload progress tracking
@@ -87,42 +179,39 @@ spatial-omics-copilot/
 │       ├── tutorial.js          # tutorial button behavior
 │       ├── tutorial.css         # tutorial controls styling
 │       └── font.css             # font imports
-├── niceview/                    # UI layer
-│   ├── interface/
-│   │   ├── upload.py            # image + h5ad upload handlers
-│   │   ├── visualization.py     # spot overlay, VivViewer setup
-│   │   ├── actions.py           # re-visualize, save ROI
-│   │   ├── callback.py          # Dash callbacks
-│   │   ├── interface.py         # shared interface state
-│   │   └── data_io.py           # session data helpers
-│   ├── pyplot/
-│   │   └── leaflet.py           # VivViewer component builder + cluster legend
-│   └── utils/                   # io, colors, dataset, aristotle helpers
-├── rag/                         # analysis pipeline
-│   ├── pipeline.py              # fallback sequential pipeline (_run_sequential)
-│   ├── preprocessing.py         # QC, normalize, PCA
-│   ├── clustering.py            # Leiden / KMeans spatial clustering
-│   ├── deg/
-│   │   ├── __init__.py          # exposes: get_roi/cluster_high_expression_genes
-│   │   └── extraction.py        # DEG computation
-│   ├── pathway/
-│   │   ├── __init__.py          # exposes: enrich_pathways
-│   │   └── enrichment.py        # ORA against GO / KEGG
-│   ├── pubmed/
-│   │   ├── __init__.py          # exposes: retrieve_abstracts
-│   │   └── retrieval.py         # mock retrieval; target: NCBI E-utilities
-│   └── agent/
-│       ├── __init__.py          # exposes: run_agent  ← only public entry point
-│       ├── graph.py             # LangGraph agent (currently mock)
-│       ├── tools.py             # LangChain tool definitions
-│       └── prompt.py            # context string formatting
-├── dash_viv_viewer/             # VivViewer React component package
+├── src/                         # installable Python packages
+│   ├── niceview/                # UI/domain helpers
+│   │   ├── interface/
+│   │   │   ├── upload.py        # image + h5ad upload handlers
+│   │   │   ├── visualization.py # spot overlay, VivViewer setup
+│   │   │   ├── actions.py       # re-visualize, save ROI
+│   │   │   ├── callback.py      # Dash callbacks
+│   │   │   ├── interface.py     # shared interface state
+│   │   │   └── data_io.py       # session data helpers
+│   │   ├── pyplot/
+│   │   │   └── leaflet.py       # VivViewer component builder + cluster legend
+│   │   └── utils/               # io, colors, dataset, aristotle helpers
+│   └── rag/                     # analysis pipeline
+│       ├── pipeline.py          # fallback sequential pipeline (_run_sequential)
+│       ├── preprocessing.py     # QC, normalize, PCA
+│       ├── clustering.py        # Leiden / KMeans spatial clustering
+│       ├── deg/                 # DEG computation
+│       ├── pathway/             # GO / KEGG enrichment
+│       ├── pubmed/              # PubMed retrieval
+│       └── agent/               # run_agent entry point + prompt/tool wiring
+├── packages/
+│   └── dash_viv_viewer/         # VivViewer React component package
+├── data/                        # local runtime files
+│   ├── chat_sessions/
+│   ├── status_data/
+│   └── workspace_map.json       # generated at runtime
 └── docs/
     ├── PRD.md
     ├── specs.md
     ├── tech.md
     ├── rules.md
-    └── tickets.md
+    ├── tickets.md
+    └── planning/
 ```
 
 ## More Docs

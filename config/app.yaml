@@ -1,0 +1,18 @@
+ollama:
+  host: "http://localhost:11434"
+  model: "qwen2.5:0.5b"
+  vision_model: "qwen2.5vl:7b"
+  timeout: 120
+  num_predict: 48
+  keep_alive: "10m"
+
+paths:
+  chat_dir: "data/chat_sessions"
+  status_dir: "data/status_data"
+  workspace_map: "data/workspace_map.json"
+  workdir_base: "tmp_data/workdirs"
+  tmp_base: "tmp_data"
+  tutorial_image: "tutorial/loki_tutorial_hskin_melanoma_downsampled.ome.tif"
+
+app:
+  hot_reload: false

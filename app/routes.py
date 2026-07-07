@@ -7,29 +7,39 @@ from flask import request, jsonify, send_file, redirect
 import cv2
 import numpy as np
 
+from app.config import get_path
+
 try:
     from app.session import (
-        CHAT_DIR, _session_path, _lock_and_read_session,
+        CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
     )
-    from app.worker import enqueue_chat_job
+    from app.worker import enqueue_chat_job, ensure_session_processing
     from app.image_utils import TMP_BASE, ensure_ome_tiff_cached
     import niceview.utils.io as vio
 except ImportError:
     from session import (
-        CHAT_DIR, _session_path, _lock_and_read_session,
+        CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
     )
-    from worker import enqueue_chat_job
+    from worker import enqueue_chat_job, ensure_session_processing
     from image_utils import TMP_BASE, ensure_ome_tiff_cached
     import niceview.utils.io as vio
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-TUTORIAL_IMAGE_PATH = os.environ.get(
-    'COPILOT_TUTORIAL_IMAGE',
-    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif')
+TUTORIAL_IMAGE_PATH = get_path(
+    'paths.tutorial_image',
+    os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif'),
+    env='COPILOT_TUTORIAL_IMAGE',
 )
 TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
+
+
+def _chat_stream_timeout_seconds():
+    try:
+        return int(os.environ.get("COPILOT_CHAT_STREAM_TIMEOUT") or os.environ.get("OLLAMA_TIMEOUT") or 120)
+    except (TypeError, ValueError):
+        return 120
 
 try:
     from rag.agent import run_agent
@@ -37,25 +47,26 @@ except ImportError:
     run_agent = None
 
 
-def register_chat_routes(server, token, work_dir):
+def register_chat_routes(server, workspace_id, work_dir, base_path=None):
+    base_path = base_path or f"/workspaces/{workspace_id}"
 
-    # Register purely STATIC routes using the provided token.
+    # Register static routes before Dash's internal wildcard routes.
     # Checks priority over Dash's internal wildcard routes.
 
-    @server.route(f"/app/{token}/chat", methods=["POST"])
+    @server.route(f"{base_path}/chat", methods=["POST"])
     def chat_api():
-        # NOTE: 'token' arg is removed because it is hardcoded in route
-        print(f"DEBUG: chat_api called for token={token}")
+        print(f"DEBUG: chat_api called for workspace={workspace_id}")
         try:
             data = request.get_json(force=True)
-            # FORCE session_id to be calculation token (from command line)
-            session_id = token
+            session_id = workspace_id
 
             # --- ROI & Image Handling ---
             images = []
             roi_s3_path = None
 
             try:
+                is_duplicate = False
+                last_roi_s3_key_file = None
                 # 1. Get Sample Information & Update Visualization State
                 args = vio.load_json(f'{work_dir}/user/args.json')
 
@@ -135,7 +146,6 @@ def register_chat_routes(server, token, work_dir):
                                 print(f"DEBUG: Using coords.json (pixels) for ROI. Num polygons: {len(coords_data)}")
 
                                 # --- OPTIMIZATION START: Check for Duplicates ---
-                                is_duplicate = False
                                 roi_s3_path = None # Will be filled from cache if duplicate
 
                                 # Paths for cache
@@ -429,10 +439,11 @@ def register_chat_routes(server, token, work_dir):
                                 json.dump(roi_json_to_upload, f)
                             roi_s3_path = roi_local_path
                             print(f"DEBUG: Saved ROI to {roi_local_path}")
-                            try:
-                                with vio.open_file(last_roi_s3_key_file, 'w') as f:
-                                    f.write(roi_local_path)
-                            except: pass
+                            if last_roi_s3_key_file:
+                                try:
+                                    with vio.open_file(last_roi_s3_key_file, 'w') as f:
+                                        f.write(roi_local_path)
+                                except: pass
                         except Exception as e:
                              print(f"DEBUG: Failed to save ROI: {e}")
 
@@ -450,7 +461,7 @@ def register_chat_routes(server, token, work_dir):
             # ----------------------------
 
             prompt = data.get("prompt", "")
-            prompt += "\n\nRespond in 3–4 sentences maximum. Be direct and concise."
+            prompt += "\n\nRespond in 1-2 concise sentences. Be direct."
 
             # RAG pipeline — reads cached gene_objects written by popup callbacks
             rag_metadata = None
@@ -467,25 +478,32 @@ def register_chat_routes(server, token, work_dir):
                         _rag = run_agent(_gene_objects, message=_user_message, label=_label)
                     elif vio.exists(_roi_path):
                         _rctx = vio.load_json(_roi_path)
-                        _rag = run_agent(_rctx.get("gene_objects", []), message=_user_message, label="ROI")
+                        _gene_objects = _rctx.get("gene_objects", [])
+                        _rag = run_agent(_gene_objects, message=_user_message, label="ROI") if _gene_objects else None
                     else:
-                        _rag = run_agent([], message=_user_message, label="demo")
+                        _rag = None
 
-                    rag_context_str = _rag["context_str"]
-                    rag_metadata = _rag["metadata"]
-                    print(f"DEBUG: RAG ran for {rag_metadata['label']}")
+                    if _rag:
+                        rag_context_str = _rag["context_str"]
+                        rag_metadata = _rag["metadata"]
+                        print(f"DEBUG: RAG ran for {rag_metadata['label']}")
             except Exception as e:
                 print(f"DEBUG: RAG pipeline failed: {e}")
 
             status = enqueue_chat_job(
                 session_id=session_id,
-                model=data.get("model", "ollama:qwen3-vl:30b"),
+                model=data.get("model", "ollama:qwen2.5:0.5b"),
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,
                 roi_path=roi_s3_path,
                 rag_context_str=rag_context_str if 'rag_context_str' in locals() else "",
             )
+            if status == "busy":
+                return jsonify({
+                    "status": "error",
+                    "message": "Still processing the previous chat message. Wait for it to finish or clear the session."
+                })
 
             # Decide what to show as preview:
             # If we have a specific overlay (Cell Type), use that.
@@ -508,19 +526,32 @@ def register_chat_routes(server, token, work_dir):
             print(f"ERROR in chat_api: {e}")
             return jsonify({"status": "error", "message": str(e)})
 
-    @server.route(f"/app/{token}/chat/poll", methods=["GET"])
+    @server.route(f"{base_path}/chat/poll", methods=["GET"])
     def chat_poll_api():
         try:
-            session_id = token
+            session_id = workspace_id
             session_file = _session_path(session_id)
             try:
                 current_data = _lock_and_read_session(session_file)
                 if current_data:
                     messages = current_data.get("messages", [])
+                    if not messages:
+                        return jsonify({"status": "idle"})
                     if messages:
                         last_msg = messages[-1]
                         if last_msg.get("role") == "assistant":
                             is_streaming = last_msg.get("streaming", False)
+                            if is_streaming:
+                                started_at = float(last_msg.get("timestamp") or time.time())
+                                if time.time() - started_at > _chat_stream_timeout_seconds():
+                                    last_msg["streaming"] = False
+                                    if not last_msg.get("content") or last_msg.get("content") == "...":
+                                        last_msg["content"] = (
+                                            "Chat generation timed out. Try a smaller ROI, or restart Ollama if it is still busy."
+                                        )
+                                    current_data["updated_at"] = time.time()
+                                    _lock_and_write_session(session_file, current_data)
+                                    is_streaming = False
                             status = "streaming" if is_streaming else "done"
                             response_content = last_msg.get("content", "")
                             if is_streaming:
@@ -539,6 +570,8 @@ def register_chat_routes(server, token, work_dir):
                                 "images": last_msg.get("images", []),
                                 "visible": last_msg.get("visible", True)
                             })
+                        if last_msg.get("role") == "user":
+                            ensure_session_processing(session_id)
             except Exception as e:
                 print(f"Poll check error: {e}")
                 return jsonify({"status": "error", "message": str(e)})
@@ -546,10 +579,10 @@ def register_chat_routes(server, token, work_dir):
         except Exception as e:
             return jsonify({"status": "error", "message": f"API Error: {str(e)}"})
 
-    @server.route(f"/app/{token}/chat/clear", methods=["POST"])
+    @server.route(f"{base_path}/chat/clear", methods=["POST"])
     def clear_session_api():
         try:
-            session_id = token
+            session_id = workspace_id
             errors = []
 
             # ── 1. Local chat session dir ──
@@ -563,10 +596,10 @@ def register_chat_routes(server, token, work_dir):
 
             # ── 2. OME-TIFF conversion cache ──
             try:
-                user_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache", token)
+                user_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache", workspace_id)
                 if os.path.exists(user_cache_dir):
                     shutil.rmtree(user_cache_dir)
-                    print(f"[chat/clear] OME-TIFF cache wiped for {token}")
+                    print(f"[chat/clear] OME-TIFF cache wiped for {workspace_id}")
             except Exception as e:
                 errors.append(f"OME-TIFF cache: {e}")
 
@@ -580,7 +613,7 @@ def register_chat_routes(server, token, work_dir):
                             os.remove(entry_path)
                         elif os.path.isdir(entry_path):
                             shutil.rmtree(entry_path)
-                    print(f"[chat/clear] work_dir/user/ wiped for {token}")
+                    print(f"[chat/clear] work_dir/user/ wiped for {workspace_id}")
             except Exception as e:
                 errors.append(f"work_dir/user/: {e}")
 
@@ -590,7 +623,7 @@ def register_chat_routes(server, token, work_dir):
                 if os.path.isdir(tmp_upload_dir):
                     shutil.rmtree(tmp_upload_dir)
                     os.makedirs(tmp_upload_dir, exist_ok=True)
-                    print(f"[chat/clear] Upload tmp dir wiped for {token}")
+                    print(f"[chat/clear] Upload tmp dir wiped for {workspace_id}")
             except Exception as e:
                 errors.append(f"upload tmp: {e}")
 
@@ -625,7 +658,7 @@ def register_chat_routes(server, token, work_dir):
         except Exception as e:
             print(f"[ome_tiff] Global pruning error: {e}")
 
-    @server.route(f"/app/{token}/ome_tiff")
+    @server.route(f"{base_path}/ome_tiff")
     def serve_ome_tiff():
         path = request.args.get("path")
         if not path:
@@ -635,7 +668,7 @@ def register_chat_routes(server, token, work_dir):
         try:
             parent_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache")
             prune_ome_tiff_cache(parent_cache_dir, max_gb=10)
-            ome_local_path = ensure_ome_tiff_cached(path, token)
+            ome_local_path = ensure_ome_tiff_cached(path, workspace_id)
             return send_file(ome_local_path, conditional=True, mimetype='image/tiff')
         except FileNotFoundError:
             return f"Not found: {path}", 404
@@ -644,7 +677,7 @@ def register_chat_routes(server, token, work_dir):
             import traceback; traceback.print_exc()
             return f"Error reading file: {str(e)}", 500
 
-    @server.route(f"/app/{token}/preview")
+    @server.route(f"{base_path}/preview")
     def preview_image():
         import cv2
         import numpy as np

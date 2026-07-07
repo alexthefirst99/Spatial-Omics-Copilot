@@ -1,10 +1,13 @@
 import json
 import os
 
+from app.config import get_path
+
 # Local file-based status store
-STATUS_DIR = os.environ.get(
-    'COPILOT_STATUS_DIR',
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'status_data')
+STATUS_DIR = get_path(
+    'paths.status_dir',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'status_data'),
+    env='COPILOT_STATUS_DIR',
 )
 os.makedirs(STATUS_DIR, exist_ok=True)
 
