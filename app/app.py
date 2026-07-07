@@ -509,7 +509,7 @@ def main():
         print("DEBUG: Sending Warmup 'hi' to Ollama...")
         try:
              enqueue_chat_job(
-                session_id=WORKSPACE_ID,
+                session_id=f"{WORKSPACE_ID}__warmup",
                 model=f"ollama:{get_config('ollama.model', DEFAULT_OLLAMA_MODEL, env='OLLAMA_MODEL')}",
                 prompt="hi",
                 images=[],
@@ -521,8 +521,8 @@ def main():
         except Exception as e:
             print(f"DEBUG: Warmup failed: {e}")
 
-    # Start Warmup in background thread so it doesn't block app launch
-    threading.Thread(target=warmup_ollama, daemon=True).start()
+    if get_bool("ollama.warmup", default=False, env="OLLAMA_WARMUP"):
+        threading.Thread(target=warmup_ollama, daemon=True).start()
 
     # Open browser after a short delay to let the server start
     url = f"http://localhost:{args.port}{APP_BASE_PATH}"

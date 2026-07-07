@@ -11,16 +11,16 @@ from app.config import get_path
 
 try:
     from app.session import (
-        CHAT_DIR, _session_path, _lock_and_read_session,
+        CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
     )
-    from app.worker import enqueue_chat_job
+    from app.worker import enqueue_chat_job, ensure_session_processing
     from app.image_utils import TMP_BASE, ensure_ome_tiff_cached
     import niceview.utils.io as vio
 except ImportError:
     from session import (
-        CHAT_DIR, _session_path, _lock_and_read_session,
+        CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
     )
-    from worker import enqueue_chat_job
+    from worker import enqueue_chat_job, ensure_session_processing
     from image_utils import TMP_BASE, ensure_ome_tiff_cached
     import niceview.utils.io as vio
 
@@ -33,6 +33,13 @@ TUTORIAL_IMAGE_PATH = get_path(
 )
 TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
+
+
+def _chat_stream_timeout_seconds():
+    try:
+        return int(os.environ.get("COPILOT_CHAT_STREAM_TIMEOUT") or os.environ.get("OLLAMA_TIMEOUT") or 75)
+    except (TypeError, ValueError):
+        return 75
 
 try:
     from rag.agent import run_agent
@@ -58,6 +65,8 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
             roi_s3_path = None
 
             try:
+                is_duplicate = False
+                last_roi_s3_key_file = None
                 # 1. Get Sample Information & Update Visualization State
                 args = vio.load_json(f'{work_dir}/user/args.json')
 
@@ -137,7 +146,6 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                                 print(f"DEBUG: Using coords.json (pixels) for ROI. Num polygons: {len(coords_data)}")
 
                                 # --- OPTIMIZATION START: Check for Duplicates ---
-                                is_duplicate = False
                                 roi_s3_path = None # Will be filled from cache if duplicate
 
                                 # Paths for cache
@@ -431,10 +439,11 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                                 json.dump(roi_json_to_upload, f)
                             roi_s3_path = roi_local_path
                             print(f"DEBUG: Saved ROI to {roi_local_path}")
-                            try:
-                                with vio.open_file(last_roi_s3_key_file, 'w') as f:
-                                    f.write(roi_local_path)
-                            except: pass
+                            if last_roi_s3_key_file:
+                                try:
+                                    with vio.open_file(last_roi_s3_key_file, 'w') as f:
+                                        f.write(roi_local_path)
+                                except: pass
                         except Exception as e:
                              print(f"DEBUG: Failed to save ROI: {e}")
 
@@ -469,25 +478,32 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                         _rag = run_agent(_gene_objects, message=_user_message, label=_label)
                     elif vio.exists(_roi_path):
                         _rctx = vio.load_json(_roi_path)
-                        _rag = run_agent(_rctx.get("gene_objects", []), message=_user_message, label="ROI")
+                        _gene_objects = _rctx.get("gene_objects", [])
+                        _rag = run_agent(_gene_objects, message=_user_message, label="ROI") if _gene_objects else None
                     else:
-                        _rag = run_agent([], message=_user_message, label="demo")
+                        _rag = None
 
-                    rag_context_str = _rag["context_str"]
-                    rag_metadata = _rag["metadata"]
-                    print(f"DEBUG: RAG ran for {rag_metadata['label']}")
+                    if _rag:
+                        rag_context_str = _rag["context_str"]
+                        rag_metadata = _rag["metadata"]
+                        print(f"DEBUG: RAG ran for {rag_metadata['label']}")
             except Exception as e:
                 print(f"DEBUG: RAG pipeline failed: {e}")
 
             status = enqueue_chat_job(
                 session_id=session_id,
-                model=data.get("model", "ollama:qwen2.5vl:7b"),
+                model=data.get("model", "ollama:qwen2.5:0.5b"),
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,
                 roi_path=roi_s3_path,
                 rag_context_str=rag_context_str if 'rag_context_str' in locals() else "",
             )
+            if status == "busy":
+                return jsonify({
+                    "status": "error",
+                    "message": "Still processing the previous chat message. Wait for it to finish or clear the session."
+                })
 
             # Decide what to show as preview:
             # If we have a specific overlay (Cell Type), use that.
@@ -523,6 +539,17 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                         last_msg = messages[-1]
                         if last_msg.get("role") == "assistant":
                             is_streaming = last_msg.get("streaming", False)
+                            if is_streaming:
+                                started_at = float(last_msg.get("timestamp") or time.time())
+                                if time.time() - started_at > _chat_stream_timeout_seconds():
+                                    last_msg["streaming"] = False
+                                    if not last_msg.get("content") or last_msg.get("content") == "...":
+                                        last_msg["content"] = (
+                                            "Chat generation timed out. Try a smaller ROI, or restart Ollama if it is still busy."
+                                        )
+                                    current_data["updated_at"] = time.time()
+                                    _lock_and_write_session(session_file, current_data)
+                                    is_streaming = False
                             status = "streaming" if is_streaming else "done"
                             response_content = last_msg.get("content", "")
                             if is_streaming:
@@ -541,6 +568,8 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                                 "images": last_msg.get("images", []),
                                 "visible": last_msg.get("visible", True)
                             })
+                        if last_msg.get("role") == "user":
+                            ensure_session_processing(session_id)
             except Exception as e:
                 print(f"Poll check error: {e}")
                 return jsonify({"status": "error", "message": str(e)})

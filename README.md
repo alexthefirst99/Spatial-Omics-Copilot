@@ -119,9 +119,9 @@ Python 3.11 is recommended. pyvips is required for OME-TIFF pyramid generation.
 conda create -n spatial-copilot python=3.11 -y
 conda activate spatial-copilot
 conda install -c conda-forge libvips
-pip install -r requirements.txt   # includes -e ./packages/dash_viv_viewer
+pip install -r requirements.txt   
 pip install -e .
-cp .env.example .env              # add API keys here if needed
+cp .env.example .env              
 spatial-copilot --port 8081 --workspace demo
 ```
 

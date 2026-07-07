@@ -5,6 +5,15 @@ from app.config import get_config
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen2.5vl:7b"
+DEFAULT_OLLAMA_TIMEOUT = 60
+DEFAULT_OLLAMA_NUM_PREDICT = 80
+
+
+def _get_int_config(key, default, env):
+    try:
+        return int(get_config(key, default, env=env))
+    except (TypeError, ValueError):
+        return default
 
 
 def _format_ollama_error(error, host, model_name):
@@ -30,6 +39,8 @@ def _format_ollama_error(error, host, model_name):
 def run_model_inference(messages, provider=None, model_name=None):
     selected_model = model_name or get_config("ollama.model", DEFAULT_OLLAMA_MODEL, env="OLLAMA_MODEL")
     host = get_config("ollama.host", DEFAULT_OLLAMA_HOST, env="OLLAMA_HOST")
+    timeout = _get_int_config("ollama.timeout", DEFAULT_OLLAMA_TIMEOUT, env="OLLAMA_TIMEOUT")
+    num_predict = _get_int_config("ollama.num_predict", DEFAULT_OLLAMA_NUM_PREDICT, env="OLLAMA_NUM_PREDICT")
     os.environ["OLLAMA_HOST"] = host
 
     clean_history = []
@@ -43,9 +54,17 @@ def run_model_inference(messages, provider=None, model_name=None):
         clean_history.append(clean_msg)
 
     try:
-        print(f"DEBUG: Calling Ollama (model={selected_model}, history={len(clean_history)})")
-        client = ollama.Client(host=host)
-        stream = client.chat(model=selected_model, messages=clean_history, stream=True)
+        print(f"DEBUG: Calling Ollama (model={selected_model}, history={len(clean_history)}, timeout={timeout}s)")
+        client = ollama.Client(host=host, timeout=timeout)
+        stream = client.chat(
+            model=selected_model,
+            messages=clean_history,
+            stream=True,
+            options={
+                "num_predict": num_predict,
+                "temperature": 0.2,
+            },
+        )
         chunk_count = 0
         for chunk in stream:
             chunk_count += 1

@@ -38,6 +38,12 @@ def preprocess_adata(h5ad_path: str) -> tuple:
 
     adata.var_names_make_unique()
 
+    existing_pca = adata.obsm.get("X_pca")
+    if existing_pca is not None and getattr(existing_pca, "shape", (0, 0))[0] == adata.n_obs:
+        n_comps = int(existing_pca.shape[1])
+        if n_comps >= 2:
+            return adata, min(30, n_comps)
+
     # QC filtering
     sc.pp.filter_genes(adata, min_cells=1)
 

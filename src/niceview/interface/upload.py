@@ -1,6 +1,7 @@
 import time
 import uuid
 import os
+import threading
 import anndata as ad
 from dash import html
 from dash import dcc
@@ -36,6 +37,53 @@ def _upload_job_id_from_path(path):
         return path.split(marker, 1)[1].split("/", 1)[0]
     except Exception:
         return None
+
+
+def _run_spatial_clustering_background(stored_path, cluster_path, state_path, job_id=None):
+    try:
+        if job_id:
+            status_store.update_status(job_id, 85, "Running basic clustering in background...")
+
+        cluster_summary = run_spatial_clustering(stored_path, cluster_path)
+
+        state = vio.load_json(state_path) if vio.exists(state_path) else {}
+        state.update({
+            "cluster_path": cluster_path,
+            "cluster_key": cluster_summary.get("cluster_key", "spatial_cluster"),
+            "cluster_method": cluster_summary.get("method"),
+            "n_clusters": cluster_summary.get("n_clusters"),
+            "cluster_status": "ready",
+        })
+        state.pop("cluster_error", None)
+        vio.dump_json(state, state_path, indent=2)
+
+        if job_id:
+            status_store.update_status(job_id, 100, "h5ad ready; clustering complete")
+    except Exception as e:
+        cluster_error = str(e)
+        print(f"Spatial clustering skipped: {cluster_error}")
+        try:
+            state = vio.load_json(state_path) if vio.exists(state_path) else {}
+            state.update({
+                "cluster_status": "failed",
+                "cluster_error": cluster_error,
+            })
+            vio.dump_json(state, state_path, indent=2)
+        except Exception as state_error:
+            print(f"Failed to save clustering error state: {state_error}")
+        if job_id:
+            status_store.update_status(job_id, 100, "h5ad ready; clustering skipped")
+
+
+def _start_spatial_clustering_background(stored_path, cluster_path, state_path, job_id=None):
+    thread = threading.Thread(
+        target=_run_spatial_clustering_background,
+        args=(stored_path, cluster_path, state_path, job_id),
+        daemon=True,
+        name="spatial-clustering",
+    )
+    thread.start()
+    return thread
 
 
 ## Note: all the temp data is the original size, the no temp data is resized (if apply)
@@ -218,30 +266,22 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
             "preview_genes": preview_genes,
         }
 
-        cluster_summary = None
-        cluster_error = None
-        try:
-            if job_id:
-                status_store.update_status(job_id, 70, "Running basic clustering...")
-            cluster_path = _spatial_omics_cluster_path(work_dir, folder_id)
-            cluster_summary = run_spatial_clustering(stored_path, cluster_path)
-            state.update({
-                "cluster_path": cluster_path,
-                "cluster_key": cluster_summary.get("cluster_key", "spatial_cluster"),
-                "cluster_method": cluster_summary.get("method"),
-                "n_clusters": cluster_summary.get("n_clusters"),
-            })
-        except Exception as e:
-            cluster_error = str(e)
-            state["cluster_error"] = cluster_error
-            print(f"Spatial clustering skipped: {cluster_error}")
+        if job_id:
+            status_store.update_status(job_id, 70, "Saving h5ad metadata...")
+
+        cluster_path = _spatial_omics_cluster_path(work_dir, folder_id)
+        state.update({
+            "cluster_path": cluster_path,
+            "cluster_key": "spatial_cluster",
+            "cluster_status": "running",
+        })
+        state_path = _spatial_omics_state_path(work_dir, folder_id)
+        vio.dump_json(state, state_path, indent=2)
 
         if job_id:
-            status_store.update_status(job_id, 90, "Saving h5ad metadata...")
-        vio.dump_json(state, _spatial_omics_state_path(work_dir, folder_id), indent=2)
+            status_store.update_status(job_id, 80, "h5ad ready; clustering continues in background")
 
-        if job_id:
-            status_store.update_status(job_id, 100, "h5ad ready for ROI analysis")
+        _start_spatial_clustering_background(stored_path, cluster_path, state_path, job_id)
 
         summary_children = [
             html.Div("h5ad ready", className="omics-upload-title"),
@@ -249,18 +289,11 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
                 html.Span(f"{n_obs:,} spots"),
                 html.Span(f"{n_vars:,} genes"),
             ]),
+            html.Div(
+                "Basic clustering is running in the background. Re-visualize after it completes to see cluster overlay.",
+                className="omics-upload-genes"
+            ),
         ]
-        if cluster_summary:
-            summary_children.append(
-                html.Div(
-                    f"{cluster_summary.get('n_clusters', 0)} spatial clusters ready for viewer overlay",
-                    className="omics-upload-genes"
-                )
-            )
-        elif cluster_error:
-            summary_children.append(
-                html.Div(f"Clustering skipped: {cluster_error}", className="omics-upload-genes")
-            )
         summary_children.append(
             html.Div("Example: " + ", ".join(preview_genes), className="omics-upload-genes")
         )

@@ -419,7 +419,7 @@ function initApp() {
     try {
       // 2. Send Request
       const modelSelect = document.getElementById("chatModelSelect");
-      const selectedModel = modelSelect && modelSelect.value ? modelSelect.value : "ollama:qwen2.5vl:7b";
+      const selectedModel = modelSelect && modelSelect.value ? modelSelect.value : "ollama:qwen2.5:0.5b";
 
       const payload = {
         model: selectedModel,
@@ -512,9 +512,17 @@ function initApp() {
       const lokiBtn = document.getElementById("start-loki-analysis-btn");
 
       await new Promise((resolve) => {
+        const pollStartedAt = Date.now();
+        const maxPollMs = 75000;
+        const pollEveryMs = 500;
         const pollInterval = setInterval(async () => {
           try {
+            if (Date.now() - pollStartedAt > maxPollMs) {
+              throw new Error("Chat is still running after 75 seconds. Retry with a smaller ROI or restart Ollama.");
+            }
+
             const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
+            if (!pollRes.ok) throw new Error(pollRes.statusText || "Failed to poll chat response");
             const pollData = await pollRes.json();
             // console.log("Poll status:", pollData.status, "Length:", pollData.response ? pollData.response.length : 0);
 
@@ -585,7 +593,7 @@ function initApp() {
             }
             resolve();
           }
-        }, 100); // Super fast polling (100ms) for smooth streaming
+        }, pollEveryMs);
       });
 
     } catch (err) {

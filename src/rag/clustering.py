@@ -12,8 +12,10 @@ Saves cluster labels + palette to cluster_path (JSON).
 """
 
 from __future__ import annotations
+import os
 import numpy as np
 import pandas as pd
+import anndata as ad
 import scanpy as sc
 import niceview.utils.io as vio
 
@@ -42,11 +44,75 @@ def _cluster_palette(labels: list[str]) -> dict[str, str]:
     return {label: colors[i % len(colors)] for i, label in enumerate(sorted_labels)}
 
 
-def run_spatial_clustering(h5ad_path: str, cluster_path: str) -> dict:
+def _cluster_cache_is_current(h5ad_path: str, cluster_path: str) -> bool:
+    if not vio.exists(cluster_path):
+        return False
+    try:
+        payload = vio.load_json(cluster_path)
+        source = payload.get("source", {}) if isinstance(payload, dict) else {}
+        return (
+            source.get("h5ad_path") == h5ad_path
+            and float(source.get("h5ad_mtime", -1)) >= float(os.path.getmtime(h5ad_path))
+            and int(source.get("h5ad_size", -1)) == int(os.path.getsize(h5ad_path))
+        )
+    except Exception:
+        return False
+
+
+def _payload_from_labels(h5ad_path: str, cluster_path: str, labels, obs_names, method: str) -> dict:
+    labels = [str(x) for x in labels]
+    palette = _cluster_palette(labels)
+    clusters = {str(obs): label for obs, label in zip(obs_names, labels)}
+
+    payload = {
+        "cluster_key": "spatial_cluster",
+        "method": method,
+        "n_spots": len(labels),
+        "n_clusters": len(set(labels)),
+        "clusters": clusters,
+        "palette": palette,
+        "source": {
+            "h5ad_path": h5ad_path,
+            "h5ad_mtime": os.path.getmtime(h5ad_path),
+            "h5ad_size": os.path.getsize(h5ad_path),
+        },
+    }
+    vio.dump_json(payload, cluster_path, indent=2)
+    return payload
+
+
+def _reuse_existing_cluster_labels(h5ad_path: str, cluster_path: str) -> dict | None:
+    adata = ad.read_h5ad(h5ad_path, backed="r")
+    try:
+        if "spatial" not in adata.obsm:
+            return None
+        for key in ("spatial_cluster", "leiden", "louvain", "cluster", "clusters"):
+            if key in adata.obs:
+                return _payload_from_labels(
+                    h5ad_path,
+                    cluster_path,
+                    adata.obs[key].tolist(),
+                    adata.obs_names,
+                    f"existing_obs_{key}",
+                )
+    finally:
+        if getattr(adata, "file", None) is not None:
+            adata.file.close()
+    return None
+
+
+def run_spatial_clustering(h5ad_path: str, cluster_path: str, *, use_cache: bool = True) -> dict:
     """Preprocess and cluster a spatial h5ad file.
 
     Saves results to cluster_path and returns the cluster payload dict.
     """
+    if use_cache and _cluster_cache_is_current(h5ad_path, cluster_path):
+        return vio.load_json(cluster_path)
+
+    existing_payload = _reuse_existing_cluster_labels(h5ad_path, cluster_path)
+    if existing_payload is not None:
+        return existing_payload
+
     adata, n_pcs = preprocess_adata(h5ad_path)
 
     if int(adata.n_obs) > 20_000:
@@ -77,17 +143,10 @@ def run_spatial_clustering(h5ad_path: str, cluster_path: str) -> dict:
             labels = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit_predict(x_pca)
             adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
 
-    labels = [str(x) for x in adata.obs["spatial_cluster"].tolist()]
-    palette = _cluster_palette(labels)
-    clusters = {str(obs): label for obs, label in zip(adata.obs_names, labels)}
-
-    payload = {
-        "cluster_key": "spatial_cluster",
-        "method": method,
-        "n_spots": int(adata.n_obs),
-        "n_clusters": len(set(labels)),
-        "clusters": clusters,
-        "palette": palette,
-    }
-    vio.dump_json(payload, cluster_path, indent=2)
-    return payload
+    return _payload_from_labels(
+        h5ad_path,
+        cluster_path,
+        adata.obs["spatial_cluster"].tolist(),
+        adata.obs_names,
+        method,
+    )
