@@ -11,7 +11,7 @@ and immediately receive biologically grounded, literature-backed interpretations
 - Gene expression overlay from h5ad spatial transcriptomics data.
 - Top differentially expressed genes extracted from any selected tissue region.
 - Prototype pathway enrichment over GO/KEGG-labeled gene sets.
-- Curated PubMed-style literature retrieval grounded in selected genes and pathways, with live PubMed E-utilities tracked as planned work.
+- Live NCBI PubMed ESearch/EFetch retrieval with bounded retries and no unrelated result padding; a ChromaDB semantic-search API is ready for agent integration.
 - RAG pipeline with a LangGraph-compatible entry point and sequential fallback.
 - Streaming Ollama chat interface for follow-up questions about selected regions; this is the conversational UI for the copilot, not a general-purpose medical chatbot.
 
@@ -65,13 +65,33 @@ app:
 Secrets stay in a local `.env` file. Use `.env.example` as a starting point.
 
 ```bash
-PUBMED_API_KEY=...   # planned for future live PubMed E-utilities support
+PUBMED_API_KEY=...                         # optional; enables NCBI's 10 req/s tier
+PUBMED_EMAIL=developer@example.org         # recommended by NCBI
+PUBMED_TOOL=spatial_omics_copilot
+PUBMED_CHROMA_DIR=data/pubmed_chroma
 ```
 
 Environment variables can override YAML settings for deployment. Common
 overrides include `OLLAMA_HOST`, `OLLAMA_MODEL`, `COPILOT_CHAT_DIR`,
 `COPILOT_STATUS_DIR`, `COPILOT_WORKSPACE_MAP`, `COPILOT_WORKDIR_BASE`,
-`COPILOT_TMP_BASE`, `COPILOT_TUTORIAL_IMAGE`, and `COPILOT_HOT_RELOAD`.
+`COPILOT_TMP_BASE`, `COPILOT_TUTORIAL_IMAGE`, `COPILOT_HOT_RELOAD`, and the
+four PubMed variables above.
+
+Live literature retrieval needs outbound HTTPS access to NCBI. The client
+limits itself to 3 requests/second without an API key and 10 requests/second
+with one. ChromaDB is loaded only when semantic search is requested; its
+default embedding model may be downloaded on first use.
+
+PubMed records are supplied by NCBI/NLM. Review the
+[NCBI disclaimer and copyright notice](https://www.ncbi.nlm.nih.gov/home/about/policies/)
+before redistributing abstracts or using the service outside this class
+prototype.
+
+Calling the live backend sends the selected gene symbols, pathway labels,
+disease context, and configured developer contact to NCBI over HTTPS (using
+POST); it does not send the tissue image or expression matrix. The final UI
+integration must disclose this external request and provide the required
+consent/opt-out before enabling live retrieval for sensitive research data.
 
 ## Ollama Setup
 
@@ -197,7 +217,8 @@ spatial-omics-copilot/
 │       ├── clustering.py        # Leiden / KMeans spatial clustering
 │       ├── deg/                 # DEG computation
 │       ├── pathway/             # GO / KEGG enrichment
-│       ├── pubmed/              # PubMed retrieval
+│       ├── pubmed_retrieval/    # NCBI retrieval + Chroma semantic search
+│       ├── pubmed/              # compatibility import for current pipeline
 │       └── agent/               # run_agent entry point + prompt/tool wiring
 ├── packages/
 │   └── dash_viv_viewer/         # VivViewer React component package

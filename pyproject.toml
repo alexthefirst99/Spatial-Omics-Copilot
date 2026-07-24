@@ -43,6 +43,7 @@ dependencies = [
     "langgraph>=0.1.0",
     "gseapy==1.1.2",
     "biopython>=1.83",
+    "chromadb>=1.5,<2.0",
     "ipyleaflet==0.17.4",
     "ollama",
     "packaging>=24.0",
@@ -59,7 +60,7 @@ dev = [
 spatial-copilot = "app.app:main"
 
 [tool.pytest.ini_options]
-testpaths = ["src/tests"]
+testpaths = ["src/tests", "tests"]
 
 [tool.setuptools]
 packages = [
@@ -73,6 +74,7 @@ packages = [
     "rag.deg",
     "rag.pathway",
     "rag.pubmed",
+    "rag.pubmed_retrieval",
 ]
 package-dir = {"" = "src", "app" = "app"}
 include-package-data = false

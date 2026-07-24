@@ -79,7 +79,7 @@ Required behavior:
 ### 3.3 PubMed Retrieval
 
 ```python
-# rag/pubmed/__init__.py
+# rag/pubmed_retrieval/__init__.py
 def retrieve_abstracts(genes: list[str], pathways: list[str] = None, n: int = 3) -> list[dict]
 ```
 

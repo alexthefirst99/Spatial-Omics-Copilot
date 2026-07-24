@@ -50,9 +50,12 @@ spatial-omics-copilot/
 │   ├── pathway/
 │   │   ├── __init__.py           # exposes: enrich_pathways
 │   │   └── enrichment.py         # mock enrichment; target: GO / KEGG ORA
-│   ├── pubmed/
-│   │   ├── __init__.py           # exposes: retrieve_abstracts
-│   │   └── retrieval.py          # mock PubMed retrieval; target: NCBI E-utilities
+│   ├── pubmed_retrieval/
+│   │   ├── client.py             # rate-limited NCBI ESearch/EFetch + XML parsing
+│   │   ├── query.py              # gene/pathway/disease query builder
+│   │   ├── retrieval.py          # PubMedResult + legacy schema adapter
+│   │   └── vector_store.py       # ChromaDB abstract indexing/search
+│   ├── pubmed/                    # compatibility import for current pipeline
 │   └── agent/
 │       ├── __init__.py           # exposes: run_agent  ← only public entry point
 │       ├── graph.py              # run_agent wrapper; target: LangGraph agent
@@ -85,13 +88,13 @@ Browser (Dash + VivViewer)
 
 Target run_agent() internals (src/rag/agent/graph.py):
   → pathway tool (src/rag/pathway/)   — GO / KEGG ORA
-  → pubmed tool  (src/rag/pubmed/)    — NCBI abstract retrieval
+  → pubmed tool  (src/rag/pubmed_retrieval/) — NCBI abstract retrieval
   → prompt.py   formats context string
   → returns {gene_objects, context_str, metadata}
 
 Current fallback:
   → src/rag/agent/graph.py calls src/rag/pipeline._run_sequential()
-  → _run_sequential() always runs mock pathway + mock PubMed retrieval
+  → _run_sequential() always runs mock pathway + live PubMed retrieval
 ```
 
 ## 3. Module Responsibilities
@@ -145,7 +148,7 @@ Current fallback:
 | `src/rag/clustering.py` | Leiden / KMeans spatial clustering, saves cluster JSON |
 | `src/rag/deg/extraction.py` | DEG extraction from cluster or ROI selection |
 | `src/rag/pathway/enrichment.py` | Current mock pathway enrichment over hardcoded gene sets; target: real ORA against GO / KEGG |
-| `src/rag/pubmed/retrieval.py` | Current mock PubMed retrieval over curated abstracts; target: NCBI E-utilities retrieval |
+| `src/rag/pubmed_retrieval/` | Live NCBI ESearch/EFetch, safe result envelope, query building, and ChromaDB semantic search; `src/rag/pubmed/` is a temporary compatibility import |
 | `src/rag/agent/graph.py` | Current `run_agent()` wrapper around `_run_sequential()`; target: LangGraph tool-selection agent |
 | `src/rag/agent/tools.py` | Placeholder for planned LangChain tools: `pathway_tool`, `pubmed_tool` |
 | `src/rag/agent/prompt.py` | Formats RAG evidence into LLM context string |
@@ -200,8 +203,8 @@ worker.py  → appends context_str to messages → inference.py → streams toke
 | LLM | Ollama Python client | — |
 | RAG / Agents | `_run_sequential()` fallback | LangGraph + LangChain tools |
 | Pathway | Hardcoded mock gene-set enrichment | gseapy / GO / KEGG ORA |
-| Literature | Hardcoded mock curated abstracts | PubMed E-utilities API |
-| Vector store | Not active in current code | chromadb or faiss-cpu |
+| Literature | PubMed E-utilities ESearch + EFetch | Agent-controlled/background invocation |
+| Vector store | ChromaDB API available and loaded on demand; not yet called by the fallback agent | Agent integration / optional alternate embedding model |
 | Session | fcntl, json | — |
 
 ## 7. Configuration
@@ -218,7 +221,10 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 | `paths.status_dir` / `COPILOT_STATUS_DIR` | No | Upload status JSON path |
 | `paths.workspace_map` / `COPILOT_WORKSPACE_MAP` | No | Workspace-to-port map path |
 | `paths.tutorial_image` / `COPILOT_TUTORIAL_IMAGE` | No | Local tutorial OME-TIFF path |
-| `.env: PUBMED_API_KEY` | Planned, not active | Intended for future live PubMed E-utilities rate limits |
+| `.env: PUBMED_API_KEY` | No | Optional NCBI key; changes the client limit from 3 to 10 request starts/second |
+| `.env: PUBMED_EMAIL` | No | Developer contact recommended by NCBI |
+| `.env: PUBMED_TOOL` | No | Registered E-utilities tool name; defaults to `spatial_omics_copilot` |
+| `.env: PUBMED_CHROMA_DIR` | No | Persistent Chroma index path; defaults to `data/pubmed_chroma` |
 
 ## 8. Technical Risks
 
@@ -226,7 +232,10 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 | --- | --- |
 | Gigapixel image OOM | pyvips streaming — never load full image into RAM |
 | LLM hallucinating citations | Only cite PMIDs returned by PubMed tool |
-| Future PubMed rate limit | Cache live retrieval results; use `PUBMED_API_KEY` when NCBI integration lands |
+| PubMed rate limit or outage | Shared rate limiter, bounded Retry-After/backoff, optional `PUBMED_API_KEY`, and safe empty results |
+| Current sequential pipeline invokes live PubMed synchronously | Person 6 must complete T-042 and move the retrieval call into background work before the final demo |
+| External literature query discloses derived research terms | Use HTTPS POST; disclose that genes/pathways/disease are sent to NCBI and add consent/opt-out in the Person 6 UI integration |
+| Retrieved abstracts are untrusted external text in an LLM prompt | Person 5 must delimit evidence as data and instruct the model not to follow directives found inside abstracts |
 | Future LangGraph infinite loop | Enforce max 5 tool calls per turn when replacing `_run_sequential()` |
 | Session file corruption | Catch JSON errors; start fresh session |
 | OME-TIFF conversion slow | Async conversion with progress bar |

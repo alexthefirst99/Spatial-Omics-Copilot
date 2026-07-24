@@ -34,7 +34,7 @@ and an agentic LLM pipeline in a single interface.
 - ORA pathway enrichment against GO and KEGG via gseapy.
 - PubMed NCBI E-utilities retrieval based on genes and pathways when literature evidence is needed.
 - LangGraph agentic loop that dynamically decides which tools to call.
-- Optional vector store for semantic search over fetched PubMed abstracts, tracked as a planned enhancement.
+- ChromaDB semantic-search module for fetched PubMed abstracts, with PMID metadata preserved; agent/runtime wiring remains an integration task.
 - Streaming chat interface with AGENT TRACE, pathway, and DEG panels.
 - Session persistence so chat history survives page reloads.
 

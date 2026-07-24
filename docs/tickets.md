@@ -80,7 +80,7 @@
 - `test_pathway_success_maps_backend_rows_to_public_schema()`
 - `test_pathway_backend_failure_returns_empty()`
 
-## Milestone 6: PubMed Retrieval (src/rag/pubmed/)
+## Milestone 6: PubMed Retrieval (src/rag/pubmed_retrieval/)
 
 | **ID** | **Task** | **Done When** |
 | --- | --- | --- |
@@ -90,11 +90,15 @@
 | T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable |
 | T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability |
 
+**Implementation status:** T-015 through T-019 were implemented by Anh on
+July 23, 2026. The focused suite is in `tests/test_pubmed.py`; live relevance
+review notes are in `docs/validation/person4_pubmed_notes.md`.
+
 ### T-015 — Real PubMed / Literature Retrieval Backend
 
-**Status:** Todo
+**Status:** Implemented by Anh on July 23, 2026
 
-**Current behavior:** `src/rag/pubmed/retrieval.py` ranks and returns a hardcoded list of curated abstracts, then pads from that list until `n` results are returned.
+**Current behavior:** `src/rag/pubmed_retrieval/` builds a disease-constrained query, calls live NCBI ESearch and batched EFetch, parses real citation XML, applies bounded retry/rate limiting, and returns fewer results instead of padding. `src/rag/pubmed/` is a compatibility import for the current pipeline.
 
 **Desired behavior:** Replace curated mock abstracts with live PubMed/NCBI retrieval or a documented retrieval backend that returns real literature records for the selected genes and pathway terms.
 
@@ -119,9 +123,9 @@
 
 ### T-018 — Vector Store Integration for Literature Evidence
 
-**Status:** Todo
+**Status:** Implemented by Anh on July 23, 2026
 
-**Current behavior:** The technical design lists vector search as a planned target, but no active vector store indexes fetched PubMed abstracts or other evidence.
+**Current behavior:** `semantic_search_abstracts()` lazily indexes the papers from the current `PubMedResult` in ChromaDB, scopes queries to that corpus, preserves PMID metadata, and returns metric-labelled similarity scores. Chroma failures safely return `[]`. The API is implemented and tested, but Person 5/6 still need to call it from the agent/runtime with the user's question.
 
 **Desired behavior:** Implement or wire an optional vector store for semantic search over literature evidence if vector retrieval remains part of the desired RAG architecture.
 
