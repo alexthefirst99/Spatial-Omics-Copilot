@@ -3,7 +3,21 @@ from __future__ import annotations
 from rag.pipeline import _run_sequential
 
 
-def test_run_sequential_builds_complete_rag_metadata():
+def _fake_abstracts(genes, pathways=None, n=3):
+    return [
+        {
+            "pmid": str(1000 + index),
+            "title": f"PubMed paper {index + 1}",
+            "journal": "Test Journal",
+            "year": 2024,
+            "snippet": "A mocked abstract used to isolate the pipeline test.",
+        }
+        for index in range(n)
+    ]
+
+
+def test_run_sequential_builds_complete_rag_metadata(monkeypatch):
+    monkeypatch.setattr("rag.pipeline.retrieve_abstracts", _fake_abstracts)
     gene_objects = [
         {"gene": "SNAP25", "log2_fold_change": 3.4},
         {"gene": "SYP", "log2_fold_change": 2.8},
@@ -34,7 +48,8 @@ def test_run_sequential_builds_complete_rag_metadata():
     assert metadata["citations"][0]["id"] == 1
 
 
-def test_run_sequential_uses_demo_fallback_for_empty_gene_objects():
+def test_run_sequential_uses_demo_fallback_for_empty_gene_objects(monkeypatch):
+    monkeypatch.setattr("rag.pipeline.retrieve_abstracts", _fake_abstracts)
     result = _run_sequential([], n_pathways=2, n_abstracts=1)
 
     assert result["metadata"]["label"] == "demo"
