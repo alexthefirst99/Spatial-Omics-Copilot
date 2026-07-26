@@ -22,6 +22,7 @@ pytest.importorskip("shapely")
 
 import json
 import os
+from pathlib import Path
 
 import anndata as ad
 import numpy as np
@@ -41,7 +42,13 @@ from rag.deg.geometry import (
     build_roi_mask,
     validate_polygons,
 )
-from rag.deg.models import MESSAGE_NO_DATA, STATUS_NO_DATA
+from rag.deg.models import (
+    MESSAGE_NO_DATA,
+    STATUS_BARCODE_MISMATCH,
+    STATUS_EMPTY_SELECTION,
+    STATUS_NO_DATA,
+    STATUS_NO_SIGNIFICANT,
+)
 from rag.deg.stats import (
     REASON_CONSTANT,
     REASON_INSUFFICIENT_SPOTS,
@@ -564,6 +571,20 @@ def test_prefilter_disabled_keeps_every_gene():
     assert filtered.n_vars == 3
 
 
+def test_prefilter_removing_every_gene_reports_no_significant_genes(planted_signal):
+    """min_cells above the spot count leaves no candidate, so no test runs."""
+
+    adata, selected = planted_signal
+
+    # 80 spots total, so no gene can be detected in 200 of them.
+    result = compute_deg(adata, selected, top_n=5, min_cells=200)
+
+    assert result.status == STATUS_NO_SIGNIFICANT
+    assert result.n_genes_filtered_out == result.n_genes_input
+    assert result.top_genes == []
+    assert result.n_genes_tested == 0
+
+
 # ---------------------------------------------------------------------------
 # Degenerate selections
 # ---------------------------------------------------------------------------
@@ -622,6 +643,16 @@ def test_empty_gene_list_returns_no_data_status():
 # ---------------------------------------------------------------------------
 # T-044 — missing / corrupt data
 # ---------------------------------------------------------------------------
+
+
+def test_no_data_message_literal_is_pinned():
+    """T-044 mandates this exact wording, so pin the literal, not the constant.
+
+    Every other T-044 assertion compares against ``MESSAGE_NO_DATA``, which
+    would still pass if the constant itself were edited to a typo.
+    """
+
+    assert MESSAGE_NO_DATA == "No gene expression data loaded."
 
 
 def test_missing_h5ad_reports_no_gene_expression_data_loaded(tmp_path):
@@ -920,6 +951,47 @@ def test_cluster_wrapper_returns_none_for_missing_cluster_id(workspace):
             cluster_path_resolver=workspace["cluster_resolver"],
         )
         is None
+    )
+
+
+def test_cluster_barcodes_not_matching_the_dataset_are_reported_distinctly(workspace):
+    """A cluster file for a different dataset must not look like an empty ROI."""
+
+    # Must live inside the workspace root, or containment checking rejects it
+    # before the barcode comparison is ever reached.
+    foreign = os.path.join(
+        os.path.dirname(str(workspace["cluster_path"])), "foreign_clusters.json"
+    )
+    Path(foreign).write_text(
+        json.dumps(
+            {
+                "cluster_key": "spatial_cluster",
+                "clusters": {f"OTHER_{i}": "0" for i in range(40)},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = get_cluster_high_expression_genes(
+        workspace["work_dir"],
+        "0",
+        state_path_resolver=workspace["state_resolver"],
+        cluster_path_resolver=lambda _w, _f: foreign,
+    )
+
+    assert result is not None
+    assert result["status"] == STATUS_BARCODE_MISMATCH
+    assert result["top_genes"] == []
+    assert result["cluster_id"] == "0"
+    # The genuinely-empty case must keep reporting itself as such.
+    assert (
+        get_cluster_high_expression_genes(
+            workspace["work_dir"],
+            "does-not-exist",
+            state_path_resolver=workspace["state_resolver"],
+            cluster_path_resolver=workspace["cluster_resolver"],
+        )["status"]
+        == STATUS_EMPTY_SELECTION
     )
 
 

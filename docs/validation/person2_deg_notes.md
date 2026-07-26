@@ -573,7 +573,7 @@ than ran — a green suite meant nothing.
 
 ## 12. Test coverage (T-011)
 
-`src/tests/test_deg.py` — 72 tests, all executing (not skipping), deterministic
+`src/tests/test_deg.py` — 84 tests, all executing (not skipping), deterministic
 (`SEED = 20240725`), no network, no data files, synthetic AnnData only.
 
 Guard discipline: every `pytest.importorskip` precedes its import.
@@ -589,3 +589,193 @@ list; missing and corrupt `.h5ad`; 12 malformed-polygon variants; 10 path
 traversal variants; backward-compatibility key and bit-for-bit value locks for
 both legacy wrappers; and a JSON-serialisability check guarding against numpy
 scalars leaking into session JSON.
+
+---
+
+## 13. Handoff to Person 6 (Alex) — T-044 end to end
+
+Section 6.1 already records that the demo fallback must go. This section is the
+concrete patch, produced during the 2026-07-25 audit.
+
+### 13.1 Exact replacement for the brain-marker fallback
+
+`src/rag/pipeline.py` lines 27-54 define and apply `_DEMO_GENE_OBJECTS`
+(SNAP25, SYP, SYT1, GRIA1, AIF1, TREM2, GFAP, MBP, C1QA, MAPK1, SPP1, OLIG2)
+whenever `gene_objects` is empty. This is the last live violation of T-044: the
+path is reachable in production via `app/routes.py:478`, which calls
+`run_agent(_gene_objects, ...)` on the cluster branch **without** the
+`if _gene_objects` guard that the ROI branch on line 482 has.
+
+```diff
+--- a/src/rag/pipeline.py
++++ b/src/rag/pipeline.py
+@@ -22,25 +22,10 @@
+ from rag.pathway import enrich_pathways
+ from rag.pubmed import retrieve_abstracts
+ from rag.agent.prompt import build_prompt_context
+-
+-
+-# Demo fallback when no h5ad is loaded (mixed brain cell-type profile)
+-_DEMO_GENE_OBJECTS = [
+-    {"gene": "SNAP25",  "log2_fold_change": 3.81},
+-    {"gene": "SYP",     "log2_fold_change": 3.44},
+-    {"gene": "SYT1",    "log2_fold_change": 3.12},
+-    {"gene": "GRIA1",   "log2_fold_change": 2.94},
+-    {"gene": "AIF1",    "log2_fold_change": 2.71},
+-    {"gene": "TREM2",   "log2_fold_change": 2.55},
+-    {"gene": "GFAP",    "log2_fold_change": 2.38},
+-    {"gene": "MBP",     "log2_fold_change": 2.20},
+-    {"gene": "C1QA",    "log2_fold_change": 2.05},
+-    {"gene": "MAPK1",   "log2_fold_change": 1.92},
+-    {"gene": "SPP1",    "log2_fold_change": 1.80},
+-    {"gene": "OLIG2",   "log2_fold_change": 1.68},
+-]
++from rag.deg import MESSAGE_NO_DATA
+ 
+ 
+ def _run_sequential(
+     gene_objects: list,
+     message: str = "",
+     label: str = "selection",
+     n_pathways: int = 6,
+     n_abstracts: int = 3,
+ ) -> dict:
+-    # Use demo fallback if no genes provided
+-    if not gene_objects:
+-        gene_objects = _DEMO_GENE_OBJECTS
+-        label = "demo"
++    # T-044: with no gene context, say so. Never substitute demo genes —
++    # fabricated markers are indistinguishable from real ROI biology
++    # downstream, in both the UI and the LLM prompt.
++    if not gene_objects:
++        return {
++            "gene_objects": [],
++            "context_str": f"\n\n{MESSAGE_NO_DATA}\n",
++            "metadata": {
++                "trace": [
++                    {
++                        "step": MESSAGE_NO_DATA,
++                        "detail": "Select an ROI or cluster to gather context",
++                        "icon": "deg",
++                    }
++                ],
++                "degs": [],
++                "pathways": [],
++                "citations": [],
++                "label": "no-data",
++            },
++        }
+ 
+     genes = [g["gene"] for g in gene_objects]
+```
+
+One prerequisite is **done**; one remains for Alex.
+
+1. ~~`MESSAGE_NO_DATA` is not re-exported from `rag.deg`.~~ **Done
+   2026-07-25.** `MESSAGE_NO_DATA` is now re-exported from
+   `src/rag/deg/__init__.py` and listed in its `__all__`, so
+   `from rag.deg import MESSAGE_NO_DATA` satisfies `docs/rules.md` section 4
+   (import through the package `__init__`, never the implementation module).
+   The diff above applies as written, no import change needed. Inlining the
+   literal string in `pipeline.py` instead would duplicate the exact wording
+   T-044 pins and invite drift; use the constant.
+2. **Still outstanding — `src/tests/test_pipeline.py:51`,
+   `test_run_sequential_uses_demo_fallback_for_empty_gene_objects`, asserts the
+   fallback is used** (`result["metadata"]["label"] == "demo"` and
+   `result["gene_objects"]` truthy). That test encodes the behaviour T-044
+   removes, so it must be updated or deleted in the same change. It is not my
+   file and I have not touched it.
+
+`app/routes.py:485` guards with `if _rag:`, and the returned dict is truthy, so
+the empty-context result flows through unchanged and renders with zero DEGs,
+zero pathways and zero citations.
+
+### 13.2 Per-gene dict key: `gene`, not `name`
+
+My modules emit `"gene"` as the per-gene key (`GeneStat.to_dict`,
+`src/rag/deg/models.py:91`). Planning material assumes `"name"`. The repo
+currently has zero occurrences of a `"name"` key on a gene dict.
+
+Renaming to `"name"` breaks all of the following simultaneously:
+
+| File:line | Access |
+| --- | --- |
+| `src/rag/pipeline.py:56` | `[g["gene"] for g in gene_objects]` |
+| `src/rag/pipeline.py:99` | `{"gene": g["gene"], ...}` |
+| `app/app.py:416` | `html.Span(g["gene"], ...)` — ROI popup |
+| `app/app.py:467` | `html.Span(g["gene"], ...)` — cluster popup |
+| `src/tests/test_pipeline.py:45` | `[deg["gene"] for deg in metadata["degs"]]` |
+| `src/tests/test_deg.py` | `LEGACY_GENE_KEYS` lock, plus `top_genes[0].gene` assertions |
+
+`docs/rules.md:32`: *"Adding extra fields to output dicts is allowed; removing
+or renaming existing fields is not."* Under that rule `gene` stays and `name`,
+if wanted, is added alongside it. Note the popup dicts are persisted to
+`roi_context.json` / `cluster_context.json` (`app/app.py:406`, `:457`) and read
+back at `app/routes.py:476`, `:481`, so a rename also invalidates any cached
+context files already on disk.
+
+### 13.3 `run_roi_deg` has zero call sites
+
+`run_roi_deg` is the T-008 deliverable and the only entry point that returns a
+`DEGResult`, applies FDR filtering by default, and defaults `min_cells=10` per
+T-010. Nothing in the application calls it — verified by grep across `app/`,
+`src/` and `packages/`; every hit is inside `src/rag/deg/`, `src/tests/` or
+documentation. Production instead goes through the legacy dict wrappers at
+`app/app.py:401` (ROI) and `app/app.py:449` (cluster), which default
+`min_cells=0` and `fdr_threshold=None`. Those are the two lines that must
+migrate; section 6.2 has the call shape. Until they do, T-008's FDR filtering
+and T-010's pre-filter are both inert in the running app, and the six `config`
+keys `run_roi_deg` reads (`top_n`, `min_cells`, `chunk_size`, `normalize`,
+`ranking_label`, `fdr_threshold`) are set by nobody.
+
+### 13.4 The normalization gap is not only my problem
+
+`adata.X` as stored on disk is un-normalized. `preprocess_adata`
+(`src/rag/preprocessing.py:51-52`) applies `normalize_total` + `log1p`, but it
+runs only inside `run_spatial_clustering` and its result is never written back,
+so no depth-corrected matrix exists for any consumer. Nothing in the repo
+writes `adata.layers` at all. A Wilcoxon rank-sum on depth-uncorrected values
+is confounded by per-spot sequencing depth: a spot with a higher total count
+ranks higher for essentially every gene, so an ROI containing deeper-sequenced
+spots shows apparent enrichment across the whole transcriptome. This propagates
+downstream — the gene list Person 3's pathway enrichment consumes and the query
+terms Person 4's PubMed retrieval is built from are both derived from this
+ranking, so validation work in `person4_pubmed_notes.md` and the pathway notes
+inherits the same confound. The fix is T-034 (Person 1): persist
+`layers["counts"]` plus a normalized matrix. Section 7.1 has the detail.
+
+---
+
+## 14. Deviation record (2026-07-25 audit)
+
+Three deviations were re-examined and deliberately retained. Recorded here with
+the evidence, not re-argued.
+
+**In-house Wilcoxon retained over Scanpy.** `docs/tickets.md:42` states T-008 as
+"Add Wilcoxon rank-sum test to `_rank_high_expression_genes()`" and never
+mentions Scanpy; the Scanpy requirement appeared only in a later restatement of
+the ticket. Equivalence to `scipy.stats.mannwhitneyu(alternative="two-sided",
+use_continuity=True, method="asymptotic")` is pinned at `rtol=1e-9` across six
+regimes by `test_hand_rolled_rank_sum_matches_scipy`
+(`src/tests/test_deg.py:355`). Switching to `sc.tl.rank_genes_groups` would
+discard the explicit tie correction — worth ~136x on the p-value for a
+representative zero-inflated fixture, measured in section 2 — and give up the
+8.4x speedup measured in section 5, which is what clears T-010's 10-second
+budget. Decision: keep.
+
+**T-010 wrapper defaults left at `min_cells=0`.** The pre-filter is complete and
+active inside `run_roi_deg`, which defaults to `min_cells=10`
+(`src/rag/deg/extraction.py:586`) and applies it before any test
+(`extraction.py:308` precedes `extraction.py:350`), computed over the whole
+matrix so ROI membership cannot leak into it (`filtering.py:91`). The legacy
+wrappers stay at `min_cells=0` because raising them changes which genes today's
+UI displays, and Person 3's pathway notes and Person 4's PubMed notes were
+written against the current output. The defaults should move when `app.py`
+migrates to `run_roi_deg`, not before. See also section 13.3.
+
+**Ranking is upregulated-only.** T-008's stated goal is genes enriched inside
+the ROI, so both selection paths require `log2fc > 0`
+(`src/rag/deg/extraction.py:362` under FDR, `:374` on the legacy path). A gene
+significantly depleted in the selection is still counted in `n_significant` but
+is not reported as a marker; the asymmetry is documented on the field itself at
+`src/rag/deg/models.py:130-134`. Decision: intended, unchanged.

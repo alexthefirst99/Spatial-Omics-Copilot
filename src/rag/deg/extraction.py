@@ -75,6 +75,7 @@ from rag.deg.models import (
     SOURCE_EMPTY,
     SOURCE_RAW_COUNTS,
     SOURCE_UNKNOWN,
+    STATUS_BARCODE_MISMATCH,
     STATUS_EMPTY_SELECTION,
     STATUS_ERROR,
     STATUS_INVALID_INPUT,
@@ -770,10 +771,34 @@ def get_cluster_high_expression_genes(
         if not isinstance(clusters, dict):
             return None
         wanted = str(cluster_id)
+        spot_names = [str(name) for name in adata.obs_names]
         mask = np.array(
-            [str(clusters.get(str(name))) == wanted for name in adata.obs_names],
+            [str(clusters.get(name)) == wanted for name in spot_names],
             dtype=bool,
         )
+
+        # A cluster file keyed by different barcodes than the h5ad produces an
+        # all-False mask that is indistinguishable from a genuinely empty
+        # cluster. Report the two apart rather than silently conflating them.
+        if spot_names and not any(name in clusters for name in spot_names):
+            logger.info(
+                "Cluster assignment shares no barcode with the dataset "
+                "(%d spots, %d assignments).",
+                len(spot_names),
+                len(clusters),
+            )
+            mismatch = _empty_result(
+                STATUS_BARCODE_MISMATCH,
+                "The cluster assignment does not match this dataset's spots.",
+                total_spots=int(adata.n_obs),
+                reference_spots=int(adata.n_obs),
+                ranking_method="cluster_vs_non_cluster_log2fc",
+            )
+            mismatch.cluster_id = wanted
+            mismatch.cluster_key = str(
+                cluster_state.get("cluster_key", "spatial_cluster")
+            )
+            return mismatch.to_dict()
 
         result = compute_deg(
             adata,

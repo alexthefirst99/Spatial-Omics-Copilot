@@ -29,6 +29,11 @@ from typing import Any
 STATUS_OK = "ok"
 STATUS_NO_DATA = "no_data"
 STATUS_EMPTY_SELECTION = "empty_selection"
+# No spot barcode in the dataset appeared in the cluster assignment at all,
+# which means the two files describe different datasets. Distinct from
+# STATUS_EMPTY_SELECTION, where the barcodes matched and the cluster is simply
+# empty.
+STATUS_BARCODE_MISMATCH = "barcode_mismatch"
 STATUS_NO_SIGNIFICANT = "no_significant_genes"
 STATUS_INVALID_INPUT = "invalid_input"
 STATUS_ERROR = "error"
@@ -209,6 +214,7 @@ __all__ = [
     "SOURCE_EMPTY",
     "SOURCE_RAW_COUNTS",
     "SOURCE_UNKNOWN",
+    "STATUS_BARCODE_MISMATCH",
     "STATUS_EMPTY_SELECTION",
     "STATUS_ERROR",
     "STATUS_INVALID_INPUT",
