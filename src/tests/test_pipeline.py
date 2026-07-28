@@ -16,8 +16,22 @@ def _fake_abstracts(genes, pathways=None, n=3):
     ]
 
 
+def _fake_pathways(genes, top_n=6):
+    return [
+        {
+            "name": f"TEST · Pathway {index + 1}",
+            "gene_count": min(2, len(genes)),
+            "set_size": 50 + index,
+            "pvalue": 0.001 * (index + 1),
+            "overlap": list(genes[:2]),
+        }
+        for index in range(top_n)
+    ]
+
+
 def test_run_sequential_builds_complete_rag_metadata(monkeypatch):
     monkeypatch.setattr("rag.pipeline.retrieve_abstracts", _fake_abstracts)
+    monkeypatch.setattr("rag.pipeline.enrich_pathways", _fake_pathways)
     gene_objects = [
         {"gene": "SNAP25", "log2_fold_change": 3.4},
         {"gene": "SYP", "log2_fold_change": 2.8},
@@ -50,6 +64,7 @@ def test_run_sequential_builds_complete_rag_metadata(monkeypatch):
 
 def test_run_sequential_uses_demo_fallback_for_empty_gene_objects(monkeypatch):
     monkeypatch.setattr("rag.pipeline.retrieve_abstracts", _fake_abstracts)
+    monkeypatch.setattr("rag.pipeline.enrich_pathways", _fake_pathways)
     result = _run_sequential([], n_pathways=2, n_abstracts=1)
 
     assert result["metadata"]["label"] == "demo"

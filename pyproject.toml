@@ -73,6 +73,8 @@ packages = [
     "rag.agent",
     "rag.deg",
     "rag.pathway",
+    "rag.pathway_enrichment",
+    "rag.gene_annotation",
     "rag.pubmed",
     "rag.pubmed_retrieval",
 ]

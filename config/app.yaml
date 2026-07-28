@@ -16,3 +16,20 @@ paths:
 
 app:
   hot_reload: false
+
+pathway_enrichment:
+  gene_sets:
+    - "GO_Biological_Process_2023"
+    - "KEGG_2021_Human"
+  organism: "Human"
+  top_n: 10
+  max_genes: 100
+  adjusted_p_value_cutoff: 0.05
+  significant_only: true
+
+gene_annotation:
+  organism: "Homo sapiens"
+  max_genes: 10
+  timeout: 15
+  max_retries: 2
+  tool: "spatial_omics_copilot"
