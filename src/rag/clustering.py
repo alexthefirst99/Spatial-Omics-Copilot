@@ -8,6 +8,11 @@ Strategy:
   - ≤20 000 spots → Scanpy Leiden graph clustering
   - Leiden failure  → KMeans fallback
 
+Config options (all optional):
+  - leiden_resolution: float, controls Leiden cluster granularity (T-037)
+  - n_clusters: int, user-specified KMeans cluster count (T-039)
+  - use_spatial: bool, combine spatial coordinates with PCA features (T-038)
+
 Saves cluster labels + palette to cluster_path (JSON).
 """
 
@@ -20,6 +25,25 @@ import scanpy as sc
 import niceview.utils.io as vio
 
 from rag.preprocessing import preprocess_adata
+
+
+def build_clustering_features(adata: ad.AnnData, n_pcs: int, use_spatial: bool = True) -> np.ndarray:
+    """Combine PCA features with normalized spatial coordinates (T-038).
+
+    Returns a feature matrix used for KMeans-based clustering. When
+    use_spatial is False, or spatial coordinates are unavailable,
+    returns PCA features only.
+    """
+    pca_features = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
+
+    if not use_spatial or "spatial" not in adata.obsm:
+        return pca_features
+
+    from sklearn.preprocessing import StandardScaler
+
+    spatial = np.asarray(adata.obsm["spatial"])
+    spatial_scaled = StandardScaler().fit_transform(spatial)
+    return np.hstack([pca_features, spatial_scaled])
 
 
 def _cluster_palette(labels: list[str]) -> dict[str, str]:
@@ -101,11 +125,19 @@ def _reuse_existing_cluster_labels(h5ad_path: str, cluster_path: str) -> dict | 
     return None
 
 
-def run_spatial_clustering(h5ad_path: str, cluster_path: str, *, use_cache: bool = True) -> dict:
+def run_spatial_clustering(
+    h5ad_path: str,
+    cluster_path: str,
+    *,
+    use_cache: bool = True,
+    config: dict | None = None,
+) -> dict:
     """Preprocess and cluster a spatial h5ad file.
 
     Saves results to cluster_path and returns the cluster payload dict.
     """
+    config = config or {}
+
     if use_cache and _cluster_cache_is_current(h5ad_path, cluster_path):
         return vio.load_json(cluster_path)
 
@@ -113,34 +145,40 @@ def run_spatial_clustering(h5ad_path: str, cluster_path: str, *, use_cache: bool
     if existing_payload is not None:
         return existing_payload
 
-    adata, n_pcs = preprocess_adata(h5ad_path)
+    adata, n_pcs = preprocess_adata(h5ad_path, config)
+    use_spatial = config.get("use_spatial", True)
 
     if int(adata.n_obs) > 20_000:
         from sklearn.cluster import MiniBatchKMeans
 
         method = "pca_minibatch_kmeans_over_20k"
-        n_clusters = min(12, max(4, int(round(np.sqrt(float(adata.n_obs) / 3000.0)))))
-        x_pca = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
+        n_clusters = config.get("n_clusters") or min(
+            12, max(4, int(round(np.sqrt(float(adata.n_obs) / 3000.0))))
+        )
+        features = build_clustering_features(adata, n_pcs, use_spatial=use_spatial)
         labels = MiniBatchKMeans(
             n_clusters=n_clusters,
             random_state=0,
             batch_size=min(8192, int(adata.n_obs)),
             n_init=5,
-        ).fit_predict(x_pca)
+        ).fit_predict(features)
         adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
     else:
         sc.pp.neighbors(adata, n_neighbors=min(15, max(2, int(adata.n_obs) - 1)), n_pcs=n_pcs)
         method = "scanpy_leiden"
+        leiden_resolution = config.get("leiden_resolution", 0.8)
         try:
-            sc.tl.leiden(adata, key_added="spatial_cluster", resolution=0.8)
+            sc.tl.leiden(adata, key_added="spatial_cluster", resolution=leiden_resolution)
         except Exception as e:
             print(f"[clustering] Leiden failed, using KMeans fallback: {e}")
             from sklearn.cluster import KMeans
 
             method = "pca_kmeans_fallback"
-            n_clusters = min(8, max(2, int(round(np.sqrt(float(adata.n_obs) / 2.0)))))
-            x_pca = np.asarray(adata.obsm["X_pca"])[:, :n_pcs]
-            labels = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit_predict(x_pca)
+            n_clusters = config.get("n_clusters") or min(
+                8, max(2, int(round(np.sqrt(float(adata.n_obs) / 2.0))))
+            )
+            features = build_clustering_features(adata, n_pcs, use_spatial=use_spatial)
+            labels = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit_predict(features)
             adata.obs["spatial_cluster"] = pd.Categorical([str(x) for x in labels])
 
     return _payload_from_labels(
