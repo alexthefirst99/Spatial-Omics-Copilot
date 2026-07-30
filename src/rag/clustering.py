@@ -23,7 +23,8 @@ import pandas as pd
 import anndata as ad
 import scanpy as sc
 import niceview.utils.io as vio
-
+import json
+import hashlib
 from rag.preprocessing import preprocess_adata
 
 
@@ -188,3 +189,35 @@ def run_spatial_clustering(
         adata.obs_names,
         method,
     )
+def cluster_adata(preprocessed_path: str, config: dict | None = None) -> dict:
+    """Top-level entry point matching the integration pipeline's expected
+    signature (cluster_adata(preprocessed_path, config) -> ClusterResult).
+
+    Wraps run_spatial_clustering so Person 6's pipeline.py can call this
+    module the way the spec expects, without changing existing behavior.
+    """
+    config = config or {}
+    cluster_cache_dir = config.get("cluster_cache_dir", "tmp_data/cluster_cache")
+    os.makedirs(cluster_cache_dir, exist_ok=True)
+
+    cache_key = hashlib.sha256(
+        json.dumps({"path": preprocessed_path, "config": config}, sort_keys=True).encode()
+    ).hexdigest()[:16]
+    cluster_path = os.path.join(cluster_cache_dir, f"{cache_key}_clusters.json")
+
+    payload = run_spatial_clustering(
+        preprocessed_path,
+        cluster_path,
+        use_cache=True,
+        config=config,
+    )
+
+    return {
+        "adata_path": preprocessed_path,
+        "cluster_path": cluster_path,
+        "cluster_summary": {
+            "method": payload["method"],
+            "n_clusters": payload["n_clusters"],
+            "n_spots": payload["n_spots"],
+        },
+    }
