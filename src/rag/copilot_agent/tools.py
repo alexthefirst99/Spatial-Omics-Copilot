@@ -308,10 +308,16 @@ def run_pubmed_tool(
         outcome.status = STATUS_OK
         pmids = [adapters.clean_text(adapters.get_field(p, "pmid")) for p in papers]
         pmids = [pmid for pmid in pmids if pmid]
-        # Naming the PMIDs here matters: chat.js renders citation chips inside
-        # the DEG panel, so when no DEG rows exist the chips never appear. The
-        # trace is then the only place the evidence is visible.
-        outcome.detail = f"{len(papers)} abstract(s)" + (
+        # The disease anchor leads because a wrong one is otherwise invisible:
+        # it silently returns confident, well-formed papers about the wrong
+        # cancer. Observed live — a breast-tissue ROI analysed with the config
+        # default of "colorectal cancer" returned three colorectal papers.
+        # Surfacing it in the trace makes the misconfiguration checkable.
+        #
+        # Naming the PMIDs here matters too: chat.js renders citation chips
+        # inside the DEG panel, so when no DEG rows exist the chips never
+        # appear and the trace is the only place the evidence is visible.
+        outcome.detail = f"{disease} · {len(papers)} abstract(s)" + (
             f" · PMID {', '.join(pmids[:3])}" if pmids else ""
         )
         outcome.output_summary = f"retrieved {len(papers)} abstract(s)"

@@ -254,6 +254,38 @@ def test_agent_trace_matches_actual_tool_calls(spy_tools):
     assert traced == spy_tools
 
 
+def test_pubmed_trace_names_the_disease_anchor(monkeypatch):
+    """A wrong disease anchor returns confident papers about the wrong cancer.
+
+    Observed live: a breast-tissue ROI analysed with the config default of
+    "colorectal cancer" returned three credible-looking colorectal papers.
+    The anchor must be visible in the trace so it can be checked.
+    """
+
+    captured = {}
+
+    def fake_pubmed(genes, **kwargs):
+        captured["disease"] = kwargs.get("disease")
+        return ToolOutcome(
+            tool=routing.TOOL_PUBMED,
+            result=FakePubMedResult(),
+            status=STATUS_OK,
+            detail=f"{kwargs.get('disease')} · 1 abstract(s) · PMID 38912204",
+        )
+
+    monkeypatch.setattr(tools, "run_pubmed_tool", fake_pubmed)
+
+    result = agent_graph.run_copilot_agent(
+        question="any papers on this?",
+        deg=GENE_OBJECTS,
+        disease="breast cancer",
+    )
+
+    assert captured["disease"] == "breast cancer"
+    step = next(s for s in result.trace if s.tool == routing.TOOL_PUBMED)
+    assert "breast cancer" in step.detail
+
+
 def test_trace_records_input_and_output_summaries(spy_tools):
     result = agent_graph.run_agent(GENE_OBJECTS, message="Any papers on this?")
 

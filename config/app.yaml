@@ -38,8 +38,14 @@ gene_annotation:
 copilot_agent:
   # Hard cap on tool calls per turn (docs/rules.md section 4).
   max_tool_calls: 5
-  # Disease anchor for the PubMed query. The demo dataset is 10x Genomics
-  # Human Colorectal Cancer; change this if the tissue changes.
+  # Disease anchor for the PubMed query. THIS MUST MATCH THE LOADED SLIDE.
+  # A wrong value does not fail loudly — it returns confident, well-formed
+  # papers about the wrong cancer. Verified live: a breast-tissue ROI analysed
+  # with "colorectal cancer" returned three colorectal papers that looked
+  # entirely credible. The value now appears in the AGENT TRACE so it can be
+  # checked at a glance during a demo.
+  # The task plan names a colorectal demo dataset; the .h5ad currently in
+  # data/demo is Visium FFPE Human BREAST Cancer, so set this accordingly.
   disease: "colorectal cancer"
   # Re-rank retrieved abstracts against the question with ChromaDB. Off by
   # default: Chroma's default embedding function downloads a ~79 MB ONNX model

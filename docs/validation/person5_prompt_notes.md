@@ -212,6 +212,55 @@ on the real demo ROI.
 Cost was negligible — roughly 2e-06 USD for the first probe; a full turn with
 evidence runs a few thousand prompt tokens.
 
+## 3d. Live run on the REAL Visium slide (July 31, 2026)
+
+The team's actual data arrived: `spot_data.h5ad` (2518 spots × 2587 genes,
+`obsm/spatial` present, Visium barcodes) plus a 27452×25233 px H&E slide. Both
+are in `data/demo/` and gitignored.
+
+A real ROI was analysed end-to-end — real spots, real DEGs, the real crop, live
+NCBI Gene, live PubMed, live DeepInfra generation. DEGs were computed with
+`h5py`/`scipy` directly (a 194-spot window vs the remaining 2324 spots),
+mirroring `rag.deg`'s ranking, because `anndata` is not installed here.
+
+**Finding: the slide is BREAST cancer, not colorectal.** The top ROI genes —
+`WFDC2`, `GABRP`, `PPP1R1B`, `SCGB3A1`, `MSMB`, `WNT7B`, `MMP12`, `CCL7` — are
+a breast signature, and the file is named
+`Visium_FFPE_Human_Breast_Cancer_image.jpg`. The task plan and
+`config/app.yaml` both specify **colorectal cancer**.
+
+**Why that is dangerous rather than merely wrong.** The same ROI was run twice,
+changing only the disease anchor:
+
+| Anchor | PMIDs returned |
+| --- | --- |
+| `colorectal cancer` (config default) | 39905201, 41290259, 40911779 — all genuine, all *colorectal*, none about this tissue |
+| `breast cancer` (correct) | 30258889, 29687286, 40957419 |
+
+The wrong anchor did not fail, warn, or return nothing. It returned three
+credible, recent, correctly-formatted colorectal papers for a breast tumour —
+exactly the kind of evidence a reader would trust. Mitigation: the disease
+anchor is now printed in the AGENT TRACE (`PubMed retrieval — breast cancer ·
+3 abstract(s) · PMID …`) so a mismatch is visible at a glance, and
+`config/app.yaml` carries a warning. **Someone must set
+`copilot_agent.disease` to match whichever slide is demoed.**
+
+**Second finding, for Person 4:** even with the correct `breast cancer` anchor,
+the top hit was PMID 30258889 — *"Temozolomide resistance in glioblastoma
+multiforme"* — which is unrelated to breast tissue. One irrelevant paper in
+three. Worth reviewing how the query combines many gene symbols with the
+disease term; `docs/specs.md` §3.3 requires returning fewer results rather than
+padding with unrelated ones.
+
+**Vision on real histology.** With the real crop attached, the model produced a
+genuine H&E reading: *"dense cellularity interspersed with large, eosinophilic
+(pink) regions that appear to be necrotic or proteinaceous debris… prominent
+dark, basophilic (purple) clusters, which may represent calcifications."* It
+described the image first, analysed transcriptomics separately, then
+synthesised — the T-048 behaviour. This supersedes the synthetic-image caveat
+in section 3c for the plumbing, though a domain expert still needs to judge
+whether the morphology call itself is correct.
+
 ## 4. Anti-hallucination checks (T-026)
 
 | Check | Behaviour | Test |
