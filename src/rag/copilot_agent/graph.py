@@ -489,6 +489,7 @@ def run_copilot_agent(
     max_tool_calls: int = MAX_TOOL_CALLS,
     semantic_rerank: bool = False,
     disease: str | None = None,
+    synthesize_answer: bool = False,
 ) -> AgentResult:
     """Run one agent turn and return a structured result.
 
@@ -513,6 +514,11 @@ def run_copilot_agent(
         max_tool_calls: Per-turn tool budget (T-023).
         semantic_rerank: Enable ChromaDB re-ranking of retrieved abstracts.
         disease: Disease anchor for the PubMed query.
+        synthesize_answer: Call DeepInfra to fill ``AgentResult.answer``
+            (T-047). Off by default: in the running app the LLM call belongs to
+            ``app/worker.py``, which streams it (``docs/rules.md`` section 3).
+            The integration pipeline turns this on when it wants a complete
+            answer rather than an evidence block.
 
     Returns:
         An :class:`AgentResult`. Never raises for ordinary failures — missing
@@ -551,7 +557,70 @@ def run_copilot_agent(
     }
 
     final = _invoke(state, max_tool_calls)
-    return _to_result(final)
+    result = _to_result(final)
+
+    if synthesize_answer:
+        _attach_llm_answer(result, final, config or {})
+
+    return result
+
+
+def _attach_llm_answer(result: AgentResult, state: dict, config: dict) -> None:
+    """Fill ``result.answer`` from DeepInfra, recording the attempt (T-047).
+
+    Mutates ``result`` in place. A failure is recorded in the trace and leaves
+    the evidence block intact, so the caller still has something to show.
+    """
+
+    from rag.copilot_agent.llm import call_deepinfra_chat, is_configured
+    from rag.copilot_agent.multimodal import build_multimodal_prompt_payload
+
+    if not is_configured(config):
+        result.trace.append(
+            TraceStep(
+                step="Answer synthesis skipped",
+                detail="DeepInfra not configured",
+                icon=ICON_AGENT,
+                tool="",
+                status=STATUS_SKIPPED,
+                input_summary="deepinfra",
+                output_summary="set DEEPINFRA_API_KEY and deepinfra.model to enable",
+            )
+        )
+        return
+
+    outcomes = state.get("outcomes") or {}
+    payload = build_multimodal_prompt_payload(
+        state.get("question", ""),
+        roi_image=state.get("roi_image"),
+        deg=state.get("gene_objects"),
+        gene_annotations=_result_of(outcomes.get(TOOL_GENE_ANNOTATION)),
+        pathways=_result_of(outcomes.get(TOOL_PATHWAY)),
+        pubmed=_result_of(outcomes.get(TOOL_PUBMED)),
+        config=config,
+        label=state.get("label", "selection"),
+        roi=state.get("roi"),
+        evidence_gaps=tuple(_evidence_gaps(outcomes)),
+    )
+
+    response = call_deepinfra_chat(payload, config)
+    result.answer = response.text
+    # The image is only genuinely "used" if it reached the model.
+    result.used_roi_image = bool(payload.get("image_included"))
+
+    result.trace.append(
+        TraceStep(
+            step="Answer synthesised" if response.ok else "Answer synthesis failed",
+            detail=response.model,
+            icon=ICON_AGENT,
+            tool="deepinfra",
+            status=STATUS_OK if response.ok else STATUS_ERROR,
+            input_summary=(
+                "prompt with image" if payload.get("image_included") else "text prompt"
+            ),
+            output_summary=response.status_message or f"{len(response.text)} characters",
+        )
+    )
 
 
 def _to_result(state: dict) -> AgentResult:

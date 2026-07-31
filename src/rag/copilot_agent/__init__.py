@@ -17,12 +17,22 @@ from rag.copilot_agent.graph import (
     run_agent,
     run_copilot_agent,
 )
+from rag.copilot_agent.llm import (
+    LLMResponse,
+    call_deepinfra_chat,
+    call_deepinfra_model,
+    is_configured,
+)
 from rag.copilot_agent.models import (
     AgentResult,
     Citation,
     DegBar,
     PathwayBar,
     TraceStep,
+)
+from rag.copilot_agent.multimodal import (
+    build_multimodal_prompt_payload,
+    model_supports_vision,
 )
 from rag.copilot_agent.prompt import (
     build_evidence_context,
@@ -49,14 +59,20 @@ __all__ = [
     "AgentResult",
     "Citation",
     "DegBar",
+    "LLMResponse",
     "PathwayBar",
     "ToolOutcome",
     "ToolPlan",
     "TraceStep",
     "build_evidence_context",
+    "build_multimodal_prompt_payload",
     "build_no_data_context",
     "build_prompt_context",
+    "call_deepinfra_chat",
+    "call_deepinfra_model",
     "classify_question",
+    "is_configured",
+    "model_supports_vision",
     "gene_annotation_tool",
     "pathway_tool",
     "plan_tools",

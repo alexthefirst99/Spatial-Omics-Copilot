@@ -71,6 +71,7 @@ packages = [
     "niceview.utils",
     "rag",
     "rag.agent",
+    "rag.copilot_agent",
     "rag.deg",
     "rag.pathway",
     "rag.pathway_enrichment",
