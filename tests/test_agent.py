@@ -513,6 +513,51 @@ def test_prompt_permits_visual_description_when_an_image_is_attached(spy_tools, 
     assert "cropped H&E image" in result.context_str
 
 
+def test_annotations_for_non_roi_genes_are_dropped_from_the_prompt(monkeypatch):
+    """Observed live during T-027 validation.
+
+    NCBI Gene resolves symbols through historical aliases, so querying SPP1
+    also returns CXXC1 — whose former symbol was SPP1 and which is unrelated
+    to the region. It must not reach the model as regional evidence.
+    """
+
+    class AliasCollisionResult:
+        genes = [
+            {
+                "gene_symbol": "SPP1",
+                "full_name": "secreted phosphoprotein 1",
+                "functional_summary": "Binds hydroxyapatite; cytokine activity.",
+                "query_symbol": "SPP1",
+            },
+            {
+                "gene_symbol": "CXXC1",
+                "full_name": "CXXC finger protein 1",
+                "functional_summary": "Unrelated to the selected region.",
+                "query_symbol": "SPP1",
+            },
+        ]
+        source_database = "NCBI Gene"
+        status_message = ""
+        missing_genes = []
+
+    monkeypatch.setattr(
+        tools,
+        "run_gene_annotation_tool",
+        lambda genes, **kwargs: ToolOutcome(
+            tool=routing.TOOL_GENE_ANNOTATION,
+            result=AliasCollisionResult(),
+            status=STATUS_OK,
+        ),
+    )
+
+    context = agent_graph.run_agent(
+        [{"gene": "SPP1", "log2_fold_change": 2.5}], message="what does SPP1 do?"
+    )["context_str"]
+
+    assert "secreted phosphoprotein 1" in context
+    assert "CXXC1" not in context
+
+
 def test_retrieved_abstracts_are_fenced_as_untrusted_data(spy_tools):
     """docs/tech.md:238 — abstracts are external text inside an LLM prompt."""
 

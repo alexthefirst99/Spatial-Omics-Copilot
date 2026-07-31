@@ -74,13 +74,34 @@ def _format_genes(gene_objects: Sequence[dict], limit: int = 10) -> list[str]:
     return lines
 
 
-def _format_annotations(annotation_result: object, limit: int = 6) -> list[str]:
-    """Render the gene annotation block with explicit source attribution."""
+def _format_annotations(
+    annotation_result: object,
+    limit: int = 6,
+    allowed_symbols: frozenset[str] | None = None,
+) -> list[str]:
+    """Render the gene annotation block with explicit source attribution.
+
+    Args:
+        annotation_result: ``GeneAnnotationResult`` or ``None``.
+        limit: Maximum annotations to render.
+        allowed_symbols: Uppercase ROI gene symbols. Annotations for anything
+            else are dropped.
+
+    The filter is not paranoia. NCBI Gene resolves a symbol through its
+    historical aliases, so querying ``SPP1`` also returns ``CXXC1`` — a gene
+    whose *former* symbol was SPP1 and which has nothing to do with the ROI.
+    Observed live during T-027 validation. Passing that through would put a
+    gene the region never expressed in front of the model as regional
+    evidence, which is precisely the hallucination T-026 exists to prevent.
+    Dropping a real annotation is the safer failure.
+    """
 
     lines: list[str] = []
     for annotation in adapters.iter_annotations(annotation_result)[:limit]:
         symbol = adapters.annotation_symbol(annotation)
         if not symbol:
+            continue
+        if allowed_symbols is not None and symbol.upper() not in allowed_symbols:
             continue
         full_name = adapters.clean_text(adapters.get_field(annotation, "full_name"))
         summary = adapters.clean_text(adapters.get_field(annotation, "functional_summary"))
@@ -255,7 +276,15 @@ def build_evidence_context(
         body.append("")
         body.append(f"GENE EXPRESSION: {_NO_DATA_MESSAGE}")
 
-    annotation_lines = _format_annotations(annotation_result)
+    roi_symbols = frozenset(
+        adapters.clean_text(row.get("gene")).upper()
+        for row in (gene_objects or ())
+        if isinstance(row, dict) and row.get("gene")
+    )
+    annotation_lines = _format_annotations(
+        annotation_result,
+        allowed_symbols=roi_symbols or None,
+    )
     if annotation_lines:
         body.append("")
         body.append("GENE FUNCTION ANNOTATIONS (retrieved from a curated gene database):")
