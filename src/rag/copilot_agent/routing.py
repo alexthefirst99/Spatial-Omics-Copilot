@@ -40,20 +40,30 @@ TOOL_PUBMED = "pubmed_tool"
 
 ALL_TOOLS = (TOOL_GENE_ANNOTATION, TOOL_PATHWAY, TOOL_PUBMED)
 
+#: Gene symbols this long or shorter must match the question's case exactly.
+#: Longer symbols (EPCAM, CEACAM5) are unambiguous enough to match loosely.
+_SHORT_SYMBOL_LEN = 4
+
 
 def _terms(*words: str) -> tuple[re.Pattern[str], ...]:
-    """Compile whole-word patterns so ``"gene"`` does not match ``"generate"``.
+    """Compile strict whole-word patterns.
 
     Multi-word entries are matched as phrases with flexible internal
-    whitespace. A trailing ``\\w*`` lets a single entry cover a small family of
-    inflections (``enrich`` covers ``enriched`` / ``enrichment``) without
-    listing each one.
+    whitespace.
+
+    Both boundaries are anchored, so an entry matches only the exact word.
+    An earlier version appended ``\\w*`` to cover inflections cheaply, which
+    silently turned every entry into a prefix match — ``"color"`` then matched
+    **"colorectal"**, routing questions about this project's own demo tissue to
+    the image branch and running no evidence tools at all, and ``"gene"``
+    matched ``"general"`` and ``"generate"``. Inflections are listed explicitly
+    below instead; that is more typing and far fewer surprises.
     """
 
     patterns: list[re.Pattern[str]] = []
     for word in words:
         escaped = r"\s+".join(re.escape(part) for part in word.split())
-        patterns.append(re.compile(rf"\b{escaped}\w*", re.IGNORECASE))
+        patterns.append(re.compile(rf"\b{escaped}\b", re.IGNORECASE))
     return tuple(patterns)
 
 
@@ -63,11 +73,11 @@ def _terms(*words: str) -> tuple[re.Pattern[str], ...]:
 # routes to two tools rather than forcing a single winner.
 
 _PATHWAY_TERMS = _terms(
-    "pathway", "pathways", "enrich", "enrichment", "ora", "gsea",
-    "gene ontology", "go term", "go terms", "kegg", "reactome",
+    "pathway", "pathways", "enrich", "enriched", "enriches", "enrichment",
+    "ora", "gsea", "gene ontology", "go term", "go terms", "kegg", "reactome",
     "signaling", "signalling", "signal transduction", "biological process",
-    "molecular function", "cellular component", "gene set", "gene sets",
-    "over representation", "overrepresentation",
+    "biological processes", "molecular function", "cellular component",
+    "gene set", "gene sets", "over representation", "overrepresentation",
 )
 
 # Deliberately excludes bare interrogatives such as "what does" — those match
@@ -91,15 +101,21 @@ _LITERATURE_TERMS = _terms(
     "prior work", "known from", "reported", "abstract", "abstracts",
 )
 
+# Strictly visual cues only. Words that merely *co-occur* with tissue talk —
+# "structure", "architecture", "pattern", "stroma", "colour" — were removed:
+# they made "explain the biology of the stromal compartment" an image question
+# (zero evidence tools), and "colour" collided with "colorectal" outright.
+# A term earns a place here only if a researcher using it is asking what the
+# tissue LOOKS LIKE.
 _IMAGE_TERMS = _terms(
     "image", "images", "picture", "photo", "crop", "cropped", "thumbnail",
-    "morphology", "morphological", "histology", "histological", "h&e", "he stain",
-    "stain", "staining", "tissue architecture", "architecture", "texture",
+    "morphology", "morphological", "histology", "histological",
+    "h&e", "he stain", "stain", "stained", "staining",
+    "tissue architecture", "tissue pattern", "spatial pattern", "texture",
     "look", "looks", "looking", "see", "seen", "visible", "visually", "visual",
-    "appearance", "appears", "shape", "pattern", "patterns", "structure",
-    "gland", "glands", "glandular", "stroma", "stromal", "nuclei", "nucleus",
-    "cell shape", "necrosis", "necrotic", "invasion", "invasive front",
-    "colour", "color", "dark", "bright", "region look",
+    "appearance", "microscope", "magnification",
+    "gland", "glands", "glandular", "nuclei", "nucleus", "cell shape",
+    "necrosis", "necrotic", "invasive front",
 )
 
 # Broad interpretive asks that justify pulling every evidence source.
@@ -111,8 +127,20 @@ _SUMMARY_TERMS = _terms(
     "what is going on", "what's going on", "tell me about", "walk me through",
     "analyse", "analyze", "analysis", "insight", "insights",
     "cell type", "cell types", "celltype", "phenotype", "tumor", "tumour",
-    "cancer", "disease", "biology", "biological", "clinical", "prognosis",
-    "prognostic", "significance", "meaning", "why", "how come",
+    "tumors", "tumours", "cancer", "disease", "biology", "biological",
+    "clinical", "prognosis", "prognostic", "significance", "meaning",
+    "why", "how come",
+    # Disease and tissue vocabulary. A question naming the tissue or a
+    # diagnosis is a biological question even with no other cue —
+    # "Is this region colorectal adenocarcinoma?" must gather evidence.
+    "colorectal", "colon", "rectal", "adenocarcinoma", "carcinoma",
+    "neoplasm", "malignant", "malignancy", "benign", "dysplasia", "dysplastic",
+    "metastasis", "metastatic", "invasion", "invasive",
+    "epithelium", "epithelial", "mucosa", "mucosal", "fibroblast",
+    "fibroblasts", "macrophage", "macrophages", "lymphocyte", "lymphocytes",
+    "immune", "inflammation", "inflammatory", "stroma", "stromal",
+    "proliferation", "apoptosis", "angiogenesis", "microenvironment",
+    "subtype", "subtypes",
 )
 
 # Conversational openers that must not trigger a network call.
@@ -222,7 +250,14 @@ def _mentioned_genes(text: str, genes: Sequence[str]) -> list[str]:
         # would match ordinary words.
         if len(symbol) < 2 or symbol.upper() in seen:
             continue
-        if re.search(rf"\b{re.escape(symbol)}\b", text, re.IGNORECASE):
+
+        # CAT, SET, REST, MAX, ACHE, SHE, PIGS and TH are all real HGNC
+        # symbols and all ordinary English words. Matching those
+        # case-insensitively turns "what is the cat doing here?" into a gene
+        # question and fires a live NCBI lookup. A researcher naming a gene
+        # writes it in caps, so short symbols require an exact-case match.
+        flags = 0 if len(symbol) <= _SHORT_SYMBOL_LEN else re.IGNORECASE
+        if re.search(rf"\b{re.escape(symbol)}\b", text, flags):
             seen.add(symbol.upper())
             found.append(symbol.upper())
     return found

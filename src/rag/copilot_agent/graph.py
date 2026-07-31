@@ -108,7 +108,7 @@ class AgentState(TypedDict, total=False):
     config: dict
     roi: Any
     roi_image: Any
-    image_attached: bool
+    image_attached: bool | None
     max_tool_calls: int
     semantic_rerank: bool
     disease: str
@@ -342,7 +342,7 @@ def synthesize_node(state: AgentState) -> dict:
         pubmed_result=_result_of(outcomes.get(TOOL_PUBMED)),
         roi=state.get("roi"),
         roi_image=state.get("roi_image"),
-        image_attached=bool(state.get("image_attached")),
+        image_attached=state.get("image_attached"),
         evidence_gaps=gaps,
     )
 
@@ -528,8 +528,12 @@ def run_copilot_agent(
     gene_objects = adapters.normalize_gene_objects(deg)
     genes = adapters.extract_gene_symbols(gene_objects)
 
-    if image_attached is None:
+    if image_attached is None and roi_image is not None:
+        # A roi_image was supplied, so its crop path is authoritative.
         image_attached = bool(adapters.get_field(roi_image, "crop_path"))
+    # Otherwise image_attached stays None — "unknown". run_agent cannot know:
+    # its signature carries no image, yet app/worker.py may still attach the
+    # crop to the same message when a vision model is selected.
 
     supplied = {
         TOOL_GENE_ANNOTATION: gene_annotations,
@@ -545,7 +549,7 @@ def run_copilot_agent(
         "config": config or {},
         "roi": roi,
         "roi_image": roi_image,
-        "image_attached": bool(image_attached),
+        "image_attached": image_attached,
         "max_tool_calls": max_tool_calls,
         "semantic_rerank": bool(semantic_rerank),
         "disease": disease or tools.DEFAULT_DISEASE,

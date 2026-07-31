@@ -26,6 +26,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any
 
 #: OpenAI-compatible base URL. Overridable through ``deepinfra.base_url``.
@@ -65,6 +66,29 @@ class LLMResponse:
 
 class DeepInfraNotConfigured(RuntimeError):
     """Raised only by :func:`require_deepinfra_config`, never by the callers."""
+
+
+def _as_int(value: object, default: int) -> int:
+    """Coerce to int, falling back to ``default`` rather than raising."""
+
+    if isinstance(value, bool) or value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(value: object, default: float) -> float:
+    """Coerce to a finite float, falling back to ``default`` rather than raising."""
+
+    if isinstance(value, bool) or value is None:
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if isfinite(number) else default
 
 
 def _section(config: object | None, name: str) -> dict:
@@ -210,29 +234,36 @@ def call_deepinfra_chat(
     base_url = str(_setting(config, "base_url", DEFAULT_BASE_URL, env="DEEPINFRA_BASE_URL"))
     url = base_url.rstrip("/") + "/chat/completions"
 
+    # config/app.yaml is hand-edited, so every numeric setting is coerced
+    # defensively. A bare int()/float() here would raise on `temperature: hot`
+    # and escape the turn rather than degrading it.
     body = {
         "model": model,
         "messages": messages,
-        "max_tokens": int(
+        "max_tokens": _as_int(
             max_tokens
             if max_tokens is not None
-            else _setting(config, "max_tokens", DEFAULT_MAX_TOKENS)
+            else _setting(config, "max_tokens", DEFAULT_MAX_TOKENS),
+            DEFAULT_MAX_TOKENS,
         ),
-        "temperature": float(
+        "temperature": _as_float(
             temperature
             if temperature is not None
-            else _setting(config, "temperature", DEFAULT_TEMPERATURE)
+            else _setting(config, "temperature", DEFAULT_TEMPERATURE),
+            DEFAULT_TEMPERATURE,
         ),
         "stream": False,
     }
 
-    request_timeout = float(
-        timeout if timeout is not None else _setting(config, "timeout", DEFAULT_TIMEOUT)
+    request_timeout = _as_float(
+        timeout if timeout is not None else _setting(config, "timeout", DEFAULT_TIMEOUT),
+        DEFAULT_TIMEOUT,
     )
-    attempts = int(
+    attempts = _as_int(
         max_retries
         if max_retries is not None
-        else _setting(config, "max_retries", DEFAULT_MAX_RETRIES)
+        else _setting(config, "max_retries", DEFAULT_MAX_RETRIES),
+        DEFAULT_MAX_RETRIES,
     )
 
     headers = {
@@ -272,7 +303,15 @@ def _backoff(attempt: int) -> float:
 
 
 def _retry_delay(response: Any, attempt: int) -> float:
-    """Honour ``Retry-After`` when present, else back off exponentially."""
+    """Honour ``Retry-After`` when present, else back off exponentially.
+
+    Both ends are clamped and non-finite values are rejected. A server (or a
+    proxy in front of it) answering ``Retry-After: -1`` would otherwise reach
+    ``time.sleep(-1.0)``, which raises ``ValueError`` outside the try that
+    guards the request — killing the whole agent turn instead of degrading it.
+    ``NaN`` and ``inf`` fail the same way, and an unbounded positive value
+    would stall the request path.
+    """
 
     header = ""
     try:
@@ -280,9 +319,12 @@ def _retry_delay(response: Any, attempt: int) -> float:
     except Exception:  # noqa: BLE001 - a stubbed response may lack headers.
         header = ""
     try:
-        return min(float(header), 10.0)
+        delay = float(header)
     except (TypeError, ValueError):
         return _backoff(attempt)
+    if not isfinite(delay):
+        return _backoff(attempt)
+    return min(max(delay, 0.0), 10.0)
 
 
 def _parse_response(response: Any, model: str) -> LLMResponse:
@@ -314,8 +356,14 @@ def _parse_response(response: Any, model: str) -> LLMResponse:
             model=model, status_message="DeepInfra returned no completion choices."
         )
 
-    first = choices[0] or {}
-    message = first.get("message") or {}
+    # An error page, a proxy, or a partially OpenAI-compatible provider can
+    # return 200 with choices like ["service unavailable"] or
+    # [{"message": "boom"}]. Attribute access on those raises AttributeError
+    # outside any try, which would escape all the way out of the agent turn.
+    first = choices[0] if isinstance(choices[0], dict) else {}
+    message = first.get("message")
+    if not isinstance(message, dict):
+        message = {}
     content = message.get("content")
 
     # Some OpenAI-compatible providers return content as a list of parts.

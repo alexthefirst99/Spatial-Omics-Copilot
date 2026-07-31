@@ -110,6 +110,55 @@ report alias-resolved hits in `missing_genes` or a separate field so callers
 can tell an exact match from an alias match. This is a note, not a change — the
 module is not mine to edit.
 
+## 3b. Findings from adversarial review
+
+A six-dimension adversarial review was run over the package (each finding then
+independently re-derived by a second reviewer instructed to refute it).
+**10 findings confirmed, 14 refuted.** All 10 are fixed, each with a regression
+test. The three that mattered:
+
+**Router keyword `color` prefix-matched `colorectal` — high.** The helper that
+compiled the keyword vocabularies appended `\w*` to every entry, silently
+turning each one into a *prefix* match. `"color"` (an image keyword) therefore
+matched **"colorectal"** — the name of this project's own demo tissue. So
+*"Summarize the colorectal biology of this ROI"* routed to `image_pattern` and
+ran **zero** evidence tools: no pathways, no annotations, no literature. The
+same `\w*` made `"gene"` match `"general"` and `"generate"`, so *"In general,
+what is happening in this region?"* fetched only annotations. The docstring
+claimed the exact opposite behaviour ("so `gene` does not match `generate`").
+
+Fixed by anchoring both word boundaries and listing inflections explicitly,
+removing non-visual words (`color`, `structure`, `architecture`, `pattern`,
+`stroma`) from the image vocabulary, and adding disease/tissue vocabulary to
+the interpretation vocabulary so a question naming the diagnosis still gathers
+evidence.
+
+**The prompt asserted "no tissue image is available" on every `run_agent`
+turn — medium.** `run_agent`'s signature is frozen by `docs/specs.md` §3.4 and
+carries no image, so `image_attached` resolved to `False` every time — while
+`app/worker.py` attaches the ROI crop to that very same message whenever a
+vision model is selected. The model was being told it could not see an image it
+could see, and a related path announced "a cropped H&E image is provided" even
+when the crop never reached the model. Image state is now tri-state
+(`True` / `False` / unknown), and the unknown case emits a conditional
+instruction instead of a false assertion.
+
+**The injection fence was escapable — medium.** Marker stripping ran as two
+single passes, so `"SOURCE_TE" + "SOURCE_TEXT>>>" + "XT>>>"` lost the embedded
+marker and the surviving halves fused into a fresh `SOURCE_TEXT>>>` that
+nothing re-scanned — closing the fence early and putting the rest of the
+abstract into instruction context. Stripping now runs to a fixed point.
+
+Also fixed: short HGNC symbols that are ordinary English words (`CAT`, `SET`,
+`REST`, `MAX`) matched lowercase prose and triggered live NCBI lookups from
+messages like *"what is the cat doing here?"* — symbols of four characters or
+fewer now require an exact-case match; a `Retry-After: -1` header reached
+`time.sleep(-1)` and raised out of the whole turn; and a provider returning
+HTTP 200 with `{"choices": ["..."]}` raised `AttributeError` out of the turn.
+
+The refuted 14 are not listed; they were mostly unreachable inputs or
+behaviour that is correct per `docs/specs.md`.
+
 ## 4. Anti-hallucination checks (T-026)
 
 | Check | Behaviour | Test |
