@@ -27,7 +27,7 @@ What was live and what was not:
 | PubMed retrieval (E-utilities) | **Live** |
 | NCBI Gene annotation | **Live** |
 | Enrichr pathway enrichment | **Mocked** — `gseapy` is not installed on the test interpreter. A realistic colorectal Enrichr response was substituted and is labelled as such throughout. |
-| LLM generation | **Not called.** DeepInfra needs an API key that is not set, and the running app streams through local Ollama. Only the prompt sent to the model was inspected. |
+| LLM generation (DeepInfra) | **Live** — see section 3c. Re-validated July 31, 2026 with `google/gemma-4-26B-A4B-it`. |
 
 This table must be refreshed against the real demo ROI during Person 6's
 end-to-end task (T-029 / T-030). **These notes are not clinical
@@ -159,6 +159,59 @@ HTTP 200 with `{"choices": ["..."]}` raised `AttributeError` out of the turn.
 The refuted 14 are not listed; they were mostly unreachable inputs or
 behaviour that is correct per `docs/specs.md`.
 
+## 3c. Live DeepInfra run (T-047, T-046)
+
+Run July 31, 2026 against the team's configured model,
+`google/gemma-4-26B-A4B-it`, using the `.env` credentials. This is a real
+end-to-end turn: live NCBI Gene, live PubMed, live DeepInfra generation, with
+Enrichr still mocked.
+
+**The model is vision-capable.** Confirmed empirically rather than by name: a
+solid magenta test image sent as a base64 data URI came back correctly
+identified. DeepInfra accepted the standard OpenAI content-parts shape
+(`{"type": "image_url", "image_url": {"url": "data:image/png;base64,…"}}`).
+
+**Two defects this run exposed, both now fixed:**
+
+1. **Vision was silently disabled for this project's own model.** The
+   capability markers listed `gemma-3` but not `gemma-4`, so the configured
+   model was classified text-only and the ROI crop was never attached.
+2. **The payload builder and the LLM client disagreed about the model.**
+   `build_multimodal_prompt_payload` resolved the model from config only,
+   while `llm.resolve_model` checks the environment first. Since the model
+   lives in `.env` as `LLM_MODEL`, the builder saw *no* model, concluded "no
+   vision", and dropped the image — while the client went on to call a vision
+   model. T-046 was inert in exactly the team's configuration. Both paths now
+   resolve through `llm.resolve_model`, and `LLM_MODEL` is honoured alongside
+   `DEEPINFRA_MODEL`.
+
+Neither was reachable by the unit tests, which pass the model explicitly. Both
+now have regression tests.
+
+**Answer quality, text-only turn** ("Explain what is happening in this
+region."): the model organised the answer into epithelial/oncogenic signature
+and ECM/microenvironment remodeling, attributed each gene claim to the supplied
+annotation text, and cited `[1]`–`[3]` against the retrieved PMIDs only. No
+citation was invented, and no tissue morphology was described — correct, since
+no image was attached on that turn.
+
+**Answer quality, vision turn** ("What does this region look like, and does it
+match the gene evidence?"): the model first described the image —
+*"circular structures with a dark purple outer ring and a lighter pink/white
+center, set against a uniform light pink background"* — which is an accurate
+description of the synthetic crop, then analysed the genes separately, then
+synthesised the two. That separation of visual observation from molecular
+inference is exactly the behaviour T-048 is meant to evaluate.
+
+**Caveat on the image used.** The crop was a *synthetic* stand-in (drawn rings
+on a pink field), not real tissue, because the demo `.h5ad` and slide are not
+in the repo. It proves the image reaches the model and shapes the answer; it
+does **not** validate interpretation of real histology. T-048 still needs a run
+on the real demo ROI.
+
+Cost was negligible — roughly 2e-06 USD for the first probe; a full turn with
+evidence runs a few thousand prompt tokens.
+
 ## 4. Anti-hallucination checks (T-026)
 
 | Check | Behaviour | Test |
@@ -214,9 +267,10 @@ gene list tends to answer as though it were bulk RNA-seq.
 1. **Pathway output here is mocked.** Every pathway string in these notes came
    from a substituted Enrichr response. Re-validate once `gseapy` is installed
    and T-012 runs live.
-2. **No LLM answer was evaluated.** These notes validate the *prompt*, not the
-   generation. T-030 and T-048 still need a real model run against the real
-   demo ROI, with the cropped image attached.
+2. **The LLM run used a synthetic ROI image.** Generation is now validated
+   live (section 3c), but on drawn shapes rather than real histology, because
+   the demo `.h5ad` and slide are not in the repo. T-030 and T-048 still need
+   a run on the real demo ROI.
 3. **The app's length instruction fights the citation instruction.**
    `app/routes.py:464` appends "Respond in 1-2 concise sentences. Be direct."
    before the evidence block. Two sentences is tight for an answer that also

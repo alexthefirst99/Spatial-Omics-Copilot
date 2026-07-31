@@ -37,8 +37,14 @@ DEFAULT_MAX_TOKENS = 512
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_RETRIES = 2
 
-#: Environment variables checked for the API key, in order.
+#: Environment variables checked for the API key, in order. DeepInfra's own
+#: docs call it DEEPINFRA_TOKEN; this project's .env uses DEEPINFRA_API_KEY.
 _API_KEY_ENV_VARS = ("DEEPINFRA_API_KEY", "DEEPINFRA_TOKEN")
+
+#: Environment variables checked for the model id, in order. ``LLM_MODEL`` is
+#: this team's existing convention and is checked first so the shared .env
+#: works without duplicating the value.
+_MODEL_ENV_VARS = ("LLM_MODEL", "DEEPINFRA_MODEL")
 
 #: Statuses worth retrying: rate limiting and transient server errors.
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
@@ -147,7 +153,11 @@ def resolve_model(config: object | None = None) -> str:
     "not configured" error.
     """
 
-    return str(_setting(config, "model", "", env="DEEPINFRA_MODEL") or "").strip()
+    for env_var in _MODEL_ENV_VARS:
+        value = os.environ.get(env_var)
+        if value:
+            return value.strip()
+    return str(_setting(config, "model", "") or "").strip()
 
 
 def is_configured(config: object | None = None) -> bool:

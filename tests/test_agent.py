@@ -98,6 +98,25 @@ class FakeAnnotationResult:
         self.missing_genes = []
 
 
+@pytest.fixture(autouse=True)
+def isolate_llm_environment(monkeypatch):
+    """Clear provider environment variables for every test.
+
+    ``resolve_model`` reads ``LLM_MODEL`` before falling back to config, and a
+    developer with a real ``.env`` exported into their shell would otherwise
+    change what these tests assert. Tests that need a value set it themselves.
+    """
+
+    for name in (
+        "LLM_MODEL",
+        "DEEPINFRA_MODEL",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_TOKEN",
+        "DEEPINFRA_BASE_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def spy_tools(monkeypatch):
     """Replace all three tools with recording stubs.
@@ -780,6 +799,42 @@ def test_split_fence_marker_cannot_be_reassembled_by_stripping():
     ],
 )
 def test_model_supports_vision_detection(model, expected):
+    assert model_supports_vision(model) is expected
+
+
+def test_model_is_resolved_from_the_environment_like_the_llm_client(monkeypatch, tmp_path):
+    """The payload builder and the LLM client must agree on the model.
+
+    This project's .env sets LLM_MODEL. Resolving the model from config only
+    made the builder see no model, conclude "no vision" and silently drop the
+    ROI crop — while the client read the env and called a vision model.
+    """
+
+    crop = tmp_path / "roi.png"
+    crop.write_bytes(b"\x89PNG\r\n\x1a\n" + b"7" * 32)
+    monkeypatch.setenv("LLM_MODEL", "google/gemma-4-26B-A4B-it")
+    monkeypatch.delenv("DEEPINFRA_MODEL", raising=False)
+
+    payload = build_multimodal_prompt_payload(
+        "what does this look like?",
+        roi_image={"crop_path": str(crop)},
+        deg=GENE_OBJECTS,
+        config={},  # no deepinfra block at all — the env is the only source
+    )
+
+    assert payload["model"] == "google/gemma-4-26B-A4B-it"
+    assert payload["image_included"] is True
+
+
+@pytest.mark.parametrize(
+    "model,expected",
+    [
+        ("google/gemma-4-26B-A4B-it", True),  # verified live against DeepInfra
+        ("google/gemma-3-27b-it", True),
+        ("google/gemma-2-27b-it", False),  # Gemma 1/2 are text-only
+    ],
+)
+def test_gemma_vision_detection_is_generation_aware(model, expected):
     assert model_supports_vision(model) is expected
 
 
