@@ -40,3 +40,6 @@ packages/dash_viv_viewer/demo_data/
 *.tif
 *.svs
 *.ndpi
+
+# Office lock files
+~$*
