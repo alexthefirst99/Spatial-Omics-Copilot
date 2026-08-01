@@ -224,7 +224,7 @@ def create_layout(work_dir, folder_id):
                     html.Button(id="upload-trigger-btn", className="upload-trigger", style={'width': '0', 'height': '0', 'opacity': '0', 'padding': '0', 'border': 'none', 'overflow': 'hidden'}),
                     
                     html.Button("Cancel", className="upload-cancel-btn", style={'display': 'none'})
-                ], className="s3-upload-wrapper"),
+                ], className="s3-upload-wrapper", **{"data-accept": ".tiff,.tif,.ome.tiff,.svs,.btf"}),
 
                 html.P([
                         "Click 'Re-visualize Image' to view the tissue image.",
