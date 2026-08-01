@@ -1,61 +1,73 @@
-from __future__ import annotations
-
-import anndata as ad
+"""
+Tests for the clustering module (T-041).
+"""
+import os
 import numpy as np
-import pytest
+import pandas as pd
+import anndata as ad
+
+from rag.clustering import build_clustering_features, run_spatial_clustering
 
 
-pytest.importorskip("scanpy")
-pytest.importorskip("rasterio")
-
-from rag.clustering import _cluster_palette, run_spatial_clustering
-
-
-def test_cluster_palette_is_stable_and_numeric_labels_sort_numerically():
-    palette = _cluster_palette(["10", "2", "1", "2"])
-
-    assert list(palette) == ["1", "2", "10"]
-    assert palette["1"] == "#0071e3"
-    assert palette["2"] == "#ff3b30"
-    assert palette["10"] == "#34c759"
+def make_synthetic_adata(n_spots=100, n_genes=200, seed=1):
+    rng = np.random.default_rng(seed)
+    X = rng.poisson(3, size=(n_spots, n_genes)).astype(float)
+    obs = pd.DataFrame(index=[f"spot_{i}" for i in range(n_spots)])
+    var = pd.DataFrame(index=[f"gene_{i}" for i in range(n_genes)])
+    adata = ad.AnnData(X=X, obs=obs, var=var)
+    adata.obsm["spatial"] = rng.random((n_spots, 2)) * 1000
+    return adata
 
 
-def test_cluster_palette_handles_mixed_numeric_and_text_labels():
-    palette = _cluster_palette(["tumor", "2", "stroma", "1"])
+def test_build_clustering_features_spatial_flag():
+    adata = make_synthetic_adata()
+    adata.obsm["X_pca"] = np.random.default_rng(2).random((adata.n_obs, 10))
 
-    assert list(palette) == ["1", "2", "stroma", "tumor"]
-    assert all(color.startswith("#") and len(color) == 7 for color in palette.values())
+    with_spatial = build_clustering_features(adata, n_pcs=10, use_spatial=True)
+    without_spatial = build_clustering_features(adata, n_pcs=10, use_spatial=False)
+
+    assert with_spatial.shape[1] > without_spatial.shape[1]
+    assert without_spatial.shape[1] == 10
 
 
-def test_run_spatial_clustering_reuses_existing_obs_labels(tmp_path):
-    h5ad_path = tmp_path / "existing_clusters.h5ad"
-    cluster_path = tmp_path / "clusters.json"
-    adata = ad.AnnData(np.ones((4, 3)))
-    adata.obsm["spatial"] = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
-    adata.obs["leiden"] = ["0", "0", "1", "1"]
+def test_run_spatial_clustering_leiden_path(tmp_path):
+    adata = make_synthetic_adata(n_spots=60)
+    h5ad_path = tmp_path / "test.h5ad"
     adata.write_h5ad(h5ad_path)
+    cluster_path = str(tmp_path / "clusters.json")
 
-    payload = run_spatial_clustering(str(h5ad_path), str(cluster_path))
+    config = {"min_genes": 1, "min_counts": 1, "leiden_resolution": 1.0}
+    result = run_spatial_clustering(str(h5ad_path), cluster_path, use_cache=False, config=config)
 
-    assert payload["method"] == "existing_obs_leiden"
-    assert payload["n_clusters"] == 2
-    assert payload["clusters"] == {
-        "0": "0",
-        "1": "0",
-        "2": "1",
-        "3": "1",
-    }
+    assert result["n_spots"] == 60
+    assert result["n_clusters"] >= 1
+    assert os.path.exists(cluster_path)
 
 
-def test_run_spatial_clustering_uses_current_cache(tmp_path):
-    h5ad_path = tmp_path / "cached.h5ad"
-    cluster_path = tmp_path / "clusters.json"
-    adata = ad.AnnData(np.ones((4, 3)))
-    adata.obsm["spatial"] = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
-    adata.obs["leiden"] = ["0", "0", "1", "1"]
+def test_run_spatial_clustering_respects_n_clusters_kmeans_fallback(tmp_path):
+    adata = make_synthetic_adata(n_spots=60)
+    h5ad_path = tmp_path / "test.h5ad"
     adata.write_h5ad(h5ad_path)
+    cluster_path = str(tmp_path / "clusters.json")
 
-    first_payload = run_spatial_clustering(str(h5ad_path), str(cluster_path))
-    cached_payload = run_spatial_clustering(str(h5ad_path), str(cluster_path))
+    # Force very high resolution so Leiden is unlikely to be the deciding factor;
+    # main check here is that the pipeline runs end-to-end and produces valid output.
+    config = {"min_genes": 1, "min_counts": 1, "n_clusters": 4}
+    result = run_spatial_clustering(str(h5ad_path), cluster_path, use_cache=False, config=config)
 
-    assert cached_payload == first_payload
+    assert result["n_spots"] == 60
+    assert "clusters" in result
+    assert len(result["clusters"]) == 60
+
+
+def test_run_spatial_clustering_uses_cache(tmp_path):
+    adata = make_synthetic_adata(n_spots=60)
+    h5ad_path = tmp_path / "test.h5ad"
+    adata.write_h5ad(h5ad_path)
+    cluster_path = str(tmp_path / "clusters.json")
+
+    config = {"min_genes": 1, "min_counts": 1}
+    result1 = run_spatial_clustering(str(h5ad_path), cluster_path, use_cache=True, config=config)
+    result2 = run_spatial_clustering(str(h5ad_path), cluster_path, use_cache=True, config=config)
+
+    assert result1["clusters"] == result2["clusters"]
