@@ -182,11 +182,7 @@ function initApp() {
     const title = document.createElement("span");
     title.className = "rag-trace-title";
     title.textContent = "AGENT TRACE";
-    const badge = document.createElement("span");
-    badge.className = "rag-badge";
-    badge.textContent = "MOCK";
     header.appendChild(title);
-    header.appendChild(badge);
     card.appendChild(header);
 
     (trace || []).forEach(step => {
@@ -226,11 +222,7 @@ function initApp() {
     const labelEl = document.createElement("span");
     labelEl.className = "rag-deg-label";
     labelEl.textContent = `ENRICHED PATHWAYS · ${label || "selection"}`;
-    const badge = document.createElement("span");
-    badge.className = "rag-badge";
-    badge.textContent = "MOCK";
     left.appendChild(labelEl);
-    left.appendChild(badge);
     const scoreLabel = document.createElement("span");
     scoreLabel.className = "rag-deg-fc-label";
     scoreLabel.textContent = "-log₁₀p";
@@ -294,11 +286,7 @@ function initApp() {
     const labelEl = document.createElement("span");
     labelEl.className = "rag-deg-label";
     labelEl.textContent = `TOP DEGs · ${label || "selection"}`;
-    const badge = document.createElement("span");
-    badge.className = "rag-badge";
-    badge.textContent = "MOCK";
     left.appendChild(labelEl);
-    left.appendChild(badge);
     const fcLabel = document.createElement("span");
     fcLabel.className = "rag-deg-fc-label";
     fcLabel.textContent = "log₂FC";
@@ -339,9 +327,19 @@ function initApp() {
       const chips = document.createElement("div");
       chips.className = "rag-citation-row";
       citations.forEach(c => {
-        const chip = document.createElement("span");
+        const label = `[${c.id}] ${c.journal} · PMID ${c.pmid}`;
+        let chip;
+        if (c.url) {
+          chip = document.createElement("a");
+          chip.href = c.url;
+          chip.target = "_blank";
+          chip.rel = "noopener noreferrer";
+          if (c.title) chip.title = c.title;
+        } else {
+          chip = document.createElement("span");
+        }
         chip.className = "rag-citation-chip";
-        chip.textContent = `[${c.id}] ${c.journal} · PMID ${c.pmid}`;
+        chip.textContent = label;
         chips.appendChild(chip);
       });
       panel.appendChild(chips);

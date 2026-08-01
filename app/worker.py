@@ -127,6 +127,12 @@ def process_session(session_id):
                     local_crop = os.path.join(tmp_dir, f"crop_{idx}.png")
                     if crop_image_by_roi(img_path, roi_path, local_crop):
                         processed_images.append(local_crop)
+                else:
+                    # No roi_path means routes.py already cropped this at ROI
+                    # selection time (see the selection_time_crop cache) and
+                    # is passing the crop straight through — use as-is rather
+                    # than dropping the image.
+                    processed_images.append(img_path)
 
         inference_messages = _build_inference_messages(messages, last_msg)
         if processed_images and model_supports_images:

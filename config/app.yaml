@@ -3,8 +3,15 @@ ollama:
   model: "qwen2.5:0.5b"
   vision_model: "qwen2.5vl:7b"
   timeout: 120
-  num_predict: 48
+  # Safety ceiling only — the prompt instructs the model to answer in ~3-4
+  # sentences, so this just needs enough room for that to actually finish
+  # instead of a hard mid-sentence cutoff.
+  num_predict: 220
   keep_alive: "10m"
+  # Load both the text and vision models into memory at app startup instead
+  # of on the user's first chat message, so the first real message isn't the
+  # slow cold-start one.
+  warmup: true
 
 paths:
   chat_dir: "data/chat_sessions"
@@ -44,8 +51,9 @@ copilot_agent:
   # with "colorectal cancer" returned three colorectal papers that looked
   # entirely credible. The value now appears in the AGENT TRACE so it can be
   # checked at a glance during a demo.
-  # The task plan names a colorectal demo dataset; the .h5ad currently in
-  # data/demo is Visium FFPE Human BREAST Cancer, so set this accordingly.
+  # data/demo currently holds the 10x Visium HD Human Colon Cancer dataset,
+  # matching this anchor. Update this value if a different disease's .h5ad is
+  # ever loaded into data/demo.
   disease: "colorectal cancer"
   # Re-rank retrieved abstracts against the question with ChromaDB. Off by
   # default: Chroma's default embedding function downloads a ~79 MB ONNX model

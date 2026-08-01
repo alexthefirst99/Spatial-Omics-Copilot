@@ -99,6 +99,26 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 # Image is in work_dir/db/data/{sample_id}-wsi-img.tiff
                 image_s3_path = args.get("tutorialImagePath") or f"{work_dir}/db/data/{sample_id}-wsi-img.tiff"
 
+                # Selection-time ROI crop cache (written by app.py's
+                # callback_save_roi when the ROI is drawn, not on every chat
+                # message). If it matches the current image, reuse it instead
+                # of running the crop-generation logic below and instead of
+                # having worker.py crop again from the full whole-slide image.
+                selection_time_crop = None
+                _crop_cache_path = f"{work_dir}/user/roi_crop.png"
+                _crop_meta_path = f"{work_dir}/user/roi_crop_meta.json"
+                if vio.exists(_crop_cache_path) and vio.exists(_crop_meta_path):
+                    try:
+                        if vio.load_json(_crop_meta_path).get("image_path") == image_s3_path:
+                            selection_time_crop = _crop_cache_path
+                    except Exception as e_cache:
+                        print(f"DEBUG: Failed to read ROI crop cache: {e_cache}")
+                if selection_time_crop:
+                    print(f"DEBUG: Reusing selection-time ROI crop: {selection_time_crop}")
+                    images = [selection_time_crop]
+                    preview_crop_path = selection_time_crop
+                    roi_s3_path = None
+
                 # No more scaling needed - VivViewer handles full resolution pyramids
 
                 # Check for active overlay based on visualizeOption
@@ -135,7 +155,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 roi_json_to_upload = None
 
                 # Check for pixel coordinates first
-                if vio.exists(user_coords_path):
+                if not selection_time_crop and vio.exists(user_coords_path):
                     try:
                         with vio.open_file(user_coords_path, "r") as f_coords:
                             coords_data = json.load(f_coords)
@@ -275,7 +295,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 if 'preview_crop_path' not in locals():
                      preview_crop_path = None
 
-                if not roi_json_to_upload and vio.exists(user_roi_path):
+                if not selection_time_crop and not roi_json_to_upload and vio.exists(user_roi_path):
                     try:
                         with vio.open_file(user_roi_path, "r") as f_src:
                             roi_json = json.load(f_src)
@@ -471,12 +491,27 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                     _roi_path = f'{work_dir}/user/roi_context.json'
 
                     _user_message = data.get("prompt", "")
-                    if vio.exists(_cluster_path):
+
+                    # Neither context file is ever deleted, only overwritten on
+                    # a new selection of that type — so once a cluster has
+                    # been clicked once, cluster_context.json exists forever.
+                    # Always preferring it here would silently keep reusing
+                    # that first cluster's genes even after a newer ROI was
+                    # drawn. Use whichever file was actually written most
+                    # recently instead.
+                    _cluster_exists = vio.exists(_cluster_path)
+                    _roi_exists = vio.exists(_roi_path)
+                    _use_cluster = _cluster_exists and (
+                        not _roi_exists
+                        or os.path.getmtime(_cluster_path) >= os.path.getmtime(_roi_path)
+                    )
+
+                    if _use_cluster:
                         _cctx = vio.load_json(_cluster_path)
                         _gene_objects = _cctx.get("gene_objects", [])
                         _label = f"Cluster {_cctx.get('cluster_id', '?')}"
                         _rag = run_agent(_gene_objects, message=_user_message, label=_label)
-                    elif vio.exists(_roi_path):
+                    elif _roi_exists:
                         _rctx = vio.load_json(_roi_path)
                         _gene_objects = _rctx.get("gene_objects", [])
                         _rag = run_agent(_gene_objects, message=_user_message, label="ROI") if _gene_objects else None

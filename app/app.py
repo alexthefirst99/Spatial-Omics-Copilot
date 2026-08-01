@@ -398,6 +398,28 @@ def main():
             if not vio.exists(coords_path):
                 return status, []
             coords = vio.load_json(coords_path)
+
+            # Crop the ROI out of the whole-slide image now, once, instead of
+            # on every chat message. This callback only fires when the ROI
+            # actually changes, so the crop below is always fresh; routes.py
+            # and worker.py reuse this file instead of re-cropping per message.
+            crop_output_path = f'{work_dir}/user{folder_id}/roi_crop.png'
+            crop_meta_path = f'{work_dir}/user{folder_id}/roi_crop_meta.json'
+            try:
+                args_path = f'{work_dir}/user{folder_id}/args.json'
+                sample_id = vio.load_json(args_path).get('sampleId') if vio.exists(args_path) else None
+                image_path = f'{work_dir}/db/data/{sample_id}-wsi-img.tiff' if sample_id else None
+                if image_path and vio.exists(image_path) and crop_image_by_roi(image_path, coords_path, crop_output_path):
+                    vio.dump_json({"image_path": image_path}, crop_meta_path)
+                else:
+                    print(f"DEBUG: ROI crop-at-selection produced no crop (sample_id={sample_id})")
+                    if vio.exists(crop_meta_path):
+                        vio.remove(crop_meta_path)
+            except Exception as e_crop:
+                print(f"DEBUG: ROI crop-at-selection failed: {e_crop}")
+                if vio.exists(crop_meta_path):
+                    vio.remove(crop_meta_path)
+
             deg_result = get_roi_high_expression_genes(
                 work_dir, coords, folder_id=folder_id, top_n=25
             )
@@ -505,21 +527,30 @@ def main():
         return dash.no_update
 
     # --- OLLAMA WARMUP ---
+    # Ollama only loads a model into memory on first use, which costs several
+    # seconds (measured ~7.5s for the 7b vision model vs ~0.4s once warm) and
+    # unloads it again after ollama.keep_alive of inactivity. Warming up here
+    # means the user's first real chat message never pays that cold-start
+    # cost. Both models are warmed since the UI lets the user switch to
+    # vision mid-session.
     def warmup_ollama():
-        print("DEBUG: Sending Warmup 'hi' to Ollama...")
-        try:
-             enqueue_chat_job(
-                session_id=f"{WORKSPACE_ID}__warmup",
-                model=f"ollama:{get_config('ollama.model', DEFAULT_OLLAMA_MODEL, env='OLLAMA_MODEL')}",
-                prompt="hi",
-                images=[],
-                work_dir=work_dir,
-                roi_path=None,
-                visible=False # Invisible to user
-            )
-             print("DEBUG: Warmup 'hi' sent successfully.")
-        except Exception as e:
-            print(f"DEBUG: Warmup failed: {e}")
+        text_model = get_config('ollama.model', DEFAULT_OLLAMA_MODEL, env='OLLAMA_MODEL')
+        vision_model = get_config('ollama.vision_model', text_model, env='OLLAMA_VISION_MODEL')
+        for model_name in dict.fromkeys([text_model, vision_model]):  # de-duped, order preserved
+            print(f"DEBUG: Sending warmup 'hi' to Ollama ({model_name})...")
+            try:
+                enqueue_chat_job(
+                    session_id=f"{WORKSPACE_ID}__warmup__{model_name}",
+                    model=f"ollama:{model_name}",
+                    prompt="hi",
+                    images=[],
+                    work_dir=work_dir,
+                    roi_path=None,
+                    visible=False # Invisible to user
+                )
+                print(f"DEBUG: Warmup 'hi' sent successfully ({model_name}).")
+            except Exception as e:
+                print(f"DEBUG: Warmup failed ({model_name}): {e}")
 
     if get_bool("ollama.warmup", default=False, env="OLLAMA_WARMUP"):
         threading.Thread(target=warmup_ollama, daemon=True).start()

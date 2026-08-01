@@ -351,6 +351,11 @@ def _instructions(*, has_papers: bool, image_attached: bool | None) -> list[str]
 
     lines = ["HOW TO ANSWER:"]
 
+    lines.append(
+        "- Keep your answer short: about 3-4 sentences. Finish your point — do "
+        "not trail off or leave a sentence incomplete."
+    )
+
     if has_papers:
         lines.append(
             "- Cite the numbered sources inline as [1], [2] when a claim comes from "

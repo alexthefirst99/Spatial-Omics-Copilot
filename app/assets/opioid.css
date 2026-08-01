@@ -1080,4 +1080,14 @@ h2 {
   font-weight: 500;
   cursor: default;
   white-space: nowrap;
+  text-decoration: none;
+}
+
+a.rag-citation-chip {
+  cursor: pointer;
+}
+
+a.rag-citation-chip:hover {
+  background: rgba(29, 99, 201, 0.16);
+  border-color: rgba(29, 99, 201, 0.35);
 }
