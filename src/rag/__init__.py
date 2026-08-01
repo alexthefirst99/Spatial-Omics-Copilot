@@ -9,6 +9,7 @@
 #   rag/pubmed/    — PubMed abstract retrieval via NCBI E-utilities
 #   rag/agent/     — run_agent() entry point; assembles context_str for the LLM
 #   rag/pipeline.py — fallback sequential pipeline (pathway + PubMed) until LangGraph is ready
-#   rag/contracts.py — shared PreprocessResult/ClusterResult types for preprocess_h5ad()/cluster_adata()
+#   rag/contracts.py — shared result types (PreprocessResult, ClusterResult,
+#                      ROISelection, ROIImageResult, DEGResult, AgentResult)
 #
 # Only import from subpackage __init__.py files, not implementation modules directly.
