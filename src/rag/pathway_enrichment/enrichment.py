@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import importlib
 import re
+from types import SimpleNamespace
 from typing import Any
 
 from .models import PathwayEntry, PathwayResult
@@ -256,17 +257,61 @@ def run_pathway_enrichment(
 
     try:
         gseapy = importlib.import_module("gseapy")
-        enrichr_result = gseapy.enrichr(
-            gene_list=input_genes,
-            gene_sets=gene_sets,
-            organism=organism,
-            outdir=None,
-            cutoff=cutoff,
-            no_plot=True,
-            verbose=False,
+        pandas = importlib.import_module("pandas")
+
+        def _fetch_one(gene_set: str):
+            return gseapy.enrichr(
+                gene_list=input_genes,
+                gene_sets=[gene_set],
+                organism=organism,
+                outdir=None,
+                cutoff=cutoff,
+                no_plot=True,
+                verbose=False,
+            )
+
+        # gseapy.enrichr() silently drops every library but one when given
+        # multiple gene_sets in a single call (verified directly against
+        # gseapy 1.1.2: querying GO_Biological_Process_2023 alone returns 128
+        # real rows, but querying it together with KEGG_2021_Human in one
+        # call returns 0 GO rows). Query each library in its own call instead.
+        #
+        # An earlier version fired these concurrently via ThreadPoolExecutor to
+        # avoid paying the extra network round-trips serially, but gseapy's
+        # enrichr() is not safe to call concurrently — it intermittently
+        # dropped one library's results at random (reproduced directly: 1 of 3
+        # concurrent runs silently lost GO_Biological_Process_2023 entirely).
+        # A demo that randomly shows only one library's pathways is worse than
+        # one that is reliably a few seconds slower, so this queries libraries
+        # sequentially instead.
+        frames = []
+        errors: list[str] = []
+        for gene_set in gene_sets:
+            try:
+                single_result = _fetch_one(gene_set)
+            except Exception as exc:  # noqa: BLE001 - one library's failure must not sink the rest
+                errors.append(f"{gene_set}: {exc}")
+                continue
+            frame = getattr(single_result, "res2d", None)
+            if frame is None:
+                frame = getattr(single_result, "results", None)
+            if frame is not None and not frame.empty:
+                frames.append(frame)
+
+        if not frames:
+            detail = "; ".join(errors) or "no results returned"
+            return PathwayResult(
+                pathways=[],
+                status_message=f"Pathway enrichment unavailable: {detail}",
+                input_genes=input_genes,
+                sources=gene_sets,
+            )
+
+        combined_frame = (
+            pandas.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
         )
         pathways, valid_rows = _records_from_enrichr(
-            enrichr_result,
+            SimpleNamespace(res2d=combined_frame),
             gene_sets=gene_sets,
             adjusted_p_value_cutoff=cutoff,
             significant_only=significant_only,
