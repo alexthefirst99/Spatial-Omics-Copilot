@@ -10,6 +10,12 @@ Flask==2.3.3
 flask-cors
 plotly==5.18.0
 requests
+# Makes requests/urllib3 trust the OS certificate store instead of only
+# certifi's bundled list. Needed on networks with a TLS-inspecting firewall
+# (e.g. a hospital network) whose custom root CA is trusted by the OS but not
+# by certifi — otherwise every external call (Enrichr, NCBI) fails with
+# SSLCertVerificationError while curl/the browser work fine on the same host.
+pip-system-certs
 
 # AWS / S3
 boto3==1.28.17
