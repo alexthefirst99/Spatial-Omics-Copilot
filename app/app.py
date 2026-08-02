@@ -391,6 +391,19 @@ def main():
     def callback_save_roi(drawn_geojson):
         status = save_roi(drawn_geojson, folder_id, work_dir)
         if not drawn_geojson:
+            # save_roi() already cleared roi.json/coords.json for an erased
+            # selection — but it doesn't know about the derived caches this
+            # callback itself writes below (roi_context.json's gene list,
+            # the ROI crop). Left alone, those go stale: routes.py only
+            # checks "does the file exist", so an erased ROI would still
+            # silently serve the previous selection's genes/image forever.
+            for stale_path in (
+                f'{work_dir}/user{folder_id}/roi_context.json',
+                f'{work_dir}/user{folder_id}/roi_crop.png',
+                f'{work_dir}/user{folder_id}/roi_crop_meta.json',
+            ):
+                if vio.exists(stale_path):
+                    vio.remove(stale_path)
             return status, []
 
         try:
