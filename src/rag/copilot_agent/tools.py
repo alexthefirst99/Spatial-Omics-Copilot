@@ -103,6 +103,22 @@ def _genes_summary(genes: list[str], limit: int = 5) -> str:
     return head
 
 
+def _is_failure_status_message(status_message: str) -> bool:
+    """Tell "the call failed" apart from "the call succeeded and found nothing".
+
+    rag.pathway_enrichment / rag.gene_annotation / rag.pubmed_retrieval all
+    put the word "unavailable" in their status_message specifically and only
+    for genuine failures (network errors, SSL errors, timeouts) — a
+    successful-but-empty result uses different wording ("No matching ...
+    were found.", "... but none passed the cutoff."). Without this check, a
+    tool with zero rows always reports STATUS_EMPTY even when the real cause
+    was a connection failure, silently presenting "no results found" to the
+    user in place of an error.
+    """
+
+    return "unavailable" in (status_message or "").lower()
+
+
 # --- Pathway enrichment (T-012 upstream) ---------------------------------
 
 
@@ -155,6 +171,11 @@ def run_pathway_tool(
         )
         outcome.detail = sources or "GO · KEGG"
         outcome.output_summary = f"{len(rows)} enriched pathway(s)"
+    elif _is_failure_status_message(status_message):
+        outcome.status = STATUS_ERROR
+        outcome.error = status_message
+        outcome.detail = "unavailable"
+        outcome.output_summary = status_message
     else:
         outcome.status = STATUS_EMPTY
         outcome.detail = "no enriched pathways"
@@ -220,9 +241,16 @@ def run_gene_annotation_tool(
         if missing:
             outcome.output_summary += f"; {len(missing)} not found"
     else:
-        outcome.status = STATUS_EMPTY
-        outcome.detail = "no annotations found"
-        outcome.output_summary = adapters.status_of(result) or "no annotations returned"
+        annotation_status = adapters.status_of(result)
+        if _is_failure_status_message(annotation_status):
+            outcome.status = STATUS_ERROR
+            outcome.error = annotation_status
+            outcome.detail = "unavailable"
+            outcome.output_summary = annotation_status
+        else:
+            outcome.status = STATUS_EMPTY
+            outcome.detail = "no annotations found"
+            outcome.output_summary = annotation_status or "no annotations returned"
 
     return outcome
 
@@ -325,9 +353,16 @@ def run_pubmed_tool(
         if semantic_rerank and question:
             outcome.extras["semantic"] = _semantic_rerank(result, question, max_results)
     else:
-        outcome.status = STATUS_EMPTY
-        outcome.detail = "no matching papers"
-        outcome.output_summary = adapters.status_of(result) or "no papers returned"
+        pubmed_status = adapters.status_of(result)
+        if _is_failure_status_message(pubmed_status):
+            outcome.status = STATUS_ERROR
+            outcome.error = pubmed_status
+            outcome.detail = "unavailable"
+            outcome.output_summary = pubmed_status
+        else:
+            outcome.status = STATUS_EMPTY
+            outcome.detail = "no matching papers"
+            outcome.output_summary = pubmed_status or "no papers returned"
 
     return outcome
 
