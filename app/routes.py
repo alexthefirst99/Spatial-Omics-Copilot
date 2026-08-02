@@ -42,9 +42,97 @@ def _chat_stream_timeout_seconds():
         return 120
 
 try:
-    from rag.agent import run_agent
+    from rag.agent import run_agent, run_copilot_agent
 except ImportError:
     run_agent = None
+    run_copilot_agent = None
+
+try:
+    from app.inference import run_model_inference
+except ImportError:
+    from inference import run_model_inference
+
+# Extraction only ever runs once per session (result is cached — see
+# _extract_disease_context), so the one-time cost of a larger, more reliable
+# model is fine. qwen2.5:0.5b was tested and is not reliable at this task —
+# it answered "unknown" for a conversation that stated the context in its
+# very first line. qwen2.5vl:7b is already part of the app's standard model
+# set (no new dependency) and got it right, just too slowly (~32s) to accept
+# on every turn — which is exactly why this is cached instead of re-run live.
+_DISEASE_EXTRACTION_MODEL = "qwen2.5vl:7b"
+
+
+def _disease_cache_path(work_dir, folder_id=""):
+    return f"{work_dir}/user{folder_id}/disease_context.json"
+
+
+def _extract_disease_context(work_dir, session_id, current_message, folder_id=""):
+    """Return the disease/tissue context this session's conversation has
+    established, so PubMed retrieval anchors on the right disease instead of
+    a fixed config default that goes stale the moment a different sample is
+    loaded (docs/validation: a wrong anchor doesn't fail loudly — it returns
+    confident, well-formed papers about the wrong cancer).
+
+    Cached to disk after the first successful extraction — the model call
+    behind this is too slow (~30s, see _DISEASE_EXTRACTION_MODEL) to repeat
+    on every turn, so once a value is found it is reused for the rest of the
+    session instead of re-extracted. If the context has not been stated yet,
+    nothing is cached, so the next turn tries again. Fails safe to None
+    (falls back to config's default disease) on any error — this must never
+    block the actual chat turn.
+    """
+
+    cache_path = _disease_cache_path(work_dir, folder_id)
+    try:
+        if vio.exists(cache_path):
+            cached = vio.load_json(cache_path).get("disease")
+            if cached:
+                return cached
+    except Exception as e:
+        print(f"DEBUG: Disease context cache read failed: {e}")
+
+    try:
+        session_data = _lock_and_read_session(_session_path(session_id)) or {}
+        prior = [
+            m for m in session_data.get("messages", [])
+            if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()
+            and not m.get("streaming") and m.get("content") != "..."
+        ]
+        convo_lines = [f"{m['role']}: {m['content'].strip()}" for m in prior[-20:]]
+        if current_message:
+            convo_lines.append(f"user: {current_message.strip()}")
+        if not convo_lines:
+            return None
+
+        extraction_prompt = (
+            "Below is a conversation between a researcher and an assistant "
+            "about a spatial transcriptomics tissue sample.\n\n"
+            + "\n".join(convo_lines)
+            + "\n\nHas the researcher stated what disease or tissue type this "
+            "sample is from? Reply with ONLY the disease/tissue name in a few "
+            "words (e.g. \"colorectal cancer\"). If it was never stated, "
+            "reply with exactly: unknown"
+        )
+        response = "".join(
+            run_model_inference(
+                [{"role": "user", "content": extraction_prompt}],
+                provider="ollama",
+                model_name=_DISEASE_EXTRACTION_MODEL,
+            )
+        ).strip()
+
+        cleaned = response.strip().strip(".").strip()
+        if not cleaned or "unknown" in cleaned.lower() or len(cleaned) > 80:
+            return None
+
+        try:
+            vio.dump_json({"disease": cleaned}, cache_path)
+        except Exception as e:
+            print(f"DEBUG: Disease context cache write failed: {e}")
+        return cleaned
+    except Exception as e:
+        print(f"DEBUG: Disease context extraction failed: {e}")
+        return None
 
 
 def register_chat_routes(server, workspace_id, work_dir, base_path=None):
@@ -491,6 +579,17 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                     _roi_path = f'{work_dir}/user/roi_context.json'
 
                     _user_message = data.get("prompt", "")
+                    _disease = _extract_disease_context(work_dir, session_id, _user_message)
+
+                    def _run_rag(gene_objects, label):
+                        if run_copilot_agent:
+                            return run_copilot_agent(
+                                question=_user_message,
+                                deg=gene_objects,
+                                label=label,
+                                disease=_disease,
+                            ).to_legacy_dict()
+                        return run_agent(gene_objects, message=_user_message, label=label)
 
                     # Neither context file is ever deleted, only overwritten on
                     # a new selection of that type — so once a cluster has
@@ -510,11 +609,11 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                         _cctx = vio.load_json(_cluster_path)
                         _gene_objects = _cctx.get("gene_objects", [])
                         _label = f"Cluster {_cctx.get('cluster_id', '?')}"
-                        _rag = run_agent(_gene_objects, message=_user_message, label=_label)
+                        _rag = _run_rag(_gene_objects, _label)
                     elif _roi_exists:
                         _rctx = vio.load_json(_roi_path)
                         _gene_objects = _rctx.get("gene_objects", [])
-                        _rag = run_agent(_gene_objects, message=_user_message, label="ROI") if _gene_objects else None
+                        _rag = _run_rag(_gene_objects, "ROI") if _gene_objects else None
                     else:
                         _rag = None
 
@@ -527,7 +626,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
 
             status = enqueue_chat_job(
                 session_id=session_id,
-                model=data.get("model", "ollama:qwen2.5:0.5b"),
+                model=data.get("model", "ollama:qwen2.5vl:7b"),
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,

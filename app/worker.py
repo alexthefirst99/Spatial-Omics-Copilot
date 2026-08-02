@@ -85,6 +85,16 @@ def _build_inference_messages(messages, current_user_message):
 
     latest = copy.deepcopy(current_user_message)
     latest.pop("rag_context_str", None)
+    # Bounded so response latency stays roughly constant regardless of how
+    # long the session runs — Ollama's /api/chat re-processes the whole
+    # prompt from scratch on every call (no cross-call KV-cache reuse here),
+    # so unbounded history means a 20-turn conversation gets progressively
+    # slower to respond to than a 2-turn one. A fact stated early (e.g. "this
+    # is a colon sample") scrolling out of this window used to mean the model
+    # silently fell back to guessing tissue identity from genes alone — that
+    # is now handled separately by app/routes.py's disease-context
+    # extraction (cached per session, injected into the evidence block
+    # directly), so it no longer depends on staying inside this window.
     history = history[-4:]
     history.append(latest)
     return history

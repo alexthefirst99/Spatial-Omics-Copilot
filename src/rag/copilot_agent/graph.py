@@ -112,6 +112,13 @@ class AgentState(TypedDict, total=False):
     max_tool_calls: int
     semantic_rerank: bool
     disease: str
+    # Raw disease value as passed in, before the "or tools.DEFAULT_DISEASE"
+    # fallback below — needed because the evidence block (unlike the PubMed
+    # query) must not assert a guessed default; it has to be able to tell
+    # "the caller actually stated this" apart from "nothing was provided so
+    # this was defaulted", which `disease` alone can no longer distinguish
+    # once resolved.
+    disease_stated: str
     # Pre-computed results supplied by the integration pipeline.
     supplied: dict
 
@@ -344,6 +351,14 @@ def synthesize_node(state: AgentState) -> dict:
         roi_image=state.get("roi_image"),
         image_attached=state.get("image_attached"),
         evidence_gaps=gaps,
+        # The raw stated value, not state["disease"] — that one is already
+        # resolved to tools.DEFAULT_DISEASE when nothing was provided (needed
+        # for the PubMed call below, which requires *some* query anchor).
+        # Asserting a guessed default to the LLM with "do not contradict
+        # this" would risk the same wrong-sample failure this is meant to
+        # prevent, so the evidence block only ever states this when the
+        # caller actually provided it.
+        disease=state.get("disease_stated") or "",
     )
 
     return {
@@ -553,6 +568,7 @@ def run_copilot_agent(
         "max_tool_calls": max_tool_calls,
         "semantic_rerank": bool(semantic_rerank),
         "disease": disease or tools.DEFAULT_DISEASE,
+        "disease_stated": disease or "",
         "supplied": {k: v for k, v in supplied.items() if v is not None},
         "pending": [],
         "tool_calls": 0,
