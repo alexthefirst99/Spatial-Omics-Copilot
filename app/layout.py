@@ -308,8 +308,8 @@ def create_layout(work_dir, folder_id):
                                         className="chat-model-select",
                                         title="Choose model",
                                         children=[
-                                            html.Option("Ollama fast text  qwen2.5:0.5b", value="ollama:qwen2.5:0.5b", selected=True),
-                                            html.Option("Ollama vision  qwen2.5vl:7b", value="ollama:qwen2.5vl:7b"),
+                                            html.Option("Ollama fast text  qwen2.5:0.5b", value="ollama:qwen2.5:0.5b"),
+                                            html.Option("Ollama vision  qwen2.5vl:7b", value="ollama:qwen2.5vl:7b", selected=True),
                                             html.Option("Ollama local  qwen2.5vl:32b", value="ollama:qwen2.5vl:32b"),
                                         ],
                                     ),

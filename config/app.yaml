@@ -1,6 +1,6 @@
 ollama:
   host: "http://localhost:11434"
-  model: "qwen2.5:0.5b"
+  model: "qwen2.5vl:7b"
   vision_model: "qwen2.5vl:7b"
   timeout: 120
   # Safety ceiling only — the prompt instructs the model to answer in ~3-4
