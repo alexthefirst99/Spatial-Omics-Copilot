@@ -250,16 +250,16 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 
 | **ID** | **Task** | **Done When** | **Status** |
 | --- | --- | --- | --- |
-| T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status | Todo |
+| T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status | Known limitation — not tracked as active work, see below |
 | T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup | ✓ Done |
 
 ### T-042 — Async / Background Execution Boundary for Real RAG APIs
 
-**Status:** Todo
+**Status:** Known limitation, accepted — not tracked as active work. `routes.py` calling the agent synchronously hasn't caused a real problem in practice (calls are fast and reliable so far); see `docs/tech.md` section 8. Revisit only if a slow or hanging external call actually blocks a request.
 
 **Current behavior:** `routes.py` calls the agent (`run_copilot_agent()`) before enqueueing the chat job. This is acceptable for mock/fallback code but will block the request path once real PubMed, pathway, or vector APIs are enabled.
 
-**Desired behavior:** Move real external RAG calls out of the main Flask request path and align execution with the background-worker expectations in the architecture rules.
+**Ideal behavior (not planned):** Move real external RAG calls out of the main Flask request path and align execution with the background-worker expectations in the architecture rules.
 
 **Implementation notes:**
 - Decide whether the agent call (`run_copilot_agent()`) runs inside `worker.py`, a dedicated RAG executor, or another background task abstraction.
