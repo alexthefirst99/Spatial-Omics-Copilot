@@ -281,7 +281,6 @@ def create_layout(work_dir, folder_id):
                                 children=[
                                     html.Div([
                                         # html.Img(src="/assets/logo.png", style={"height": "60px", "marginBottom": "20px"}), # Optional branding
-                                        # html.H2("Welcome to Loki", className="text", style={"marginBottom": "10px"}),
                                         # html.P("Upload an H&E image to get started.", className="text", style={"color": "#666"})
                                     ], style={"display": "flex", "flexDirection": "column", "alignItems": "center", "justifyContent": "center", "height": "100%", "opacity": "0.6"})
                                 ],

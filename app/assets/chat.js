@@ -351,7 +351,7 @@ function initApp() {
   // ---------------------------------------------------------------------------
   // CORE: AI Response Handler
   // ---------------------------------------------------------------------------
-  async function aiRespond(userText, wasLokiBtnEnabled = false) {
+  async function aiRespond(userText) {
     const roiPaths = getROIPaths();
     const token = getSessionID();
 
@@ -506,9 +506,6 @@ function initApp() {
       let aiMsgElement = null;
       let lastContentLength = 0;
 
-      // Use the state passed from handleSend (captured BEFORE disabling)
-      const lokiBtn = document.getElementById("start-loki-analysis-btn");
-
       await new Promise((resolve) => {
         const pollStartedAt = Date.now();
         const maxPollMs = 120000;
@@ -532,11 +529,6 @@ function initApp() {
                 aiMsgElement = addMessage("", "ai", pollData.images);
               }
 
-              // Keep Loki button disabled during streaming
-              if (lokiBtn && pollData.status === "streaming") {
-                lokiBtn.disabled = true;
-              }
-
               // 2. Update Content
               if (pollData.response && pollData.response.length > lastContentLength) {
                 // Only update if content changed/grew
@@ -550,11 +542,6 @@ function initApp() {
                 clearInterval(pollInterval);
                 // Ensure final content is set
                 aiMsgElement.textContent = cleanMarkdownText(pollData.response);
-
-                // Re-enable Loki button ONLY if it was enabled before the chat
-                if (lokiBtn && wasLokiBtnEnabled) {
-                  lokiBtn.disabled = false;
-                }
 
                 // Always replace thumbs on done so we show the final correct crop,
                 // not whatever stale path was present during the streaming phase.
@@ -623,18 +610,9 @@ function initApp() {
     sendBtn.disabled = true;
     setChatInputValue("");
 
-    // Capture Loki button state BEFORE disabling
-    const lokiBtn = document.getElementById("start-loki-analysis-btn");
-    const wasEnabled = lokiBtn ? !lokiBtn.disabled : false;
-
-    // Disable Loki Analysis button immediately when sending message
-    if (lokiBtn) {
-      lokiBtn.disabled = true;
-    }
-
     try {
       addMessage(text, "user");
-      await aiRespond(text, wasEnabled);
+      await aiRespond(text);
     } finally {
       sendInFlight = false;
       sendBtn.disabled = false;
@@ -676,7 +654,7 @@ function initApp() {
     });
   }
   // ---------------------------------------------------------------------------
-  // GLOBAL POLLER (To catch external triggers like Loki Analysis Button)
+  // GLOBAL POLLER (To catch external triggers)
   // ---------------------------------------------------------------------------
   let lastKnownResponse = "";
 
