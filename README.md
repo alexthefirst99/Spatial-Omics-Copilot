@@ -44,11 +44,12 @@ General app settings live in `config/app.yaml`.
 ```yaml
 ollama:
   host: "http://localhost:11434"
-  model: "qwen2.5:0.5b"
+  model: "qwen2.5vl:7b"
   vision_model: "qwen2.5vl:7b"
   timeout: 120
-  num_predict: 48
+  num_predict: 220
   keep_alive: "10m"
+  warmup: true          # load the model at startup instead of on first message
 
 paths:
   chat_dir: "data/chat_sessions"
@@ -110,18 +111,19 @@ Start the Ollama server:
 ollama serve
 ```
 
-In another terminal, pull the default fast text model:
-
-```bash
-ollama pull qwen2.5:0.5b
-```
-
-Optional: pull the vision-language model only if you want the chat model to
-inspect ROI crops/images directly. This model is much heavier and can be slow
-on CPU-only machines.
+In another terminal, pull the default vision-language model (the chat UI
+selects this one by default so it can inspect ROI crops/images directly).
+This model is heavier and can be slow on CPU-only machines:
 
 ```bash
 ollama pull qwen2.5vl:7b
+```
+
+Optional: pull the smaller, faster text-only model too if you want a quick
+option for turns that don't need image input.
+
+```bash
+ollama pull qwen2.5:0.5b
 ```
 
 Verify Ollama is reachable:
@@ -136,12 +138,13 @@ To change the Ollama host or default model, edit `config/app.yaml`:
 ```yaml
 ollama:
   host: "http://localhost:11434"
-  model: "qwen2.5:0.5b"
+  model: "qwen2.5vl:7b"
   vision_model: "qwen2.5vl:7b"
 ```
 
-The chat UI includes a fast text model (`qwen2.5:0.5b`) and a heavier vision
-model (`qwen2.5vl:7b`); make sure the selected model has been pulled locally.
+The chat UI includes a heavier vision model (`qwen2.5vl:7b`, selected by
+default) and a faster text-only model (`qwen2.5:0.5b`); make sure the
+selected model has been pulled locally.
 
 ## Quick Start
 
@@ -185,6 +188,7 @@ spatial-omics-copilot/
 │   ├── routes.py                # Flask HTTP routes
 │   ├── worker.py                # background job queue + LLM streaming
 │   ├── inference.py             # Ollama API wrapper
+│   ├── config.py                # config/app.yaml + env var resolution
 │   ├── session.py               # chat session read/write
 │   ├── image_utils.py           # ROI crop, OME-TIFF caching
 │   ├── status_store.py          # upload progress tracking
@@ -212,17 +216,26 @@ spatial-omics-copilot/
 │   │   │   └── leaflet.py       # VivViewer component builder + cluster legend
 │   │   └── utils/               # io, colors, dataset, aristotle helpers
 │   └── rag/                     # analysis pipeline
-│       ├── pipeline.py          # fallback sequential pipeline (_run_sequential)
-│       ├── preprocessing.py     # QC, normalize, PCA
-│       ├── clustering.py        # Leiden / KMeans spatial clustering
-│       ├── deg/                 # DEG computation
-│       ├── pathway/             # GO / KEGG enrichment
-│       ├── pubmed_retrieval/    # NCBI retrieval + Chroma semantic search
-│       ├── pubmed/              # compatibility import for current pipeline
-│       └── agent/               # run_agent entry point + prompt/tool wiring
+│       ├── contracts.py         # shared result types (PreprocessResult, ClusterResult,
+│       │                        # ROISelection, ROIImageResult, DEGResult, AgentResult, ...)
+│       ├── pipeline.py          # run_integration_pipeline(): preprocess -> cluster ->
+│       │                        # ROI resolution -> DEG -> annotation -> pathway -> PubMed -> agent
+│       ├── preprocessing.py     # QC, normalize, HVG, PCA (cached to disk)
+│       ├── clustering.py        # Leiden / KMeans spatial clustering (cached to disk)
+│       ├── deg/                 # DEG: Wilcoxon rank-sum + BH correction
+│       ├── pathway_enrichment/  # real GO / KEGG ORA via gseapy/Enrichr
+│       ├── gene_annotation/     # NCBI Gene functional annotation retrieval
+│       ├── pubmed_retrieval/    # NCBI E-utilities retrieval + Chroma semantic search
+│       ├── copilot_agent/       # the real LangGraph agent: dynamic tool routing,
+│       │                        # multimodal prompt, DeepInfra client, disease-context
+│       │                        # extraction hooks
+│       ├── agent/               # back-compat re-export of copilot_agent.run_agent
+│       ├── pathway/              # back-compat import path for pathway_enrichment
+│       └── pubmed/               # back-compat import path for pubmed_retrieval
 ├── packages/
 │   └── dash_viv_viewer/         # VivViewer React component package
 ├── data/                        # local runtime files
+│   ├── demo/                    # 10x Visium HD Human Colon Cancer demo dataset
 │   ├── chat_sessions/
 │   ├── status_data/
 │   └── workspace_map.json       # generated at runtime
@@ -232,6 +245,7 @@ spatial-omics-copilot/
     ├── tech.md
     ├── rules.md
     ├── tickets.md
+    ├── validation/               # per-person biological/functional validation notes
     └── planning/
 ```
 

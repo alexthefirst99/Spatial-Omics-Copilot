@@ -23,11 +23,11 @@
 - **`src/rag/` is pure analysis** — no HTTP handling, no streaming, no session writes.
 - **`app/` owns the LLM call** — `worker.py` calls `inference.py` directly. No code inside `src/rag/` should call the LLM or import from `app/`.
 - **One entry point for chat** — only `routes.py` calls `run_agent`. `app.py` calls `rag.deg` directly (for the gene popup on selection). Never import other RAG submodules (`rag.pathway`, `rag.pubmed`, etc.) from outside the RAG layer.
-- **`run_agent()` owns the output contract** — whatever is inside `src/rag/agent/graph.py` is JN's business. The output dict format must not change.
+- **`run_agent()` owns the output contract** — whatever is inside `src/rag/copilot_agent/graph.py` is JN's business (`src/rag/agent/graph.py` is now a deprecated shim that re-exports from it). The output dict format must not change.
 
 ## 4. RAG Module Rules
 
-- Each submodule (`deg/`, `pathway/`, `pubmed/`, `agent/`) exposes its public function only through its `__init__.py`.
+- Each submodule (`deg/`, `pathway_enrichment/`, `pubmed_retrieval/`, `copilot_agent/` — plus the `pathway/`, `pubmed/`, `agent/` back-compat import paths) exposes its public function only through its `__init__.py`.
 - Output formats are fixed — see `docs/specs.md` section 3 for each module's contract.
 - Adding extra fields to output dicts is allowed; removing or renaming existing fields is not.
 - Return empty lists or `None` on failure — never raise unhandled exceptions from a tool.

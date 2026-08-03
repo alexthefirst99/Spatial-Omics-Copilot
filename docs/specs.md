@@ -38,8 +38,21 @@ Returns:
     "selected_spots":  120,
     "reference_spots": 880,
     "total_spots":     1000,
+    "ranking_method":  "roi_vs_non_roi_log2fc",
     "top_genes": [
-        {"gene": "SNAP25", "log2_fold_change": 3.81, "mean_expression": 2.4, ...},
+        {
+            "gene": "SNAP25",
+            "log2_fold_change": 3.81,
+            "mean_expression": 2.4,
+            "pct_spots_expressed": 0.87,
+            "mean_reference": 0.3,
+            "pct_reference": 0.12,
+            "pvalue": 1.2e-5,        # Mann-Whitney U, two-sided (T-008)
+            "adj_pvalue": 3.4e-4,    # Benjamini-Hochberg corrected (T-009)
+            "statistic": 91234.0,
+            "testable": True,
+            "untestable_reason": "",
+        },
         ...
     ]
 }
@@ -48,13 +61,14 @@ Returns:
 Required behavior:
 - Read h5ad path from `spatial_omics.json` in `work_dir`.
 - Return `None` if h5ad is not loaded or selection has no spots.
-- Rank by log2 fold-change (selected vs reference spots).
+- Rank by log2 fold-change (selected vs reference spots); `pvalue`/`adj_pvalue` come from a Wilcoxon rank-sum test with Benjamini-Hochberg correction, pre-filtering low-count genes first for performance.
+- `rag.contracts.DEGResult`/`GeneStat` are the canonical typed form of this dict; `rag.deg.models` re-exports them for backward compatibility.
 
 ### 3.2 Pathway Enrichment
 
 ```python
-# rag/pathway/__init__.py
-def enrich_pathways(genes: list[str], top_n: int = 6) -> list[dict]
+# rag/pathway_enrichment/__init__.py  (rag/pathway/ is a back-compat import path)
+def run_pathway_enrichment(genes: list[str], config: dict | None = None) -> PathwayResult
 ```
 
 Returns:
@@ -72,15 +86,18 @@ Returns:
 ```
 
 Required behavior:
-- Run ORA against GO and KEGG using gseapy or g:Profiler.
-- Sort by ascending p-value.
-- Return empty list `[]` when no pathways are enriched.
+- Run real ORA against GO Biological Process and KEGG via `gseapy`/Enrichr.
+- Sort by ascending adjusted p-value.
+- Return an empty result when no pathways are enriched, or when Enrichr is unreachable — the two cases have different `status_message` text (the latter contains "unavailable") so callers can tell a real failure apart from a genuine negative result instead of treating both as one clean "no results" checkmark.
+- Enrichr silently drops every gene-set library but one when queried with multiple libraries in a single call; each configured library (GO, KEGG) is queried in its own separate call and the results merged.
+- `rag.pathway_enrichment.models.PathwayEntry`/`PathwayResult` are the typed result; `overlap`/`gene_count`/`set_size`/`pvalue` are legacy dict-style aliases still supported for existing callers.
 
 ### 3.3 PubMed Retrieval
 
 ```python
 # rag/pubmed_retrieval/__init__.py
-def retrieve_abstracts(genes: list[str], pathways: list[str] = None, n: int = 3) -> list[dict]
+def search_pubmed(query: str, max_results: int = 5, ...) -> PubMedResult
+def build_pubmed_query(genes: list[str], pathways: list[str] | None, disease: str = "colorectal cancer") -> str
 ```
 
 Returns:
@@ -98,19 +115,33 @@ Returns:
 ```
 
 Required behavior:
-- Build query from gene symbols and pathway names.
+- Build query from gene symbols, pathway names, and a disease anchor.
 - Call NCBI E-utilities (esearch + efetch).
 - Return up to `n` relevant results. If fewer relevant results are found, return fewer results instead of padding with unrelated papers.
 - Respect rate limits (3 req/s without key, 10 req/s with `PUBMED_API_KEY`).
+- The disease anchor matters more than it looks: a wrong value does not fail loudly, it returns confident, well-formed papers about the wrong disease. `app/routes.py` extracts the disease/sample context from the conversation once per session (cached after the first success) and passes it through; if nothing has been stated yet, this still falls back to a fixed default (`"colorectal cancer"`) rather than skipping the anchor — see `docs/tech.md` section 8 for this as an open risk.
 
 ### 3.4 Agent Entry Point
 
 ```python
-# rag/agent/__init__.py
+# rag/agent/__init__.py — re-exported from rag/copilot_agent, the real implementation
 def run_agent(gene_objects, message="", label="selection") -> dict
 ```
 
-**Input parameters:**
+This signature is frozen and must not change — it is a thin wrapper around the extensible entry point below, with no `disease` parameter. `app/routes.py` calls the extensible one directly instead so the extracted disease context can actually reach it:
+
+```python
+def run_copilot_agent(
+    question="", roi=None, roi_image=None, deg=None,
+    gene_annotations=None, pathways=None, pubmed=None, config=None, *,
+    label="selection", image_attached=None, max_tool_calls=5,
+    semantic_rerank=False, disease=None, synthesize_answer=False,
+) -> AgentResult   # call .to_legacy_dict() for the same dict shape as run_agent()
+```
+
+`roi_image`/`image_attached` carry the cropped ROI image and whether it actually reached the model — `run_agent()` has no equivalent parameters, so on that path the evidence block states visual claims as conditional rather than asserting either way.
+
+**Input parameters (`run_agent`):**
 
 | Parameter | Type | Description |
 | --- | --- | --- |
@@ -170,19 +201,23 @@ Fallback: if `gene_objects` is empty, the system must clearly state that no ROI-
 
 **DEG extraction is not the agent's decision.** It runs automatically when the user clicks a cluster or draws an ROI in the UI (`app.py`), before any chat message is sent. The gene list is already available by the time the agent runs.
 
-The LangGraph agent in `src/rag/agent/graph.py`:
+The LangGraph agent in `src/rag/copilot_agent/graph.py` (`src/rag/agent/` is a back-compat import path, not the implementation):
 1. Receives the pre-computed gene list (from DEG) along with the user message.
-2. Decides whether to call **pathway_tool** (GO / KEGG enrichment) based on the question.
-3. Decides whether to call **pubmed_tool** (NCBI abstract retrieval) based on the question.
-4. Passes all results to `prompt.py` to build `context_str`.
-5. Returns the structured result dict above.
+2. Decides whether to call **gene_annotation_tool** (NCBI Gene functional summaries) based on the question.
+3. Decides whether to call **pathway_tool** (GO / KEGG enrichment) based on the question.
+4. Decides whether to call **pubmed_tool** (NCBI abstract retrieval) based on the question.
+5. Passes all results, plus the disease/sample context extracted from the conversation (when known), to `prompt.py` to build `context_str`.
+6. Returns the structured result dict above.
 
 Required behavior:
 - `trace` must reflect what the agent actually ran — not a hardcoded list. DEG appears when valid DEG context exists; otherwise the trace should clearly show that DEG context is unavailable.
-- Agent decides pathway and/or PubMed based on the user message — both, one, or neither.
+- Agent decides gene annotation, pathway, and/or PubMed based on the user message — any combination, including none.
 - Must not invent gene functions, pathway names, or citations.
+- A tool's connection failure must be distinguishable from it genuinely finding nothing — both used to collapse into the same "empty" status, silently presenting a network/API failure as if it were a real negative result.
 - If no tools return results, answer only from the available ROI/gene context and clearly state which evidence sources were unavailable.
 - Limit to 5 tool calls per turn to prevent infinite loops.
+- When a vision-capable model is selected, `app/worker.py` attaches the cropped ROI image to the same message carrying `context_str`; the agent does not know for certain whether the image actually reached the model (its own signature carries no image argument), so the prompt instructs the model to describe tissue appearance only if an image is genuinely attached, rather than asserting either way.
+- The disease/sample context is stated explicitly in the evidence block only when it was actually extracted from the conversation — never a guessed default — since asserting an unverified guess risks the same wrong-sample failure this exists to prevent.
 
 ## 5. Chat Interface Behavior
 
@@ -211,3 +246,6 @@ Required behavior:
 | No h5ad loaded | Show a clear “No gene expression data loaded” message; do not present demo genes as ROI analysis |
 | Image too large for memory | Use pyvips streaming |
 | Session file corrupted | Start fresh session; log error |
+| ROI selection erased | Clear the cached gene list and cropped ROI image too, not just the raw coordinates — otherwise chat keeps silently answering about the previous selection |
+| Tool call fails to connect (network/API error) | Report it as an error, distinct from a genuine empty result — both used to look like the same clean "no results" checkmark |
+| Disease/sample context never stated in conversation | The LLM's evidence block stays silent on tissue identity rather than asserting a guess; PubMed's query still falls back to a fixed default disease anchor (open risk, see `docs/tech.md` section 8) |

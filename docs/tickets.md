@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | Group | Class prototype | June 2026 |
 
-## Milestone 1: Project Setup ✓ (Alex — done)
+## Phase 1: Project Setup ✓ (Alex — done)
 
 | **ID** | **Task** | **Status** |
 | --- | --- | --- |
@@ -16,49 +16,49 @@
 | T-006 | Chat UI — AGENT TRACE card, pathway bar chart, DEG bar chart | ✓ Done |
 | T-007 | Folder structure — `src/rag/deg/`, `src/rag/pathway/`, `src/rag/pubmed/`, `src/rag/agent/` | ✓ Done |
 
-## Milestone 2: Preprocessing (src/rag/preprocessing.py)
+## Phase 2: Preprocessing (src/rag/preprocessing.py) ✓ (Zainab — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-033 | Add spot-level QC filtering — minimum genes per spot, maximum mitochondrial gene fraction | Spots below threshold removed before normalization; `min_genes` and `max_mito_pct` are configurable params |
-| T-034 | Store raw counts layer before normalization | `adata.layers["counts"]` present after preprocessing; DEG Wilcoxon test reads from it |
-| T-035 | Cache preprocessed adata to disk | Re-running on same h5ad skips preprocessing and loads cached result in < 1s |
-| T-036 | Write `test_preprocessing.py` | Tests cover: valid h5ad processes without error, missing spatial key raises ValueError, HVG selection reduces gene count, PCA components present in result |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-033 | Add spot-level QC filtering — minimum genes per spot, maximum mitochondrial gene fraction | Spots below threshold removed before normalization; `min_genes` and `max_mito_pct` are configurable params | ✓ Done |
+| T-034 | Store raw counts layer before normalization | `adata.layers["counts"]` present after preprocessing; DEG Wilcoxon test reads from it | ✓ Done |
+| T-035 | Cache preprocessed adata to disk | Re-running on same h5ad skips preprocessing and loads cached result in < 1s | ✓ Done |
+| T-036 | Write `test_preprocessing.py` | Tests cover: valid h5ad processes without error, missing spatial key raises ValueError, HVG selection reduces gene count, PCA components present in result | ✓ Done |
 
-## Milestone 3: Clustering (src/rag/clustering.py)
+## Phase 3: Clustering (src/rag/clustering.py) ✓ (Zainab — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-037 | Expose Leiden resolution as configurable parameter | `run_spatial_clustering()` accepts `resolution` kwarg; default 0.8; stored in cluster JSON |
-| T-038 | Add spatial coordinates as auxiliary features | PCA embedding is augmented with normalized x/y coordinates before clustering; spatially coherent clusters improve visually |
-| T-039 | Support user-specified cluster count | `run_spatial_clustering()` accepts `n_clusters` override; skips auto-estimation when provided |
-| T-040 | Cache cluster results | Skip re-clustering if cluster JSON already exists and h5ad modification time has not changed |
-| T-041 | Write `test_clustering.py` | Tests cover: Leiden runs on small h5ad, KMeans fallback triggers on Leiden failure, palette has correct number of colors, cluster JSON schema is valid |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-037 | Expose Leiden resolution as configurable parameter | `run_spatial_clustering()` accepts `resolution` kwarg; default 0.8; stored in cluster JSON | ✓ Done |
+| T-038 | Add spatial coordinates as auxiliary features | PCA embedding is augmented with normalized x/y coordinates before clustering; spatially coherent clusters improve visually | ✓ Done |
+| T-039 | Support user-specified cluster count | `run_spatial_clustering()` accepts `n_clusters` override; skips auto-estimation when provided | ✓ Done |
+| T-040 | Cache cluster results | Skip re-clustering if cluster JSON already exists and h5ad modification time has not changed | ✓ Done |
+| T-041 | Write `test_clustering.py` | Tests cover: Leiden runs on small h5ad, KMeans fallback triggers on Leiden failure, palette has correct number of colors, cluster JSON schema is valid | ✓ Done |
 
-## Milestone 4: DEG Extraction (src/rag/deg/)
+## Phase 4: DEG Extraction (src/rag/deg/) ✓ (Rodney — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-008 | Add Wilcoxon rank-sum test to `_rank_high_expression_genes()` | `pvalue` field present in each gene dict |
-| T-009 | Add Benjamini-Hochberg correction | `adj_pvalue` field present; genes filtered to adj_pvalue < 0.05 |
-| T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset |
-| T-011 | Write `test_deg.py` | Tests cover cluster selection, ROI selection, empty selection |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-008 | Add Wilcoxon rank-sum test to `_rank_high_expression_genes()` | `pvalue` field present in each gene dict | ✓ Done |
+| T-009 | Add Benjamini-Hochberg correction | `adj_pvalue` field present; genes filtered to adj_pvalue < 0.05 | ✓ Done |
+| T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset | ✓ Done — pre-filter itself works, but this specific target is not met on the real ~137k-spot demo dataset: the reference group for the test stays the full remaining dataset regardless of ROI size, so the dominant cost is total spots × genes, not selection size. See `docs/validation/person2_deg_notes.md`. |
+| T-011 | Write `test_deg.py` | Tests cover cluster selection, ROI selection, empty selection | ✓ Done |
 
-## Milestone 5: Pathway Enrichment (src/rag/pathway/)
+## Phase 5: Pathway Enrichment (src/rag/pathway_enrichment/) ✓ (Quynh — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-012 | Replace mock with real gseapy.enrichr() or g:Profiler API | Returns real GO/KEGG terms with valid adjusted p-values |
-| T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception |
-| T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-012 | Replace mock with real gseapy.enrichr() or g:Profiler API | Returns real GO/KEGG terms with valid adjusted p-values | ✓ Done |
+| T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception | ✓ Done |
+| T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability | ✓ Done |
 
 ### T-012 — Real Pathway Enrichment Backend
 
-**Status:** Todo
+**Status:** Implemented by Quynh
 
-**Current behavior:** `src/rag/pathway/enrichment.py` uses a hardcoded gene-set dictionary, mock p-values, deterministic jitter, and synthetic padding so the UI always has pathway bars.
+**Current behavior:** `src/rag/pathway_enrichment/enrichment.py` runs real ORA against GO Biological Process and KEGG via `gseapy.enrichr()`. `src/rag/pathway/` is a back-compat import path for the current pipeline. Each configured gene-set library is queried in its own separate call and the results merged — Enrichr silently drops every library but one when queried together in a single call.
 
-**Desired behavior:** Replace mock and synthetic pathway output with a documented real enrichment backend for GO and KEGG terms, such as `gseapy.enrichr()`, g:Profiler, Enrichr, or another backend selected by the team.
+**Desired behavior (met):** Replace mock and synthetic pathway output with a documented real enrichment backend for GO and KEGG terms, such as `gseapy.enrichr()`, g:Profiler, Enrichr, or another backend selected by the team.
 
 **Implementation notes:**
 - Preserve `enrich_pathways(genes: list[str], top_n: int = 6) -> list[dict]` where possible.
@@ -80,15 +80,15 @@
 - `test_pathway_success_maps_backend_rows_to_public_schema()`
 - `test_pathway_backend_failure_returns_empty()`
 
-## Milestone 6: PubMed Retrieval (src/rag/pubmed_retrieval/)
+## Phase 6: PubMed Retrieval (src/rag/pubmed_retrieval/) ✓ (Anh — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-015 | Implement NCBI esearch + efetch calls | Returns real abstracts for a gene list |
-| T-016 | Build query string from genes and pathways | Query combines gene symbols and pathway names |
-| T-017 | Handle rate limiting and empty results | Returns `[]` without error; respects API rate limits |
-| T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable |
-| T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-015 | Implement NCBI esearch + efetch calls | Returns real abstracts for a gene list | ✓ Done |
+| T-016 | Build query string from genes and pathways | Query combines gene symbols and pathway names | ✓ Done |
+| T-017 | Handle rate limiting and empty results | Returns `[]` without error; respects API rate limits | ✓ Done |
+| T-018 | Add vector store for semantic search (chromadb or faiss) | Fetched abstracts are embedded and searchable | ✓ Done |
+| T-019 | Write `test_pubmed.py` | Tests cover happy path, empty result, API unavailability | ✓ Done |
 
 **Implementation status:** T-015 through T-019 were implemented by Anh on
 July 23, 2026. The focused suite is in `tests/test_pubmed.py`; live relevance
@@ -125,7 +125,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 
 **Status:** Implemented by Anh on July 23, 2026
 
-**Current behavior:** `semantic_search_abstracts()` lazily indexes the papers from the current `PubMedResult` in ChromaDB, scopes queries to that corpus, preserves PMID metadata, and returns metric-labelled similarity scores. Chroma failures safely return `[]`. The API is implemented and tested, but Person 5/6 still need to call it from the agent/runtime with the user's question.
+**Current behavior:** `semantic_search_abstracts()` lazily indexes the papers from the current `PubMedResult` in ChromaDB, scopes queries to that corpus, preserves PMID metadata, and returns metric-labelled similarity scores. Chroma failures safely return `[]`. `copilot_agent/tools.py`'s `run_pubmed_tool()` now calls it with the user's question when `semantic_rerank` is enabled (`copilot_agent.semantic_rerank` in config, off by default since Chroma's default embedding model downloads a ~79 MB ONNX model on first use).
 
 **Desired behavior:** Implement or wire an optional vector store for semantic search over literature evidence if vector retrieval remains part of the desired RAG architecture.
 
@@ -149,23 +149,23 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 - `test_vector_store_rebuilds_when_index_missing()`
 - `test_vector_store_disabled_falls_back_without_error()`
 
-## Milestone 7: LangGraph Agent (src/rag/agent/)
+## Phase 7: LangGraph Agent (src/rag/copilot_agent/ — src/rag/agent/ is now a back-compat import path) ✓ (JN — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-020 | Define LangChain tools in `tools.py`: `pathway_tool` and `pubmed_tool` | Agent can call both tools (DEG is not a tool — it runs automatically before the agent) |
-| T-021 | Implement real LangGraph agent in `graph.py` | Agent dynamically decides which tools to call based on the message |
-| T-022 | Dynamic `trace` field | `metadata.trace` reflects what the agent actually called, not a fixed list |
-| T-023 | Add max-iteration guard | Agent stops after 5 tool calls |
-| T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-020 | Define LangChain tools in `tools.py`: `pathway_tool` and `pubmed_tool` | Agent can call both tools (DEG is not a tool — it runs automatically before the agent) | ✓ Done — `gene_annotation_tool` was added too, beyond the original two |
+| T-021 | Implement real LangGraph agent in `graph.py` | Agent dynamically decides which tools to call based on the message | ✓ Done |
+| T-022 | Dynamic `trace` field | `metadata.trace` reflects what the agent actually called, not a fixed list | ✓ Done |
+| T-023 | Add max-iteration guard | Agent stops after 5 tool calls | ✓ Done |
+| T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict | ✓ Done |
 
 ### T-021 — Agentic RAG and Dynamic Tool Selection
 
-**Status:** Todo
+**Status:** Implemented by JN
 
-**Current behavior:** `src/rag/agent/graph.py` calls `_run_sequential()`, and `_run_sequential()` always runs pathway enrichment and PubMed retrieval regardless of the user query.
+**Current behavior:** `src/rag/copilot_agent/graph.py` is a real LangGraph state machine (`route` → `run_tool`, looped → `synthesize`) that decides which of gene_annotation_tool/pathway_tool/pubmed_tool to call based on the question — any combination, including none. `_run_sequential()` in `rag/pipeline.py` still exists as an explicit offline fallback when LangGraph is unavailable, per the implementation notes below.
 
-**Desired behavior:** Replace the fixed sequential fallback with LangGraph or equivalent agentic routing so the agent decides whether to call pathway enrichment, PubMed retrieval, both, or neither based on the user query and available DEG/context inputs.
+**Desired behavior (met):** Replace the fixed sequential fallback with LangGraph or equivalent agentic routing so the agent decides whether to call pathway enrichment, PubMed retrieval, both, or neither based on the user query and available DEG/context inputs.
 
 **Implementation notes:**
 - Preserve `run_agent(gene_objects, message="", label="selection") -> dict`.
@@ -191,11 +191,11 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 
 ### T-024 — Agent Test Coverage
 
-**Status:** Todo
+**Status:** Implemented by JN
 
-**Current behavior:** The ticket list names `test_agent.py`, but the current test suite uses pipeline-level tests for the sequential fallback and does not prove dynamic routing behavior.
+**Current behavior:** `tests/test_agent.py` exists and covers the real routing behavior — irrelevant queries skip tools, pathway/literature-specific queries call the right tool, combined queries call multiple tools, trace matches actual calls, and the max-tool-call guard is enforced.
 
-**Desired behavior:** Add focused agent tests that verify the public `run_agent()` contract and tool-selection behavior after T-021 is implemented.
+**Desired behavior (met):** Add focused agent tests that verify the public `run_agent()` contract and tool-selection behavior after T-021 is implemented.
 
 **Implementation notes:**
 - Mock pathway and PubMed tools so tests prove routing without requiring network calls.
@@ -213,31 +213,31 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 - `test_agent_no_gene_objects_uses_demo_fallback_when_configured()`
 - `test_agent_tool_errors_do_not_crash_turn()`
 
-## Milestone 8: Prompt Engineering (src/rag/agent/prompt.py)
+## Phase 8: Prompt Engineering (src/rag/copilot_agent/prompt.py) ✓ (JN — done)
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-025 | Improve `build_prompt_context()` with domain framing | LLM identifies cell type, pathway activity, and clinical relevance |
-| T-026 | Add structured citation instructions | LLM cites papers inline as [1], [2] consistently |
-| T-027 | Test prompts against demo dataset | Responses are biologically relevant for the demo data |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-025 | Improve `build_prompt_context()` with domain framing | LLM identifies cell type, pathway activity, and clinical relevance | ✓ Done — as `build_evidence_context()` |
+| T-026 | Add structured citation instructions | LLM cites papers inline as [1], [2] consistently | ✓ Done |
+| T-027 | Test prompts against demo dataset | Responses are biologically relevant for the demo data | ✓ Done — see `docs/validation/person5_prompt_notes.md` |
 
-## Milestone 9: Demo Data & Evaluation
+## Phase 9: Demo Data & Evaluation
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-028 | Download and validate spatial omics demo dataset | h5ad loads, spots overlay correctly, clustering runs |
-| T-029 | End-to-end test with real data | Draw ROI → DEG → pathway → PubMed → streamed answer with citations |
-| T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type |
-| T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response |
-| T-032 | Freeze final submission | Repo, docs, and demo complete |
-| T-044 | Replace domain-inappropriate demo fallback genes | Empty ROI/no h5ad paths clearly say no gene context, or use only explicitly labeled CRC/demo-dataset genes |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-028 | Download and validate spatial omics demo dataset | h5ad loads, spots overlay correctly, clustering runs | ✓ Done — 10x Visium HD Human Colon Cancer dataset in `data/demo/` |
+| T-029 | End-to-end test with real data | Draw ROI → DEG → pathway → PubMed → streamed answer with citations | ✓ Done — verified live against the demo dataset, plus `tests/test_e2e_pipeline.py` |
+| T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type | Partially done — see `docs/validation/person2_deg_notes.md` and `docs/validation/person3_pathway_notes.md`; no single end-to-end write-up yet |
+| T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response | Todo |
+| T-032 | Freeze final submission | Repo, docs, and demo complete | Todo |
+| T-044 | Replace domain-inappropriate demo fallback genes | Empty ROI/no h5ad paths clearly say no gene context, or use only explicitly labeled CRC/demo-dataset genes | ✓ Done |
 
-## Milestone 10: RAG Runtime Boundary and Test Hygiene
+## Phase 10: RAG Runtime Boundary and Test Hygiene
 
-| **ID** | **Task** | **Done When** |
-| --- | --- | --- |
-| T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status |
-| T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup |
+| **ID** | **Task** | **Done When** | **Status** |
+| --- | --- | --- | --- |
+| T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status | Todo |
+| T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup | Partially done |
 
 ### T-042 — Async / Background Execution Boundary for Real RAG APIs
 
@@ -269,9 +269,9 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 
 ### T-043 — RAG Test Documentation Cleanup
 
-**Status:** Todo
+**Status:** Partially done — `test_agent.py` now exists (T-024); `test_upload.py` still does not.
 
-**Current behavior:** Some ticket/rule references name test files that are not currently present, including `test_agent.py` and `test_upload.py`, while related coverage lives in files such as `test_pipeline.py`, `test_inference.py`, and `test_feature_slice_upload.py`.
+**Current behavior:** `tests/test_agent.py` exists and covers routing behavior in full (see T-024). `test_upload.py` is still not present — general upload coverage lives in `test_feature_slice_upload.py` (scoped to the h5 converter script only, not general image/h5ad upload) and `test_pipeline.py`/`test_inference.py`.
 
 **Desired behavior:** Reconcile stale test references after the implementation tickets above are completed, without weakening the desired product/spec/rule targets.
 
@@ -294,9 +294,9 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 
 ### T-044 — Remove or Relabel Demo Gene Fallback
 
-**Status:** Todo
+**Status:** Done
 
-**Current behavior:** Some fallback paths may substitute a small demo gene list when no valid ROI/h5ad DEG context is available.
+**Current behavior:** No h5ad/empty ROI returns a clear "no gene expression data loaded" message; `test_agent_no_gene_objects_reports_no_data_instead_of_demo_genes` in `tests/test_agent.py` covers this directly. No fallback path substitutes unrelated demo genes as if they were real ROI evidence.
 
 **Desired behavior:** Empty ROI or missing h5ad cases should not appear as real ROI-specific biology. The system should either show a clear no-gene-context message or use only explicitly labeled demo-mode genes appropriate for the selected demo dataset.
 
