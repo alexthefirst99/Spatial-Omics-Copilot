@@ -22,17 +22,17 @@
 
 - **`src/rag/` is pure analysis** — no HTTP handling, no streaming, no session writes.
 - **`app/` owns the LLM call** — `worker.py` calls `inference.py` directly. No code inside `src/rag/` should call the LLM or import from `app/`.
-- **One entry point for chat** — only `routes.py` calls `run_agent`. `app.py` calls `rag.deg` directly (for the gene popup on selection). Never import other RAG submodules (`rag.pathway`, `rag.pubmed`, etc.) from outside the RAG layer.
+- **One entry point for chat** — only `routes.py` calls into the agent (`run_copilot_agent`, or the frozen `run_agent` wrapper). `app.py` calls `rag.deg` directly (for the gene popup on selection). Never import other RAG submodules (`rag.pathway`, `rag.pubmed`, etc.) from outside the RAG layer.
 - **`run_agent()` owns the output contract** — whatever is inside `src/rag/copilot_agent/graph.py` is JN's business (`src/rag/agent/graph.py` is now a deprecated shim that re-exports from it). The output dict format must not change.
 
 ## 4. RAG Module Rules
 
-- Each submodule (`deg/`, `pathway_enrichment/`, `pubmed_retrieval/`, `copilot_agent/` — plus the `pathway/`, `pubmed/`, `agent/` back-compat import paths) exposes its public function only through its `__init__.py`.
+- Each submodule (`deg/`, `pathway_enrichment/`, `gene_annotation/`, `pubmed_retrieval/`, `copilot_agent/` — plus the `pathway/`, `pubmed/`, `agent/` back-compat import paths) exposes its public function only through its `__init__.py`.
 - Output formats are fixed — see `docs/specs.md` section 3 for each module's contract.
 - Adding extra fields to output dicts is allowed; removing or renaming existing fields is not.
 - Return empty lists or `None` on failure — never raise unhandled exceptions from a tool.
 - DEG extraction is not the agent's decision — it runs automatically when the user selects a cluster or ROI in the UI.
-- The agent decides whether to call pathway_tool and/or pubmed_tool based on the user message.
+- The agent decides whether to call gene_annotation_tool, pathway_tool, and/or pubmed_tool based on the user message.
 - The agent must not invent gene functions, pathway names, or paper citations.
 - Only cite PMIDs that were actually returned by the PubMed tool in that turn.
 - Limit the agent to a maximum of 5 tool calls per turn to prevent infinite loops.
@@ -63,6 +63,7 @@
 | `test_deg.py` | ROI / cluster correctly selects spots and returns gene list |
 | `test_pubmed.py` | PubMed tool returns expected schema; handles empty results |
 | `test_pathway.py` | Pathway tool returns expected schema; handles empty gene list |
+| `test_gene_annotation.py` | Gene annotation tool returns expected schema; handles empty/unresolved gene lists |
 | `test_agent.py` | Agent calls tools and returns complete output dict |
 | `test_session.py` | Session read/write correct under concurrent access |
 | `test_upload.py` | h5ad upload validates spatial coordinates; rejects invalid files |

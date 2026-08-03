@@ -232,6 +232,8 @@ spatial-omics-copilot/
 │       ├── agent/               # back-compat re-export of copilot_agent.run_agent
 │       ├── pathway/              # back-compat import path for pathway_enrichment
 │       └── pubmed/               # back-compat import path for pubmed_retrieval
+│   └── tests/                    # niceview/app-layer tests (upload, clustering, DEG, session, ...)
+├── tests/                        # RAG-layer tests (agent, pathway, pubmed, gene annotation, e2e pipeline)
 ├── packages/
 │   └── dash_viv_viewer/         # VivViewer React component package
 ├── data/                        # local runtime files

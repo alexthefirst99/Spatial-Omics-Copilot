@@ -284,7 +284,7 @@ worker.py  → appends context_str to messages, attaches ROI crop if a vision
 | RAG / Agents | LangGraph state machine with dynamic tool selection (`copilot_agent/graph.py`); sequential fallback (`pipeline._run_sequential()`) for offline/no-LangGraph use |
 | Pathway | Real ORA via `gseapy`/Enrichr against GO Biological Process and KEGG |
 | Gene annotation | Real NCBI Gene ESearch/ESummary retrieval |
-| Literature | PubMed E-utilities ESearch + EFetch, called directly in the request path (see Technical Risks — not yet backgrounded) |
+| Literature | PubMed E-utilities ESearch + EFetch (called synchronously in the request path — see Technical Risks) |
 | Vector store | ChromaDB, optional semantic re-ranking of retrieved abstracts |
 | Certificates | `pip-system-certs` — makes `requests`/`urllib3` trust the OS certificate store, needed on networks with a TLS-inspecting firewall (e.g. a hospital network) whose CA the OS trusts but `certifi`'s bundled list does not |
 | Session | fcntl, json |
@@ -326,7 +326,7 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 | Gigapixel image OOM | pyvips streaming — never load full image into RAM |
 | LLM hallucinating citations | Only cite PMIDs returned by PubMed tool |
 | PubMed rate limit or outage | Shared rate limiter, bounded Retry-After/backoff, optional `PUBMED_API_KEY`, and safe empty results |
-| Real gene-annotation/pathway/PubMed calls run synchronously in the request path | Still open (T-042) — needs to move into background work with timeout, retry, and user-visible status before the final demo |
+| Real gene-annotation/pathway/PubMed calls run synchronously in the request path, ahead of the background job queue | Accepted risk — hasn't caused a real problem in practice (calls are fast and reliable so far); would need a background-execution boundary with timeout/retry if a slow or hanging external call ever blocks a request |
 | A tool's genuine connection failure could look identical to "found nothing" | Fixed — all three tools (pathway, gene annotation, PubMed) distinguish a real failure (their status message contains "unavailable") from a successful-but-empty result, reporting the former as an error instead of a clean checkmark |
 | Wrong disease/tissue context silently produces confident, well-formed results for the wrong sample | Mitigated for the LLM's own reasoning (disease context is extracted from the conversation and only ever stated when actually known, never asserted as a guess) — but PubMed's query still falls back to a fixed default (`"colorectal cancer"`) when nothing has been extracted yet, so it can still anchor on the wrong disease if the sample is never mentioned in chat |
 | External literature query discloses derived research terms | Use HTTPS POST; disclose that genes/pathways/disease are sent to NCBI and add consent/opt-out in the UI |

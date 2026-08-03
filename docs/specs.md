@@ -7,8 +7,8 @@
 3. Researcher optionally uploads an h5ad file; app runs spatial clustering and overlays colored spots.
 4. Researcher clicks a cluster or draws an ROI polygon on the tissue.
 5. App runs DEG automatically and caches the gene list (`cluster_context.json` or `roi_context.json`).
-6. When a chat message is sent, `routes.py` calls `run_agent(gene_objects, message, label)`.
-7. Agent decides whether to call pathway_tool and/or pubmed_tool based on the question; results are formatted into a context string injected into the LLM prompt.
+6. When a chat message is sent, `routes.py` calls `run_copilot_agent(question, deg, label, disease, ...)` directly (the extensible entry point, not the frozen `run_agent()` — see section 3.4).
+7. Agent decides whether to call gene_annotation_tool, pathway_tool, and/or pubmed_tool based on the question; results are formatted into a context string injected into the LLM prompt.
 8. LLM response streams token by token to the chat interface.
 9. Chat UI shows AGENT TRACE card, pathway bar chart, DEG bar chart, then streamed text.
 10. Researcher can ask follow-up questions; agent continues with full region context.

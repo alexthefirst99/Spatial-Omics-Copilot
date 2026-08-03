@@ -227,28 +227,42 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 | --- | --- | --- | --- |
 | T-028 | Download and validate spatial omics demo dataset | h5ad loads, spots overlay correctly, clustering runs | ✓ Done — 10x Visium HD Human Colon Cancer dataset in `data/demo/` |
 | T-029 | End-to-end test with real data | Draw ROI → DEG → pathway → PubMed → streamed answer with citations | ✓ Done — verified live against the demo dataset, plus `tests/test_e2e_pipeline.py` |
-| T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type | Partially done — see `docs/validation/person2_deg_notes.md` and `docs/validation/person3_pathway_notes.md`; no single end-to-end write-up yet |
-| T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response | Todo |
+| T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type | ✓ Done — see `docs/validation/person2_deg_notes.md` and `docs/validation/person3_pathway_notes.md` |
+| T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response | ✓ Done |
 | T-032 | Freeze final submission | Repo, docs, and demo complete | Todo |
 | T-044 | Replace domain-inappropriate demo fallback genes | Empty ROI/no h5ad paths clearly say no gene context, or use only explicitly labeled CRC/demo-dataset genes | ✓ Done |
+| T-045 | Add automated test coverage for h5ad upload validation | `test_upload.py` exercises spatial-key validation, non-.h5ad rejection, and the empty-filenames no-op | ✓ Done — see `src/tests/test_upload.py` |
+
+### T-044 — Remove or Relabel Demo Gene Fallback
+
+**Status:** Done
+
+**Current behavior:** No h5ad/empty ROI returns a clear "no gene expression data loaded" message; `test_agent_no_gene_objects_reports_no_data_instead_of_demo_genes` in `tests/test_agent.py` covers this directly. No fallback path substitutes unrelated demo genes as if they were real ROI evidence.
+
+**Desired behavior:** Empty ROI or missing h5ad cases should not appear as real ROI-specific biology. The system should either show a clear no-gene-context message or use only explicitly labeled demo-mode genes appropriate for the selected demo dataset.
+
+**Acceptance criteria:**
+- No h5ad loaded returns a clear message instead of silently using demo genes.
+- ROI with no spots returns an empty gene list and explanatory status.
+- Demo fallback, if enabled, is explicitly labeled and not presented as ROI evidence.
 
 ## Phase 10: RAG Runtime Boundary and Test Hygiene
 
 | **ID** | **Task** | **Done When** | **Status** |
 | --- | --- | --- | --- |
 | T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status | Todo |
-| T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup | Partially done |
+| T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup | ✓ Done |
 
 ### T-042 — Async / Background Execution Boundary for Real RAG APIs
 
 **Status:** Todo
 
-**Current behavior:** `routes.py` calls `run_agent()` before enqueueing the chat job. This is acceptable for mock/fallback code but will block the request path once real PubMed, pathway, or vector APIs are enabled.
+**Current behavior:** `routes.py` calls the agent (`run_copilot_agent()`) before enqueueing the chat job. This is acceptable for mock/fallback code but will block the request path once real PubMed, pathway, or vector APIs are enabled.
 
 **Desired behavior:** Move real external RAG calls out of the main Flask request path and align execution with the background-worker expectations in the architecture rules.
 
 **Implementation notes:**
-- Decide whether `run_agent()` runs inside `worker.py`, a dedicated RAG executor, or another background task abstraction.
+- Decide whether the agent call (`run_copilot_agent()`) runs inside `worker.py`, a dedicated RAG executor, or another background task abstraction.
 - Return meaningful UI/API status while RAG retrieval and LLM generation are pending.
 - Add timeouts, bounded retries, and clear failure messages for PubMed, enrichment, and vector-store operations.
 - Preserve existing chat session persistence and streaming behavior.
@@ -269,9 +283,9 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 
 ### T-043 — RAG Test Documentation Cleanup
 
-**Status:** Partially done — `test_agent.py` now exists (T-024); `test_upload.py` still does not.
+**Status:** Done — `test_agent.py` now exists (T-024); `test_upload.py` now exists too (T-045).
 
-**Current behavior:** `tests/test_agent.py` exists and covers routing behavior in full (see T-024). `test_upload.py` is still not present — general upload coverage lives in `test_feature_slice_upload.py` (scoped to the h5 converter script only, not general image/h5ad upload) and `test_pipeline.py`/`test_inference.py`.
+**Current behavior:** `tests/test_agent.py` exists and covers routing behavior in full (see T-024). `src/tests/test_upload.py` exists and covers h5ad spatial-key validation, non-`.h5ad` rejection, and the empty-filenames no-op (see T-045) — general upload coverage also lives in `test_feature_slice_upload.py` (scoped to the h5 converter script) and `test_pipeline.py`/`test_inference.py`.
 
 **Desired behavior:** Reconcile stale test references after the implementation tickets above are completed, without weakening the desired product/spec/rule targets.
 
@@ -290,17 +304,3 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 **Suggested tests:**
 - No runtime test required for the docs cleanup itself.
 - Run the full existing pytest suite after adding or renaming tests.
-
-
-### T-044 — Remove or Relabel Demo Gene Fallback
-
-**Status:** Done
-
-**Current behavior:** No h5ad/empty ROI returns a clear "no gene expression data loaded" message; `test_agent_no_gene_objects_reports_no_data_instead_of_demo_genes` in `tests/test_agent.py` covers this directly. No fallback path substitutes unrelated demo genes as if they were real ROI evidence.
-
-**Desired behavior:** Empty ROI or missing h5ad cases should not appear as real ROI-specific biology. The system should either show a clear no-gene-context message or use only explicitly labeled demo-mode genes appropriate for the selected demo dataset.
-
-**Acceptance criteria:**
-- No h5ad loaded returns a clear message instead of silently using demo genes.
-- ROI with no spots returns an empty gene list and explanatory status.
-- Demo fallback, if enabled, is explicitly labeled and not presented as ROI evidence.
