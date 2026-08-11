@@ -151,11 +151,11 @@ from niceview.interface.interface import (
 HOST = '0.0.0.0'
 workdir = setup_work_dir()
 parser = argparse.ArgumentParser(description='Run Dash app.')
-parser.add_argument('-port', type=int, default=8080, help='Port to run the app on')
-parser.add_argument('-wd', type=str, default=workdir, help='Working directory for the app')
-parser.add_argument("-workspace", type=str, default=None, help='Workspace slug used in the app URL')
-parser.add_argument("-token", type=str, default=None, help='Deprecated alias for -workspace')
-parser.add_argument("-hot-reload", action="store_true", help="Enable Dash hot reload while developing")
+parser.add_argument('--port', type=int, default=8080, help='Port to run the app on')
+parser.add_argument('--wd', type=str, default=workdir, help='Working directory for the app')
+parser.add_argument("--workspace", type=str, default=None, help='Workspace slug used in the app URL')
+parser.add_argument("--token", type=str, default=None, help='Deprecated alias for --workspace')
+parser.add_argument("--hot-reload", action="store_true", help="Enable Dash hot reload while developing")
 args = parser.parse_args()
 args.workspace = args.workspace or args.token or "demo"
 args.hot_reload = args.hot_reload or get_bool("app.hot_reload", default=False, env="COPILOT_HOT_RELOAD")
