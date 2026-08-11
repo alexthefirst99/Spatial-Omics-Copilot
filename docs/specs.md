@@ -16,7 +16,7 @@
 ## 2. Data Input Contract
 
 | **Input** | **Format** | **Required Behavior** |
-| --- | --- | --- |
+| -- | -- | -- |
 | Whole-slide image | .tiff, .ome.tiff, .svs | Convert to pyramidal OME-TIFF; render via VivViewer |
 | Gene expression | .h5ad | Validate `adata.obsm["spatial"]`; run clustering; overlay spots |
 | Cluster selection | cluster label string | `app.py` calls DEG immediately; gene list cached to `cluster_context.json` |
@@ -144,7 +144,7 @@ def run_copilot_agent(
 **Input parameters (`run_agent`):**
 
 | Parameter | Type | Description |
-| --- | --- | --- |
+| -- | -- | -- |
 | `gene_objects` | `list[dict]` | Pre-computed DEG result from `app.py`. Each dict has `"gene"` (str) and `"log2_fold_change"` (float). Pass `[]` only when no valid DEG context is available. DEG is **not** run inside `run_agent` — it runs automatically in `app.py` when the user selects a cluster or ROI. |
 | `message` | `str` | User's chat message. The real agent uses this to decide which tools to call and to build smarter PubMed queries. |
 | `label` | `str` | Human-readable region label for UI headers, e.g. `"Cluster 5"`, `"ROI"`, `"demo"`. |
@@ -237,7 +237,7 @@ Required behavior:
 ## 7. Edge Cases
 
 | **Edge Case** | **Expected Behavior** |
-| --- | --- |
+| -- | -- |
 | ROI contains no spots | Return empty gene list; explain that no spatial expression spots were found in the ROI |
 | Pathway API unavailable | Return empty list; agent answers from gene context only |
 | PubMed returns no results | Return empty list; inform user |

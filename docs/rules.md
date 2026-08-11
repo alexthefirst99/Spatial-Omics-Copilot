@@ -59,7 +59,7 @@
 ## 8. Testing Rules
 
 | **Test** | **Purpose** |
-| --- | --- |
+| -- | -- |
 | `test_deg.py` | ROI / cluster correctly selects spots and returns gene list |
 | `test_pubmed.py` | PubMed tool returns expected schema; handles empty results |
 | `test_pathway.py` | Pathway tool returns expected schema; handles empty gene list |

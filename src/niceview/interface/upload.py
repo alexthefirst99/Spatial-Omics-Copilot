@@ -86,9 +86,6 @@ def _start_spatial_clustering_background(stored_path, cluster_path, state_path, 
     return thread
 
 
-## Note: all the temp data is the original size, the no temp data is resized (if apply)
-
-# upload HE image
 def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=None, finalize_status=True):
     """
     Uploads the HE image and copy it to data path, then create client.
@@ -101,27 +98,23 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
         None
     """
 
-    # get thor parameter and all user input info
     print(f"DEBUG_CHECKPOINT: Entered upload_image with {filenames_upload_image} job_id={job_id}", flush=True)
     data_path, cache_path = get_data_path_cache_path(work_dir)
     thor, args, p_input_json = get_parameter(folder_id, work_dir)
 
-    # If job_id provided, use it. Otherwise try to extract from path or gen new one.
     upload_path = filenames_upload_image[0]
     upload_uuid = job_id
 
     if not upload_uuid:
-        # Fallback logic
         upload_uuid = None
 
-    # Try to extract UUID from local path pattern: .../data_input_temp/tmp/<uuid>/filename
+    # Recover the upload ID from current and legacy path layouts.
     if "data_input_temp/tmp/" in upload_path:
         try:
             after = upload_path.split("data_input_temp/tmp/", 1)[1]
             upload_uuid = after.split("/")[0]
         except Exception:
             pass
-    # Fallback: legacy S3 pattern .../uploads/<uuid>/filename
     elif "/uploads/" in upload_path:
         parts = upload_path.split("/")
         try:
@@ -131,22 +124,17 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
         except Exception:
             pass
 
-    # Fallback to new UUID if extraction fails (shouldn't happen with our JS)
     if not upload_uuid:
         upload_uuid = str(uuid.uuid1())
 
-    # Use extracted UUID as sample_id? Or keep using uuid1?
-    # Original logic used uuid1(). Let's stick to extraction for consistency with frontend progress bar.
     sample_id = upload_uuid
 
     status_store.update_status(upload_uuid, 0, "Wait for file check...")
 
-    # get basename of upload image
     basename = os.path.splitext(os.path.basename(filenames_upload_image[0]))[0]
 
     print(f"DEBUG: Callback triggered for {upload_uuid}. Path: {filenames_upload_image[0]}")
 
-    # wait and chech if file exist in folder
     status_store.update_status(upload_uuid, 5, "Checking file availability...")
     print(f"DEBUG_CHECKPOINT: Checking vio.exists for {filenames_upload_image[0]}", flush=True)
     while not vio.exists(filenames_upload_image[0]):
@@ -156,7 +144,6 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
     print("DEBUG: File found. Starting processing.")
     status_store.update_status(upload_uuid, 20, "Processing Data Dimensions...")
 
-    # get the height and width of image to calculate max dimension
     print(f"DEBUG_CHECKPOINT: Calling thor.process_data for {filenames_upload_image[0]}", flush=True)
     try:
         height, width = thor.process_data(sample_id, img_path=filenames_upload_image[0])
@@ -165,7 +152,6 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
         print(f"DEBUG: process_data FAILED: {e}")
         raise e
 
-    # update it in user argument file
     args["heightWidth"] = [height, width]
 
     args['sampleId'] = sample_id
@@ -173,7 +159,6 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
     args.pop("tutorialImagePath", None)
     dumpjson_parameter_from_user_input(folder_id, work_dir, args=args)
 
-    # get the name rules for further calculation, then copy it to data path
     files = files_generate(sample_id)
 
     src_path = filenames_upload_image[0]
@@ -181,28 +166,23 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
     print(f"DEBUG: Copying from {src_path} to {dst_path}")
     vio.copy(src_path, dst_path)
 
-    # calculate wsi of image BEFORE deleting the local file to avoid S3 re-download
+    # Build the WSI before deleting the local source to avoid another download.
     status_store.update_status(upload_uuid, 50, "Generating WSI Tiling...")
     print("DEBUG: Calling get_wsi...")
     get_wsi(folder_id, work_dir, local_img_path=src_path)
 
     status_store.update_status(upload_uuid, 80, "Cleaning temporary upload...")
     try:
-        # Cleanup S3 upload - delay deletion until end so all funcs can use local path
         if src_path and os.path.exists(src_path):
             print(f"DEBUG: Removing original upload {src_path}")
             vio.remove(src_path)
 
-        # CLEANUP: Delete the local uploaded file and its folder
         try:
             if upload_path and os.path.exists(upload_path):
-                # Only delete if it is NOT an S3 path (which starts with s3://)
-                # dash_uploader provides local paths like /path/to/upload_dir/...
                 if not upload_path.startswith("s3://"):
                     os.remove(upload_path)
                     print(f"DEBUG: Deleted local data_input_temp file: {upload_path}")
 
-                    # Try to remove the parent directory if empty (Dash Uploader creates one folder per upload)
                     parent_dir = os.path.dirname(upload_path)
                     if not os.listdir(parent_dir):
                         os.rmdir(parent_dir)
@@ -210,8 +190,6 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
         except Exception as e:
             print(f"WARNING: Failed to cleanup local file {upload_path}: {e}")
 
-        # Some callers do additional post-processing before the upload should
-        # be considered complete.
         if finalize_status:
             status_store.update_status(upload_uuid, 100, "Complete")
     except Exception as e:

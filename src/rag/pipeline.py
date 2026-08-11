@@ -72,17 +72,17 @@ def _run_sequential(
 
     genes = [g["gene"] for g in gene_objects]
 
-    # --- 1. Pathway Enrichment ---
+    # -- 1. Pathway Enrichment --
     pathways = enrich_pathways(genes, top_n=n_pathways)
 
-    # --- 2. PubMed Retrieval ---
+    # -- 2. PubMed Retrieval --
     pathway_names = [p["name"] for p in pathways]
     abstracts = retrieve_abstracts(genes, pathways=pathway_names, n=n_abstracts)
 
-    # --- 3. LLM Context ---
+    # -- 3. LLM Context --
     context_str = build_prompt_context(genes, pathways, abstracts, label=label)
 
-    # --- Build UI metadata ---
+    # -- Build UI metadata --
     trace = [
         {
             "step": "Extracted top DEGs",
@@ -136,9 +136,9 @@ def _run_sequential(
     }
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Real integration pipeline (T-029, T-042, T-045, T-052)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -428,10 +428,7 @@ def run_integration_pipeline(
     if image_path:
         roi_image_result = prepare_roi_image_for_llm(image_path, resolved_roi, config)
 
-    # run_roi_deg only understands a boolean mask, a bare polygon list, or a
-    # dict with a "coords" key (rag.deg.extraction._resolve_selection_mask) —
-    # not a ROISelection. Convert the barcodes we already resolved into a
-    # mask aligned to clustered_path's obs order instead of re-deriving them.
+    # run_roi_deg needs a mask aligned to the clustered AnnData observations.
     deg_selection: Any = resolved_roi
     if resolved_roi.barcode_ids:
         import anndata as ad

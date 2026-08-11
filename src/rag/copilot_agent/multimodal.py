@@ -35,9 +35,7 @@ _VISION_MARKERS = (
     "vision",      # llama-3.2-90b-vision-instruct
     "llava",
     "pixtral",
-    # Gemma 3 and 4 are multimodal; Gemma 1 and 2 are not, so the generation
-    # is part of the marker. Verified live against DeepInfra:
-    # google/gemma-4-26B-A4B-it correctly described an image sent as a data URI.
+    # Gemma 3 and 4 are multimodal; earlier generations are not.
     "gemma-3",
     "gemma-4",
     "internvl",
@@ -166,11 +164,7 @@ def build_multimodal_prompt_payload(
         plain string content and ``image_included`` is False.
     """
 
-    # Resolve through the same path the LLM client uses. Reading only the
-    # config here would disagree with llm.resolve_model, which checks the
-    # environment first — and this project's model lives in .env as LLM_MODEL.
-    # That mismatch silently decided "no vision" and dropped the ROI crop while
-    # the client went on to call a vision-capable model.
+    # Use the client's resolution order so vision detection sees env overrides.
     model_name = (model or "").strip() or resolve_model(config)
     crop_path = adapters.clean_text(adapters.get_field(roi_image, "crop_path"))
 

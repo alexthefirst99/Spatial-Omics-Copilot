@@ -20,9 +20,9 @@ from math import isfinite
 from typing import Any
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Shared coercion helpers (moved from rag.copilot_agent.models)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def _as_text(value: object) -> str:
@@ -56,9 +56,9 @@ def _as_int(value: object, default: int = 0) -> int:
         return default
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Preprocessing (T-035) / Clustering (T-040)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,9 +100,9 @@ class ClusterResult:
         }
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # ROI selection (T-052) / ROI image preparation (T-045)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 @dataclass(slots=True)
@@ -160,9 +160,9 @@ class ROIImageResult:
         }
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # DEG (T-008 / T-009 / T-044) — canonical home; rag.deg.models re-exports these
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 # Generic outcomes shared with the agent's tool-call statuses below.
 STATUS_OK = "ok"
@@ -171,10 +171,7 @@ STATUS_ERROR = "error"
 # DEG-specific outcomes.
 STATUS_NO_DATA = "no_data"
 STATUS_EMPTY_SELECTION = "empty_selection"
-# No spot barcode in the dataset appeared in the cluster assignment at all,
-# which means the two files describe different datasets. Distinct from
-# STATUS_EMPTY_SELECTION, where the barcodes matched and the cluster is simply
-# empty.
+# The dataset and cluster assignment share no barcodes.
 STATUS_BARCODE_MISMATCH = "barcode_mismatch"
 STATUS_NO_SIGNIFICANT = "no_significant_genes"
 STATUS_INVALID_INPUT = "invalid_input"
@@ -328,10 +325,10 @@ class DEGResult:
         return payload
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Agent (T-020 - T-023, T-046, T-047) — canonical home; rag.copilot_agent.models
 # re-exports these
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 # Trace icons. app/assets/chat.js never reads trace[].icon — every row gets a
 # hardcoded green check — so these are advisory metadata for future UI work.

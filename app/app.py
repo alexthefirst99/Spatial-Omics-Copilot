@@ -1,7 +1,7 @@
 import argparse
 import os
 
-# GDAL optimizations for local TIFF access
+# Avoid costly directory scans when opening local TIFFs.
 os.environ["GDAL_DISABLE_READDIR_ON_OPEN"] = "EMPTY_DIR"
 os.environ["VSI_CACHE"] = "TRUE"
 os.environ["VSI_CACHE_SIZE"] = "536870912"  # 512MB
@@ -48,9 +48,7 @@ import base64
 import mimetypes
 import ssl
 
-# ----------------------------------------------------------------------------
-# LOCAL CONFIG
-# ----------------------------------------------------------------------------
+# Local paths
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_APP_DIR, '..'))
 _DATA_DIR = os.path.join(_PROJECT_ROOT, 'data')
@@ -60,11 +58,9 @@ if _LOCAL_DASH_VIV_VIEWER not in sys.path:
 
 from app.config import get_bool, get_config, get_path
 
-# Directory for chat session JSON files
 CHAT_DIR = get_path('paths.chat_dir', os.path.join(_DATA_DIR, 'chat_sessions'), env='COPILOT_CHAT_DIR')
 os.makedirs(CHAT_DIR, exist_ok=True)
 
-# Tutorial image path is configured in config/app.yaml.
 TUTORIAL_IMAGE_PATH = get_path(
     'paths.tutorial_image',
     os.path.join(_PROJECT_ROOT, 'tutorial', 'loki_tutorial_hskin_melanoma_downsampled.ome.tif'),
@@ -73,11 +69,9 @@ TUTORIAL_IMAGE_PATH = get_path(
 TUTORIAL_SAMPLE_ID = "copilot-tutorial"
 TUTORIAL_SAMPLE_ID_FILE = "copilot-tutorial-file-name"
 
-# Base directory for temp/cache files (use /tmp or a configurable path)
 TMP_BASE = get_path('paths.tmp_base', os.path.join(_PROJECT_ROOT, 'tmp_data'), env='COPILOT_TMP_BASE')
 os.makedirs(TMP_BASE, exist_ok=True)
 
-# Import custom layout and utilities
 try:
     from app.layout import create_layout
     from app.utils import setup_work_dir
@@ -88,7 +82,6 @@ except ImportError:
     from utils import setup_work_dir
     import niceview.utils.io as vio
 
-# Import sub-modules
 try:
     from app.inference import DEFAULT_OLLAMA_MODEL, run_model_inference
     from app.session import (
@@ -130,9 +123,6 @@ except ImportError:
     )
     from routes import register_chat_routes
 
-# Import tile server
-# localtileserver removed - VivViewer serves OME-TIFFs directly
-
 def add_workspace_to_map(workspace, port):
     os.makedirs(_DATA_DIR, exist_ok=True)
     map_path = get_path('paths.workspace_map', os.path.join(_DATA_DIR, "workspace_map.json"), env='COPILOT_WORKSPACE_MAP')
@@ -148,7 +138,6 @@ def add_workspace_to_map(workspace, port):
     os.replace(tmp_path, map_path)
 
 gene_chosen = None
-# Import custom interface logic
 from niceview.interface.callback import (
     upload_image, upload_spatial_h5ad, reset, save_roi, clear_cache_forcall
 )
@@ -159,38 +148,30 @@ from niceview.interface.interface import (
     dump_default_para_arg, add_workspace_mapping
 )
 
-# Parse arguments
 HOST = '0.0.0.0'
 workdir = setup_work_dir()
 parser = argparse.ArgumentParser(description='Run Dash app.')
-parser.add_argument('--port', type=int, default=8080, help='Port to run the app on')
-parser.add_argument('--wd', type=str, default=workdir, help='Working directory for the app')
-parser.add_argument("--workspace", type=str, default=None, help='Workspace slug used in the app URL')
-parser.add_argument("--token", type=str, default=None, help='Deprecated alias for --workspace')
-parser.add_argument("--hot-reload", action="store_true", help="Enable Dash hot reload while developing")
+parser.add_argument('-port', type=int, default=8080, help='Port to run the app on')
+parser.add_argument('-wd', type=str, default=workdir, help='Working directory for the app')
+parser.add_argument("-workspace", type=str, default=None, help='Workspace slug used in the app URL')
+parser.add_argument("-token", type=str, default=None, help='Deprecated alias for -workspace')
+parser.add_argument("-hot-reload", action="store_true", help="Enable Dash hot reload while developing")
 args = parser.parse_args()
 args.workspace = args.workspace or args.token or "demo"
 args.hot_reload = args.hot_reload or get_bool("app.hot_reload", default=False, env="COPILOT_HOT_RELOAD")
 add_workspace_to_map(args.workspace, args.port)
 
 
-# ----------------------------------------------------------------------------
-# DASH APP
-# ----------------------------------------------------------------------------
-
-
 def main():
-    # Setup paths and IDs
     WORKSPACE_ID = args.workspace
     APP_BASE_PATH = f"/workspaces/{WORKSPACE_ID}"
     work_dir = args.wd
     folder_id = ""
     app_dir = os.path.dirname(os.path.realpath(__file__))
 
-    # Initialize Flask Server explicitly
     from flask import Flask
     server = Flask(__name__)
-    CORS(server) # Enable CORS for all routes (Fixes Tile Loading Status 0)
+    CORS(server)  # Required for viewer tile requests.
 
     @server.route(f"/app/{WORKSPACE_ID}")
     @server.route(f"/app/{WORKSPACE_ID}/")
@@ -201,10 +182,9 @@ def main():
     def redirect_legacy_app_path(subpath):
         return redirect(f"{APP_BASE_PATH}/{subpath}", code=308)
 
-    # Register Chat Routes BEFORE Dash.
+    # Register these before Dash's wildcard routes.
     register_chat_routes(server, WORKSPACE_ID, work_dir, base_path=APP_BASE_PATH)
 
-    # Initialize Dash app
     app = dash.Dash(
         __name__,
         server=server,
@@ -214,16 +194,13 @@ def main():
         suppress_callback_exceptions=True
     )
 
-    # (localtileserver removed - VivViewer serves OME-TIFFs via /ome_tiff proxy)
-
-    # Configure app
     temp_dir = f"{work_dir}/data_input_temp/tmp/"
     app.title = "Spatial Omics Copilot"
     prepare_file_folder(folder_id, work_dir)
     update_data_cache(folder_id, work_dir)
     dump_default_para_arg(folder_id, work_dir)
 
-    # Save workspace mapping. Keep the legacy keys because niceview reads them.
+    # niceview still reads the legacy user-token and tile-port keys.
     user_token_info = {
         "user-port": args.port,
         "user-token": WORKSPACE_ID,
@@ -234,7 +211,6 @@ def main():
 
     app.layout = create_layout(work_dir, folder_id)
 
-    # ----------------------- Local Chunked Upload -----------------------
     @app.server.route(f"{APP_BASE_PATH}/upload_chunk", methods=['POST'])
     def upload_chunk():
         try:
@@ -269,10 +245,6 @@ def main():
     def get_upload_status(job_id):
         return jsonify(status_store.get_status(job_id))
 
-    # ----------------------- Upload Callbacks -----------------------
-
-    # Callback to handle upload of H&E image
-    # Callback to handle upload of H&E image
     @app.callback(
         Output('h5ad-upload-summary', 'children'),
         Input('upload-spatial-h5ad-result', 'value')
@@ -282,8 +254,6 @@ def main():
             return dash.no_update
         return upload_spatial_h5ad([filenames_upload_h5ad], folder_id, work_dir)
 
-    # ----------------------- Standard Dash Callback (Custom Uploader) -----------------------
-    # Replaced @du.callback because we are using custom JS/HTML uploader now
     @app.callback(
         [Output('status1', 'children'),
          Output('processing-job-id', 'data')],
@@ -317,7 +287,7 @@ def main():
         filenames = [upload_path]
         print(f"DEBUG: callback_on_completion PROCESSING {upload_path}", flush=True)
 
-        # Extract Job ID from the local path: .../data_input_temp/tmp/<upload_id>/<filename>
+        # Upload paths end with tmp/<upload_id>/<filename>.
         try:
             parts = upload_path.replace('\\', '/').split('/')
             if 'tmp' in parts:
@@ -333,11 +303,8 @@ def main():
 
         print(f"DEBUG: Extracted Job ID: {job_id}")
 
-        # Initialize status immediately to avoid race condition and missing file
+        # Publish the job before the background thread can report progress.
         status_store.update_status(job_id, 0, "Initializing upload...")
-
-        # Start processing in a background thread
-        # We pass job_id so the backend can update status_store
 
         def run_processing_safe():
             try:
@@ -367,10 +334,6 @@ def main():
 
         return "File uploaded. Starting processing...", job_id
 
-    # ----------------------- Visualization + Tools -----------------------
-
-    # Reset visualization and refresh rendering
-
     @app.callback(
         Output('input-image', 'children', allow_duplicate=True),
         Input("visual-input", "n_clicks"),
@@ -379,9 +342,6 @@ def main():
     def callback_reset(n_clicks):
         return reset(n_clicks, None, None, folder_id, work_dir)
 
-    # ----------------------- Save & Export -----------------------
-
-    # Save ROI from drawing tool and show ROI marker genes
     @app.callback(
         Output('status5', 'children'),
         Output('roi-gene-popup', 'children'),
@@ -391,12 +351,7 @@ def main():
     def callback_save_roi(drawn_geojson):
         status = save_roi(drawn_geojson, folder_id, work_dir)
         if not drawn_geojson:
-            # save_roi() already cleared roi.json/coords.json for an erased
-            # selection — but it doesn't know about the derived caches this
-            # callback itself writes below (roi_context.json's gene list,
-            # the ROI crop). Left alone, those go stale: routes.py only
-            # checks "does the file exist", so an erased ROI would still
-            # silently serve the previous selection's genes/image forever.
+            # save_roi() clears the selection files, but not these derived caches.
             for stale_path in (
                 f'{work_dir}/user{folder_id}/roi_context.json',
                 f'{work_dir}/user{folder_id}/roi_crop.png',
@@ -412,10 +367,7 @@ def main():
                 return status, []
             coords = vio.load_json(coords_path)
 
-            # Crop the ROI out of the whole-slide image now, once, instead of
-            # on every chat message. This callback only fires when the ROI
-            # actually changes, so the crop below is always fresh; routes.py
-            # and worker.py reuse this file instead of re-cropping per message.
+            # Cache the crop when the ROI changes; chat requests reuse it.
             crop_output_path = f'{work_dir}/user{folder_id}/roi_crop.png'
             crop_meta_path = f'{work_dir}/user{folder_id}/roi_crop_meta.json'
             try:
@@ -467,7 +419,6 @@ def main():
                 html.Div("Could not calculate ROI genes.", className="roi-gene-empty"),
             ])
 
-    # Show marker genes when a spatial cluster legend row is clicked.
     @app.callback(
         Output('roi-gene-popup', 'children', allow_duplicate=True),
         Output('map-output', 'selected_cluster', allow_duplicate=True),
@@ -523,7 +474,6 @@ def main():
     timer.daemon = True
     timer.start()
 
-    # Clear temp data and exit app
     @app.callback(
         Output('status6', 'children'),
         Input('clear-cache', 'n_clicks'),
@@ -534,22 +484,15 @@ def main():
 
         if n_clicks > 0:
             print("DEBUG: Executing clear_cache_forcall...")
-            # We don't check for existence anymore, we just force exit
             clear_cache_forcall(WORKSPACE_ID, work_dir)
             return None
         return dash.no_update
 
-    # --- OLLAMA WARMUP ---
-    # Ollama only loads a model into memory on first use, which costs several
-    # seconds (measured ~7.5s for the 7b vision model vs ~0.4s once warm) and
-    # unloads it again after ollama.keep_alive of inactivity. Warming up here
-    # means the user's first real chat message never pays that cold-start
-    # cost. Both models are warmed since the UI lets the user switch to
-    # vision mid-session.
+    # Preload both selectable models to avoid a cold start on the first request.
     def warmup_ollama():
         text_model = get_config('ollama.model', DEFAULT_OLLAMA_MODEL, env='OLLAMA_MODEL')
         vision_model = get_config('ollama.vision_model', text_model, env='OLLAMA_VISION_MODEL')
-        for model_name in dict.fromkeys([text_model, vision_model]):  # de-duped, order preserved
+        for model_name in dict.fromkeys([text_model, vision_model]):
             print(f"DEBUG: Sending warmup 'hi' to Ollama ({model_name})...")
             try:
                 enqueue_chat_job(
@@ -559,7 +502,7 @@ def main():
                     images=[],
                     work_dir=work_dir,
                     roi_path=None,
-                    visible=False # Invisible to user
+                    visible=False
                 )
                 print(f"DEBUG: Warmup 'hi' sent successfully ({model_name}).")
             except Exception as e:
@@ -568,11 +511,9 @@ def main():
     if get_bool("ollama.warmup", default=False, env="OLLAMA_WARMUP"):
         threading.Thread(target=warmup_ollama, daemon=True).start()
 
-    # Open browser after a short delay to let the server start
     url = f"http://localhost:{args.port}{APP_BASE_PATH}"
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
 
-    # Launch browser and run app
     app.run_server(host=HOST, port=args.port, debug=False, dev_tools_hot_reload=args.hot_reload)
 
 

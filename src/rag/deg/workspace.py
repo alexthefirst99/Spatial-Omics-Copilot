@@ -8,7 +8,7 @@ would escape the workspace entirely. Everything is validated and containment-
 checked here before any file is opened.
 
 Layering note (reported, not unilaterally fixed)
-------------------------------------------------
+------------------------
 The canonical path builders ``_spatial_omics_state_path`` and
 ``_spatial_omics_cluster_path`` live in ``niceview.interface.upload``, which is
 the app/UI layer. ``docs/rules.md`` section 3 forbids ``src/rag/`` importing

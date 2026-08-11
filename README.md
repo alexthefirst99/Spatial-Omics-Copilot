@@ -34,7 +34,7 @@ python src/convert_feature_slice_h5.py \
 ```
 
 By default, the converter bins 2 um feature-slice data into 16 um bins
-(`--binning-scale 8`) and writes sparse AnnData with `obsm["spatial"]`.
+(`-binning-scale 8`) and writes sparse AnnData with `obsm["spatial"]`.
 Upload the generated `.h5ad` file in the Gene Expression Matrix box.
 
 ## Configuration
@@ -157,7 +157,7 @@ conda install -c conda-forge libvips
 pip install -r requirements.txt   
 pip install -e .
 cp .env.example .env              
-spatial-copilot --port 8081 --workspace demo
+spatial-copilot -port 8081 -workspace demo
 ```
 
 Open `http://localhost:8081/workspaces/demo` in your browser.
@@ -165,7 +165,7 @@ Open `http://localhost:8081/workspaces/demo` in your browser.
 For local development, the app can also be launched directly:
 
 ```bash
-python app/app.py --port 8081 --workspace demo
+python app/app.py -port 8081 -workspace demo
 ```
 
 ## Demo Dataset

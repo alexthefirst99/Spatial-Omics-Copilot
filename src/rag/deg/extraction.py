@@ -10,7 +10,7 @@ Read ``rag.deg.stats`` for exactly what the test does and does not establish,
 and the normalization caveat below, before quoting any p-value.
 
 NORMALIZATION CAVEAT — READ THIS
---------------------------------
+----------------
 This module runs on ``adata.X`` exactly as stored in the uploaded ``.h5ad``.
 It does NOT normalize, and it does not assume the values are raw counts; it
 inspects them and reports what it observed in ``expression_source``.
@@ -35,7 +35,7 @@ defaulting to OFF so the ``log2_fold_change`` values already rendered in the UI
 do not silently change.
 
 Output contract
----------------
+--------
 ``run_roi_deg`` returns a ``DEGResult`` (see ``rag.deg.models``).
 ``get_roi_high_expression_genes`` and ``get_cluster_high_expression_genes``
 keep their original signatures and dict output, return ``None`` in exactly the
@@ -48,7 +48,7 @@ mistake a ranked list for a statistically significant one. Pass
 ``fdr_threshold=`` to opt in.
 
 Error handling
---------------
+-------
 No public function in this module raises. Every failure path returns either
 ``None`` (legacy wrappers, matching current behaviour) or a ``DEGResult`` with
 a populated ``status`` / ``status_message``. Status messages never contain
@@ -110,10 +110,7 @@ DEFAULT_TOP_N = 25
 DEFAULT_MIN_CELLS = 10
 DEFAULT_FDR_THRESHOLD = 0.05
 
-# The RAG layer has no sanctioned channel to app/config.py — importing it would
-# violate docs/rules.md section 3 — so the threshold is read from the
-# environment, mirroring how rag.pubmed_retrieval reads its PUBMED_* settings.
-# A proper config channel into src/rag/ is a Person 6 item.
+# Keep the RAG layer independent of app/config.py (docs/rules.md section 3).
 FDR_THRESHOLD_ENV_VAR = "COPILOT_DEG_FDR_THRESHOLD"
 
 
@@ -305,7 +302,7 @@ def compute_deg(
             ranking_method=ranking_label,
         )
 
-    # --- T-010: pre-filter before any test ---------------------------------
+    # -- T-010: pre-filter before any test -----------------
     filtered, n_filtered_out = filter_deg_candidates_with_count(adata, min_cells)
     var_names = np.asarray(filtered.var_names, dtype=object)
     matrix = filtered.X
@@ -332,7 +329,7 @@ def compute_deg(
             fdr_applied=fdr_threshold is not None,
         )
 
-    # --- Effect sizes ------------------------------------------------------
+    # -- Effect sizes ---------------------------
     mean_selected, pct_selected = _group_mean_and_pct(matrix, mask)
     has_reference = reference_count > 0
     if has_reference:
@@ -347,7 +344,7 @@ def compute_deg(
         log2fc = np.zeros_like(mean_selected)
         ranking_method = f"{ranking_label}_mean_expression_only_no_reference"
 
-    # --- T-008 / T-009: test, then correct ---------------------------------
+    # -- T-008 / T-009: test, then correct -----------------
     statistic, pvalue, testable, reasons = wilcoxon_rank_sum(
         matrix,
         mask,
@@ -356,7 +353,7 @@ def compute_deg(
     adj_pvalue, n_tested = adjust_pvalues(pvalue, testable)
     n_untestable = int(n_candidates - n_tested)
 
-    # --- Selection policy --------------------------------------------------
+    # -- Selection policy -------------------------
     fdr_applied = fdr_threshold is not None
     if fdr_applied:
         threshold = float(fdr_threshold)
@@ -605,9 +602,7 @@ def run_roi_deg(
     try:
         adata = _read_adata(adata_path)
     except WorkspacePathError as exc:
-        # A corrupt or truncated file is also "no expression data available",
-        # so T-044's exact message applies here too; the specific cause is
-        # logged rather than surfaced to the UI or the LLM.
+        # Treat unreadable expression files as unavailable and log the cause.
         logger.info("Treating unreadable h5ad as no-data: %s", exc)
         return _empty_result(STATUS_NO_DATA, MESSAGE_NO_DATA)
 
@@ -777,9 +772,7 @@ def get_cluster_high_expression_genes(
             dtype=bool,
         )
 
-        # A cluster file keyed by different barcodes than the h5ad produces an
-        # all-False mask that is indistinguishable from a genuinely empty
-        # cluster. Report the two apart rather than silently conflating them.
+        # Distinguish mismatched barcodes from a valid empty cluster.
         if spot_names and not any(name in clusters for name in spot_names):
             logger.info(
                 "Cluster assignment shares no barcode with the dataset "

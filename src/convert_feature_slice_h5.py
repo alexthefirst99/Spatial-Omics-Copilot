@@ -193,7 +193,7 @@ def main(argv=None):
     parser.add_argument("source", help="Input 10x feature_slice.h5 path")
     parser.add_argument("output", help="Output .h5ad path")
     parser.add_argument(
-        "--binning-scale",
+        "-binning-scale",
         type=int,
         default=8,
         help="Number of 2 um bins per output bin. Default 8 creates 16 um bins.",

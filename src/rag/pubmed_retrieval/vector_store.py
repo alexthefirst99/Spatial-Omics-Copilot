@@ -69,8 +69,7 @@ def _prepare_records(papers: list[object]) -> list[dict[str, Any]]:
 
         title = _as_text(_value(paper, "title"))
         abstract = _as_text(_value(paper, "abstract"))
-        # Supporting the legacy field costs nothing and lets callers migrate
-        # from the project's previous PubMed schema without losing text.
+        # Accept the previous schema's abstract field.
         if not abstract:
             abstract = _as_text(_value(paper, "snippet"))
         if not title and not abstract:
@@ -249,9 +248,7 @@ def semantic_search_abstracts(
         collection = _collection_from_client(active_client, collection_name)
         distance_metric = _distance_metric(collection)
 
-        # Namespace storage IDs by corpus. The same PMID can legitimately
-        # occur in simultaneous searches; a bare PMID would let one request
-        # overwrite another request's corpus metadata before it queries.
+        # Namespace PMIDs to prevent concurrent corpora from overwriting metadata.
         ids = [
             f"{active_corpus_id}:{record['id']}"
             for record in records

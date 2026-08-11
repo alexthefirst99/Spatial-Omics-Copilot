@@ -18,21 +18,7 @@ def create_viv_viewer(
     overlay=False,
     spots=None
 ):
-    """Create viv viewer.
-    
-    Args:
-        map_id (str): Map ID.
-        base_client (TileClient): Base client.
-        base_layer: Kept for compat.
-        list_of_clients (list[tuple]): List of (TileClient, name).
-        cmax (int, optional): Max value.
-        cmap: (str, optional): Color map.
-        geojson_coords: input coordinate 
-        workspace_id: workspace id used in app routes
-        
-    Returns:
-        html.Div containing VivViewer component and custom legend
-    """
+    """Create a VivViewer component and legend."""
     if geojson_coords is None:
         geojson_coords = []
     if spots is None:
@@ -54,8 +40,7 @@ def create_viv_viewer(
 
     image_urls = []
     
-    # GIS files are already converted to pyramidal OME-TIFF and uploaded to S3
-    # during preprocessing, so let VivViewer request S3 directly.
+    # S3 OME-TIFFs can be fetched directly; local files use the proxy.
     def to_url(filename):
         if str(filename).startswith("s3://"):
             s3_path = str(filename)[5:]
@@ -68,11 +53,8 @@ def create_viv_viewer(
         print(f"[viv_url] Proxy OME-TIFF URL: {url}", flush=True)
         return url
     
-    # Push base image first
     image_urls.append(to_url(base_client.filename))
     
-    # Push any overlays
-    # In interface.py, list_of_clients is now e.g. [(cell_type_client, 'cell type')]
     for client, _ in list_of_clients:
         image_urls.append(to_url(client.filename))
         
@@ -114,7 +96,6 @@ def create_viv_viewer(
         22: "Connective", 23: "Lamina propria",
     }
     
-    # Custom HTML Legend Construction
     legend_items = []
     
     if classes is not None:
@@ -138,7 +119,6 @@ def create_viv_viewer(
                     ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '4px'})
                 )
     
-    # Spatial cluster legend from uploaded h5ad clustering.
     if cluster_counts:
         legend_items.append(
             html.Div("Spatial clusters", style={
@@ -206,9 +186,7 @@ def create_viv_viewer(
                 })
             )
 
-    # Continuous Colormap Legend (if no classes, but cmap active)
     elif cmap is not None:
-        # Build simple gradient box
         hex_colors = get_hex_values(cmap)
         if hex_colors:
             gradient = f"linear-gradient(to right, {', '.join(hex_colors)})"
@@ -234,19 +212,12 @@ def create_viv_viewer(
         'display': 'none' if not legend_items else 'block'
     })
 
-    # Convert geojson_coords to ROIs format expected by VivViewer (or just an empty list so it doesn't break)
-    # The expected ROIs structure might differ, VivViewer expects standard arrays [minX, minY, maxX, maxY]
-    # for rectangle or polygon points.
-    # VivViewer.react.js handles `rois` as an array of features or objects.
-    # We will just pass an empty list for initialization since typically `geojson_coords` are empty on initial load.
-    
     num_classes = len(classes) if classes else 0
     required_height = num_classes * 35 + 100
     base_height = max(940, required_height)
     print("DEBUG: image_urls: ", image_urls)
     has_overlay = len(image_urls) >= 2
 
-    # Return parent Div with Viewer and Legend overlapping
     return html.Div([
         dash_viv_viewer.VivViewer(
             id=map_id,

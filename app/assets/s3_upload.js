@@ -116,7 +116,7 @@ function attachUploadListener(wrapper) {
     }
 
     function formatTime(seconds) {
-        if (!isFinite(seconds) || seconds < 0) return "--s";
+        if (!isFinite(seconds) || seconds < 0) return "-s";
         if (seconds < 60) return Math.ceil(seconds) + "s";
         const m = Math.floor(seconds / 60);
         const s = Math.ceil(seconds % 60);

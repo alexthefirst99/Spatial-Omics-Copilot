@@ -50,7 +50,7 @@ viewer = VivViewer(image_url=image_url)
 > [!IMPORTANT]
 > **HTTP Range Requests**: Large OME-TIFF files require the server to support "Range Requests." This allows the viewer to download only the specific tiles you are looking at. Using the built-in `serve_directory` utility handles this automatically by setting `conditional=True`. If you use a different server that does not support ranges, the browser will try to download the entire file (many GBs), which will likely crash the tab.
 
----
+--
 
 ## Data Preparation
 
@@ -63,7 +63,7 @@ from dash_viv_viewer import convert_to_ome_tiff
 ome_path = convert_to_ome_tiff("input.png", output_path="output.ome.tif")
 ```
 
----
+--
 
 ## Using the Viewer in your Dash App
 
@@ -103,7 +103,7 @@ dash_viv_viewer.VivViewer(
 )
 ```
 
----
+--
 
 ## UI Guide
 
@@ -123,7 +123,7 @@ Slide the bar to change the transparency of the active top layer. This allows yo
 *   **Polygon (⬡)**: Click to add points, then click the **Checkmark (✓)** to finish the shape.
 *   **Undo/Clear**: Use the back-arrow to remove the last shape or the trash can to clear all.
 
----
+--
 
 ## Component Reference (Props)
 
@@ -135,7 +135,7 @@ Slide the bar to change the transparency of the active top layer. This allows yo
 - **`rois`**: Output property. A list of shapes drawn by the user.
 - **`drawMode`**: Input property. Set to `'rect'`, `'polygon'`, or `'point'` to activate a tool programmatically.
 
----
+--
 
 ## Acknowledgments
 

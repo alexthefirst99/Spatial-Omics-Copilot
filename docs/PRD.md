@@ -1,7 +1,7 @@
 # Product Requirements Document: Spatial Omics Copilot
 
 | **Team** | **Project Type** | **Date** |
-| --- | --- | --- |
+| -- | -- | -- |
 | Group | Class prototype | June 2026 |
 
 ## 1. Product Summary
@@ -15,7 +15,7 @@ and an agentic LLM pipeline in a single interface.
 ## 2. Goals
 
 | **ID** | **Goal** | **Success Target** |
-| --- | --- | --- |
+| -- | -- | -- |
 | G1 | Demonstrate spatial omics visualization | Researcher can load a whole-slide image and h5ad file and view gene expression overlays |
 | G2 | Enable region-level gene analysis | Drawing an ROI returns the top differentially expressed genes for that region |
 | G3 | Provide pathway context | Top genes map to enriched biological pathways via GO and KEGG |
@@ -49,7 +49,7 @@ and an agentic LLM pipeline in a single interface.
 ## 4. Success Metrics
 
 | **Metric** | **Target** |
-| --- | --- |
+| -- | -- |
 | Image rendering | Gigapixel OME-TIFF loads and tiles correctly in the viewer |
 | ROI gene extraction | Top N genes returned for any drawn region within 5 seconds on a coarsely-binned or downsampled dataset (~17k spots or fewer); the reference group is always the full remaining dataset regardless of ROI size, so a full-resolution dataset costs much more — on the shipped ~137k-spot demo dataset this is closer to ~2 minutes, not 5 seconds. See `docs/tickets.md` T-010 and `docs/validation/person2_deg_notes.md`. |
 | Pathway enrichment | GO / KEGG returns at least one enriched pathway for a valid gene list |

@@ -4,23 +4,23 @@ Usage (from the repo root):
 
     /opt/anaconda3/bin/python probe_agent.py "what pathways are enriched?"
     /opt/anaconda3/bin/python probe_agent.py            # runs a built-in set
-    /opt/anaconda3/bin/python probe_agent.py --live "any papers on this?"
-    /opt/anaconda3/bin/python probe_agent.py --prompt "explain this region"
+    /opt/anaconda3/bin/python probe_agent.py -live "any papers on this?"
+    /opt/anaconda3/bin/python probe_agent.py -prompt "explain this region"
 
 By default the three tools are STUBBED, so nothing hits the network and it
 returns instantly — you are checking the ROUTING decision.
---live makes real NCBI/PubMed calls (slow; pathway enrichment will report
+-live makes real NCBI/PubMed calls (slow; pathway enrichment will report
 unavailable unless gseapy is installed).
---prompt also dumps the full text sent to the LLM.
+-prompt also dumps the full text sent to the LLM.
 """
 
 import sys
 
 sys.path.insert(0, "src")
 
-LIVE = "--live" in sys.argv
-SHOW_PROMPT = "--prompt" in sys.argv
-questions = [a for a in sys.argv[1:] if not a.startswith("--")]
+LIVE = "-live" in sys.argv
+SHOW_PROMPT = "-prompt" in sys.argv
+questions = [a for a in sys.argv[1:] if not a.startswith("-")]
 
 if not questions:
     questions = [
@@ -91,7 +91,7 @@ for question in questions:
     if meta["citations"]:
         print(f"   citations   : {[c['pmid'] for c in meta['citations']]}")
     if SHOW_PROMPT:
-        print("   ---- prompt sent to the LLM ----")
+        print("   -- prompt sent to the LLM --")
         for line in result["context_str"].splitlines():
             print(f"   | {line}")
     print()

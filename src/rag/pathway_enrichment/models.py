@@ -104,8 +104,7 @@ class PathwayEntry(Mapping[str, Any]):
 
     def _mapping(self) -> dict[str, Any]:
         data = self.to_dict()
-        # Legacy aliases keep the current UI/pipeline working until Person 6
-        # switches all callers to the shared contracts.
+        # Retain aliases consumed by the current UI and pipeline.
         data.update(
             {
                 "pvalue": self.adjusted_p_value,

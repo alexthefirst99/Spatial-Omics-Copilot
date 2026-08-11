@@ -107,11 +107,11 @@ spatial-omics-copilot/
 └── (HPC launcher scripts, see docs/validation notes — not part of the installable package)
 ```
 
-Run command: `python app/app.py --port 8081 --workspace demo`
+Run command: `python app/app.py -port 8081 -workspace demo`
 
 Open `http://localhost:8081/workspaces/demo`.
 
-Installed command: `spatial-copilot --port 8081 --workspace demo`
+Installed command: `spatial-copilot -port 8081 -workspace demo`
 
 ## 2. Architecture
 
@@ -171,7 +171,7 @@ Offline fallback (no network, or LangGraph unavailable):
 ### app/
 
 | **Module** | **Responsibility** |
-| --- | --- |
+| -- | -- |
 | `app/app.py` | Dash entry point — registers layout, callbacks, and Flask server |
 | `app/layout.py` | Dash UI layout definition (components, IDs); default chat model is the vision model `qwen2.5vl:7b` |
 | `app/routes.py` | Flask HTTP handlers — `/chat`, `/chat/poll`, `/chat/clear`, `/ome_tiff`, `/preview`; extracts/caches disease context; calls `run_copilot_agent()` directly; enqueues jobs |
@@ -189,7 +189,7 @@ Offline fallback (no network, or LangGraph unavailable):
 ### src/niceview/interface/
 
 | **Module** | **Responsibility** |
-| --- | --- |
+| -- | -- |
 | `src/niceview/interface/callback.py` | Dash callback aggregator — re-exports all callbacks from `upload.py` and `actions.py` |
 | `src/niceview/interface/upload.py` | Image and h5ad upload handlers; validates spatial coordinates; triggers clustering |
 | `src/niceview/interface/visualization.py` | WSI client setup, spatial spot extraction, optional cluster overlay image, VivViewer assembly |
@@ -202,7 +202,7 @@ Offline fallback (no network, or LangGraph unavailable):
 `app.py` directly imports only `niceview.utils.io`. The other files below are reached indirectly through `niceview.interface.*` helpers.
 
 | **Module** | **Current app call path** | **Responsibility** |
-| --- | --- | --- |
+| -- | -- | -- |
 | `src/niceview/utils/io.py` | Direct: `app.py` and `routes.py` import `niceview.utils.io as vio` | File I/O wrapper for JSON, TOML, paths, images, arrays, and cache files |
 | `src/niceview/utils/dataset.py` | Indirect: `app.py` → `niceview.interface.interface/data_io.py` → `ThorQuery` | Data/cache client currently used for WSI generation and viewer tile clients |
 | `src/niceview/utils/aristotle.py` | Indirect: `ThorQuery` → `AristotleDataset` | Constructs data/cache filenames from sample IDs and field names |
@@ -212,7 +212,7 @@ Offline fallback (no network, or LangGraph unavailable):
 ### src/rag/
 
 | **Module** | **Responsibility** |
-| --- | --- |
+| -- | -- |
 | `src/rag/contracts.py` | Shared result dataclasses used across every module below — `PreprocessResult`, `ClusterResult`, `ROISelection`, `ROIImageResult`, `DEGResult`/`GeneStat`, `AgentResult`/`TraceStep`/`Citation` |
 | `src/rag/pipeline.py` | `run_integration_pipeline()` wiring every module together; `_run_sequential()` kept as an offline fallback |
 | `src/rag/preprocessing.py` | QC, normalization, HVG selection, PCA on h5ad; cached to disk |
@@ -275,7 +275,7 @@ worker.py  → appends context_str to messages, attaches ROI crop if a vision
 ## 6. Technology Stack
 
 | **Category** | **Current** |
-| --- | --- |
+| -- | -- |
 | Core | Python 3.11, Flask, Dash |
 | Image | pyvips/OME-TIFF conversion path, tifffile, Pillow, opencv-python, rasterio |
 | Spatial data | anndata, scanpy, scipy, scikit-learn |
@@ -294,7 +294,7 @@ worker.py  → appends context_str to messages, attaches ROI crop if a vision
 General settings live in `config/app.yaml`. Secrets live in `.env`.
 
 | **YAML key / env override** | **Required** | **Purpose** |
-| --- | --- | --- |
+| -- | -- | -- |
 | `ollama.model` / `OLLAMA_MODEL` | No | Local Ollama model; defaults to `qwen2.5vl:7b` |
 | `ollama.host` / `OLLAMA_HOST` | No | Ollama server URL; defaults to `http://localhost:11434` |
 | `ollama.num_predict` | No | Safety ceiling on generated tokens — the prompt itself instructs the model to answer in ~3-4 sentences, so this only needs to be large enough for that to actually finish rather than cut off mid-sentence |
@@ -322,7 +322,7 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 ## 8. Technical Risks
 
 | **Risk** | **Mitigation** |
-| --- | --- |
+| -- | -- |
 | Gigapixel image OOM | pyvips streaming — never load full image into RAM |
 | LLM hallucinating citations | Only cite PMIDs returned by PubMed tool |
 | PubMed rate limit or outage | Shared rate limiter, bounded Retry-After/backoff, optional `PUBMED_API_KEY`, and safe empty results |

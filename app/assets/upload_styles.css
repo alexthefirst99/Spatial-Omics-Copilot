@@ -1,4 +1,4 @@
-/* ======================== S3 Upload Component - Professional Design ======================== */
+/* Upload component */
 
 .s3-upload-wrapper {
     margin: 12px 0;
@@ -331,4 +331,3 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
-

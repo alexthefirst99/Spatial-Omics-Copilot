@@ -85,16 +85,7 @@ def _build_inference_messages(messages, current_user_message):
 
     latest = copy.deepcopy(current_user_message)
     latest.pop("rag_context_str", None)
-    # Bounded so response latency stays roughly constant regardless of how
-    # long the session runs — Ollama's /api/chat re-processes the whole
-    # prompt from scratch on every call (no cross-call KV-cache reuse here),
-    # so unbounded history means a 20-turn conversation gets progressively
-    # slower to respond to than a 2-turn one. A fact stated early (e.g. "this
-    # is a colon sample") scrolling out of this window used to mean the model
-    # silently fell back to guessing tissue identity from genes alone — that
-    # is now handled separately by app/routes.py's disease-context
-    # extraction (cached per session, injected into the evidence block
-    # directly), so it no longer depends on staying inside this window.
+    # Ollama reprocesses the full prompt; disease context is cached separately.
     history = history[-4:]
     history.append(latest)
     return history
@@ -138,10 +129,7 @@ def process_session(session_id):
                     if crop_image_by_roi(img_path, roi_path, local_crop):
                         processed_images.append(local_crop)
                 else:
-                    # No roi_path means routes.py already cropped this at ROI
-                    # selection time (see the selection_time_crop cache) and
-                    # is passing the crop straight through — use as-is rather
-                    # than dropping the image.
+                    # A missing roi_path identifies a crop made at selection time.
                     processed_images.append(img_path)
 
         inference_messages = _build_inference_messages(messages, last_msg)
@@ -312,7 +300,6 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
     if duplicate:
         return "duplicate"
 
-    # Dispatch directly — no separate polling loop needed
     ensure_session_processing(session_id)
 
     return "queued"

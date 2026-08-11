@@ -1,13 +1,13 @@
 # Implementation Tickets: Spatial Omics Copilot
 
 | **Team** | **Project Type** | **Date** |
-| --- | --- | --- |
+| -- | -- | -- |
 | Group | Class prototype | June 2026 |
 
 ## Phase 1: Project Setup ✓ (Alex — done)
 
 | **ID** | **Task** | **Status** |
-| --- | --- | --- |
+| -- | -- | -- |
 | T-001 | UI — VivViewer, image upload, h5ad upload, spot overlay, ROI drawing | ✓ Done |
 | T-002 | Infrastructure — routes.py, worker.py, inference.py, session.py | ✓ Done |
 | T-003 | Preprocessing — QC, normalize, HVG, PCA (`src/rag/preprocessing.py`) | ✓ Done |
@@ -19,7 +19,7 @@
 ## Phase 2: Preprocessing (src/rag/preprocessing.py) ✓ (Zainab — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-033 | Add spot-level QC filtering — minimum genes per spot, maximum mitochondrial gene fraction | Spots below threshold removed before normalization; `min_genes` and `max_mito_pct` are configurable params | ✓ Done |
 | T-034 | Store raw counts layer before normalization | `adata.layers["counts"]` present after preprocessing; DEG Wilcoxon test reads from it | ✓ Done |
 | T-035 | Cache preprocessed adata to disk | Re-running on same h5ad skips preprocessing and loads cached result in < 1s | ✓ Done |
@@ -28,7 +28,7 @@
 ## Phase 3: Clustering (src/rag/clustering.py) ✓ (Zainab — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-037 | Expose Leiden resolution as configurable parameter | `run_spatial_clustering()` accepts `resolution` kwarg; default 0.8; stored in cluster JSON | ✓ Done |
 | T-038 | Add spatial coordinates as auxiliary features | PCA embedding is augmented with normalized x/y coordinates before clustering; spatially coherent clusters improve visually | ✓ Done |
 | T-039 | Support user-specified cluster count | `run_spatial_clustering()` accepts `n_clusters` override; skips auto-estimation when provided | ✓ Done |
@@ -38,7 +38,7 @@
 ## Phase 4: DEG Extraction (src/rag/deg/) ✓ (Rodney — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-008 | Add Wilcoxon rank-sum test to `_rank_high_expression_genes()` | `pvalue` field present in each gene dict | ✓ Done |
 | T-009 | Add Benjamini-Hochberg correction | `adj_pvalue` field present; genes filtered to adj_pvalue < 0.05 | ✓ Done |
 | T-010 | Pre-filter candidates before Wilcoxon (performance) | Runs in < 10s for a 3000-spot dataset | ✓ Done — pre-filter itself works, but this specific target is not met on the real ~137k-spot demo dataset: the reference group for the test stays the full remaining dataset regardless of ROI size, so the dominant cost is total spots × genes, not selection size. See `docs/validation/person2_deg_notes.md`. |
@@ -47,7 +47,7 @@
 ## Phase 5: Pathway Enrichment (src/rag/pathway_enrichment/) ✓ (Quynh — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-012 | Replace mock with real gseapy.enrichr() or g:Profiler API | Returns real GO/KEGG terms with valid adjusted p-values | ✓ Done |
 | T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception | ✓ Done |
 | T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability | ✓ Done |
@@ -83,7 +83,7 @@
 ## Phase 6: PubMed Retrieval (src/rag/pubmed_retrieval/) ✓ (Anh — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-015 | Implement NCBI esearch + efetch calls | Returns real abstracts for a gene list | ✓ Done |
 | T-016 | Build query string from genes and pathways | Query combines gene symbols and pathway names | ✓ Done |
 | T-017 | Handle rate limiting and empty results | Returns `[]` without error; respects API rate limits | ✓ Done |
@@ -152,7 +152,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 ## Phase 7: LangGraph Agent (src/rag/copilot_agent/ — src/rag/agent/ is now a back-compat import path) ✓ (JN — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-020 | Define LangChain tools in `tools.py`: `pathway_tool` and `pubmed_tool` | Agent can call both tools (DEG is not a tool — it runs automatically before the agent) | ✓ Done — `gene_annotation_tool` was added too, beyond the original two |
 | T-021 | Implement real LangGraph agent in `graph.py` | Agent dynamically decides which tools to call based on the message | ✓ Done |
 | T-022 | Dynamic `trace` field | `metadata.trace` reflects what the agent actually called, not a fixed list | ✓ Done |
@@ -216,7 +216,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 ## Phase 8: Prompt Engineering (src/rag/copilot_agent/prompt.py) ✓ (JN — done)
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-025 | Improve `build_prompt_context()` with domain framing | LLM identifies cell type, pathway activity, and clinical relevance | ✓ Done — as `build_evidence_context()` |
 | T-026 | Add structured citation instructions | LLM cites papers inline as [1], [2] consistently | ✓ Done |
 | T-027 | Test prompts against demo dataset | Responses are biologically relevant for the demo data | ✓ Done — see `docs/validation/person5_prompt_notes.md` |
@@ -224,7 +224,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 ## Phase 9: Demo Data & Evaluation
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-028 | Download and validate spatial omics demo dataset | h5ad loads, spots overlay correctly, clustering runs | ✓ Done — 10x Visium HD Human Colon Cancer dataset in `data/demo/` |
 | T-029 | End-to-end test with real data | Draw ROI → DEG → pathway → PubMed → streamed answer with citations | ✓ Done — verified live against the demo dataset, plus `tests/test_e2e_pipeline.py` |
 | T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type | ✓ Done — see `docs/validation/person2_deg_notes.md` and `docs/validation/person3_pathway_notes.md` |
@@ -249,7 +249,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 ## Phase 10: RAG Runtime Boundary and Test Hygiene
 
 | **ID** | **Task** | **Done When** | **Status** |
-| --- | --- | --- | --- |
+| -- | -- | -- | -- |
 | T-042 | Move real RAG API calls off the main request path | External pathway/PubMed/vector calls run in background work with timeout, retry, and user-visible status | Known limitation — not tracked as active work, see below |
 | T-043 | Reconcile stale RAG test references | Missing/stale tests such as `test_agent.py` and `test_upload.py` are either added or tracked in a later docs cleanup | ✓ Done |
 
