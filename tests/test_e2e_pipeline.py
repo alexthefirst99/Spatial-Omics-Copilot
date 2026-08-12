@@ -78,9 +78,9 @@ def demo_config(tmp_path):
     }
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # map_roi_to_spatial_barcodes (T-052)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_map_roi_polygon_selects_only_spots_inside(tmp_path):
@@ -142,9 +142,9 @@ def test_map_roi_cluster_selection_without_cluster_path_returns_status_message(t
     assert "cluster" in resolved.status_message.lower()
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # prepare_roi_image_for_llm (T-045)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_prepare_roi_image_crops_and_reports_metadata(tmp_path):
@@ -186,9 +186,9 @@ def test_prepare_roi_image_missing_file_returns_status_message(tmp_path):
     assert result.status_message != ""
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # run_integration_pipeline (T-029) — the full chain
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_run_integration_pipeline_end_to_end_with_mocked_external_apis(tmp_path, monkeypatch):

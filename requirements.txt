@@ -69,3 +69,4 @@ packaging>=24.0
 PyYAML>=6.0
 setuptools>=68.0.0
 toml==0.10.2
+pytest>=8.0

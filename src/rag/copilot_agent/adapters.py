@@ -27,16 +27,13 @@ from typing import Any
 
 from rag.copilot_agent.models import Citation, DegBar, PathwayBar
 
-# Gene-symbol keys, most specific first. "gene" is what the repo actually
-# emits; the others cover Person 6's draft contract and defensive callers.
+# Gene-symbol keys in specificity order.
 _GENE_KEYS = ("gene", "gene_symbol", "symbol", "name")
 
 # Fold-change keys, most specific first.
 _FC_KEYS = ("log2_fold_change", "log2fc", "log2FoldChange", "lfc")
 
-# Enrichr library names are long ("GO_Biological_Process_2023"). chat.js renders
-# metadata.pathways[].source in a small fixed-height pill and its regex only
-# collapses colon-prefixed IDs, so a raw library name overflows. Shorten here.
+# Short tags fit the fixed-height source pill in chat.js.
 _SOURCE_TAGS = (
     ("GO_", "GO"),
     ("GO:", "GO"),
@@ -95,7 +92,7 @@ def _first_key(source: object, keys: Sequence[str]) -> Any:
     return None
 
 
-# --- DEG payloads --------------------------------------------------------
+# -- DEG payloads ----------------------------
 
 
 def normalize_gene_objects(payload: object) -> list[dict[str, Any]]:
@@ -206,7 +203,7 @@ def build_deg_bars(
     return bars
 
 
-# --- Pathway enrichment --------------------------------------------------
+# -- Pathway enrichment -------------------------
 
 
 def shorten_source(source: object) -> str:
@@ -313,7 +310,7 @@ def pathway_names(pathway_result: object, limit: int = 6) -> list[str]:
     return names
 
 
-# --- PubMed --------------------------------------------------------------
+# -- PubMed -------------------------------
 
 
 def iter_papers(pubmed_result: object) -> list[Any]:
@@ -364,7 +361,7 @@ def build_citations(pubmed_result: object, limit: int = 3) -> list[Citation]:
     return citations
 
 
-# --- Gene annotation -----------------------------------------------------
+# -- Gene annotation ---------------------------
 
 
 def iter_annotations(annotation_result: object) -> list[Any]:

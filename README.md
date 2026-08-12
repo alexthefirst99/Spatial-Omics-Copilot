@@ -148,17 +148,26 @@ selected model has been pulled locally.
 
 ## Quick Start
 
-Python 3.11 is recommended. pyvips is required for OME-TIFF pyramid generation.
+Python 3.11 is recommended. `pyvips` and the native `libvips` library are
+required for OME-TIFF pyramid generation. Installing Python and `libvips` in a
+single transaction avoids an extra Conda dependency-solving pass.
 
 ```bash
-conda create -n spatial-copilot python=3.11 -y
+conda create -n spatial-copilot -c conda-forge \
+  python=3.11 libvips=8.18.2 pip --solver=libmamba -y
 conda activate spatial-copilot
-conda install -c conda-forge libvips
-pip install -r requirements.txt   
-pip install -e .
-cp .env.example .env              
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
+
+cp .env.example .env
 spatial-copilot --port 8081 --workspace demo
 ```
+
+The final editable install uses `--no-deps` because `requirements.txt` has
+already installed the application dependencies. This prevents pip from
+resolving the same dependency tree twice.
 
 Open `http://localhost:8081/workspaces/demo` in your browser.
 

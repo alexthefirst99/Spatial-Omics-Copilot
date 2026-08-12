@@ -3,7 +3,7 @@ DEG Statistics — Wilcoxon Rank-Sum (T-008) and Benjamini-Hochberg (T-009)
 =========================================================================
 
 What the test does
-------------------
+---------
 For each candidate gene, a two-sided Wilcoxon rank-sum test (equivalently the
 Mann-Whitney U test) compares the distribution of that gene's values inside the
 selection against the distribution outside it. The null hypothesis is that a
@@ -11,7 +11,7 @@ randomly drawn selected spot is equally likely to rank above or below a
 randomly drawn reference spot.
 
 What the test does NOT establish
---------------------------------
+----------------
 * It is not a claim of biological significance. A small p-value means the two
   rank distributions differ more than sampling noise explains — nothing about
   effect magnitude, cell type, or mechanism.
@@ -26,7 +26,7 @@ What the test does NOT establish
   module docstring of ``rag.deg.extraction``.
 
 Conventions chosen
-------------------
+---------
 * **Tie correction: applied.** Spatial expression data is zero-inflated, so
   ties dominate; the uncorrected variance ``n1*n2*(N+1)/12`` is too large and
   yields conservative, wrong p-values. On a representative zero-inflated
@@ -39,7 +39,7 @@ Conventions chosen
   above the size where the approximation matters.
 
 Implementation note
--------------------
+----------
 The rank-sum is computed directly (see :func:`_rank_sum_block`) rather than by
 calling ``scipy.stats.mannwhitneyu(..., axis=0)``, which does not stay
 vectorised through its ``_axis_nan_policy`` wrapper and accounted for ~100% of
@@ -68,9 +68,7 @@ logger = logging.getLogger(__name__)
 # the normal approximation is meaningless and any p-value would be misleading.
 MIN_SPOTS_PER_GROUP = 3
 
-# Genes are densified in column blocks of this width. At 30 000 spots a
-# 512-gene block is ~123 MB at float64, which keeps peak memory bounded while
-# still letting the test run vectorised over the block.
+# At 30,000 spots, a 512-gene float64 block uses about 123 MB.
 DEFAULT_CHUNK_SIZE = 512
 
 # Reason codes recorded on genes excluded from the BH denominator.

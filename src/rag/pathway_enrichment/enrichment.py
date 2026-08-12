@@ -270,20 +270,7 @@ def run_pathway_enrichment(
                 verbose=False,
             )
 
-        # gseapy.enrichr() silently drops every library but one when given
-        # multiple gene_sets in a single call (verified directly against
-        # gseapy 1.1.2: querying GO_Biological_Process_2023 alone returns 128
-        # real rows, but querying it together with KEGG_2021_Human in one
-        # call returns 0 GO rows). Query each library in its own call instead.
-        #
-        # An earlier version fired these concurrently via ThreadPoolExecutor to
-        # avoid paying the extra network round-trips serially, but gseapy's
-        # enrichr() is not safe to call concurrently — it intermittently
-        # dropped one library's results at random (reproduced directly: 1 of 3
-        # concurrent runs silently lost GO_Biological_Process_2023 entirely).
-        # A demo that randomly shows only one library's pathways is worse than
-        # one that is reliably a few seconds slower, so this queries libraries
-        # sequentially instead.
+        # gseapy 1.1.2 drops libraries in combined or concurrent calls.
         frames = []
         errors: list[str] = []
         for gene_set in gene_sets:

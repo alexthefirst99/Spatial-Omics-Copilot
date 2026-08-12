@@ -1,8 +1,6 @@
-/* ------------------------ Fonts ------------------------ */
+/* ------------ Fonts ------------ */
 @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600&display=swap');
-/* v2 Force Reload */
-
-/* ------------------------ Base & Resets ------------------------ */
+/* ------------ Base & Resets ------------ */
 * {
   margin: 0;
   padding: 0;
@@ -21,8 +19,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* ------------------------ Hero/Parallax Section ------------------------ */
-/* ------------------------ Hero/Parallax Section ------------------------ */
+/* ------------ Hero/Parallax Section ------------ */
 #hero-section {
   height: 100vh;
   position: relative;
@@ -187,7 +184,7 @@ html {
 }
 
 
-/* ------------------------ Header ------------------------ */
+/* ------------ Header ------------ */
 #header {
   background: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px) saturate(180%);
@@ -199,7 +196,6 @@ html {
   top: 0;
   z-index: 100;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-  /* Reset previous styles */
   height: auto;
   border-radius: 0;
   left: auto;
@@ -211,16 +207,14 @@ html {
   font-weight: 600;
   color: #1d1d1f;
   padding-top: 5px;
-  /* Adjust alignment from old style */
   font-family: inherit;
   display: inline-block;
 }
 
-/* ------------------------ Main Layout Containers ------------------------ */
+/* ------------ Main Layout Containers ------------ */
 #display {
   display: flex;
   flex-direction: row;
-  /* Ensure split layout */
   gap: 20px;
   padding: 20px;
   box-sizing: border-box;
@@ -230,34 +224,26 @@ html {
 /* LEFT COLUMN (Map/Image) */
 #left-column-temp {
   flex: 3;
-  /* Glass Panel Style */
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(25px) saturate(180%);
   -webkit-backdrop-filter: blur(25px) saturate(180%);
   padding: 20px;
-  /* Grid Layout to stack Map + Panel */
   display: grid !important;
   grid-template-areas: "stack";
-  /* Reset old styles */
   min-width: 0;
 
-  /* User Request: Allow dynamic expansion */
   height: auto !important;
   min-height: 800px !important;
-  /* max-height removed to allow growth */
 
   overflow: visible;
-  /* visualizer should not scroll page */
 }
 
 /* Stack both children in the same cell */
 #left-column-temp>* {
   grid-area: stack;
   position: relative;
-  /* Create stacking context */
   z-index: 1;
-  /* Base layer for Hash/Map */
 }
 
 #input-image {
@@ -267,7 +253,6 @@ html {
   border-radius: 12px;
   overflow: hidden;
   z-index: 1;
-  /* Map fills the cell */
 }
 
 /* RIGHT COLUMN (Chat) — zero width; chat panel now floats via position:fixed */
@@ -286,39 +271,26 @@ html {
   min-width: 0;
 }
 
-/* ------------------------ Sidebar (Upload) Wrapper ------------------------ */
-/* This mimics the .upload-sidebar from ori_style */
+/* ------------ Sidebar (Upload) Wrapper ------------ */
 #submit-wrapper {
-  /* Positioned via Grid (stacked on top) */
-  /* Remove absolute position so it contributes to height if needed? 
-     Actually, if we want it to push height, it must be part of the grid flow. 
-     Grid overlap allows it to push row height. */
   position: relative;
   z-index: 9999 !important;
-  /* Force on top of map */
   margin-top: 0;
   margin-left: 0;
-  /* Dock to left edge (was 40px) */
-  /* Offset from side */
 
   width: 360px;
-  /* Increased from 300px to fit instructions */
   display: flex;
   flex-direction: column;
   transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  /* Reset constraints */
   min-width: unset;
   max-width: unset;
 
-  /* Align to top left of the grid cell */
   justify-self: start;
   align-self: start;
 }
 
 #submit-container {
-  /* Glass Panel Style */
   background: rgba(255, 255, 255, 0.85);
-  /* More opaque */
   backdrop-filter: blur(25px) saturate(180%);
   -webkit-backdrop-filter: blur(25px) saturate(180%);
   border-radius: 20px;
@@ -328,23 +300,16 @@ html {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Add spacing between elements */
-
-  /* Reset absolute positioning from old style */
   position: relative;
   top: auto;
   left: auto;
   width: 100%;
   height: auto;
-  /* Let content dictate height */
   min-height: 400px;
   margin: 0;
 
-  /* Fade Logic */
   opacity: 1;
-  /* Ensure we have a max-height to transition FROM */
   max-height: 1200px;
-  /* Prevent text wrapping during width collapse */
   white-space: nowrap;
   overflow: hidden;
 
@@ -362,13 +327,9 @@ html {
   height: auto;
   left: 0 !important;
   margin-left: 0 !important;
-  /* Remove horizontal offset */
   margin-top: 0 !important;
-  /* Remove vertical offset */
   align-self: start !important;
-  /* Force to top */
   transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
-  /* Slow closing speed */
 }
 
 #submit-wrapper.collapsed #submit-container {
@@ -383,7 +344,6 @@ html {
   transition: all 0.4s ease;
 }
 
-/* Open State - Simple transition */
 #submit-wrapper:not(.collapsed) #submit-container {
   transition: all 0.4s ease;
 }
@@ -399,18 +359,14 @@ html {
   transition: opacity 0.2s ease 0.4s;
 }
 
-/* Toggle Button - Reference Style (Blue Circle on Edge) */
+/* Sidebar toggle */
 .toggle-control {
   position: absolute;
-  /* Visual Middle: 658px / 2 = 329px. Minus half button (16px) = 313px. */
   top: 313px;
-  /* Removed transform translateY to avoid hover conflicts */
 
   right: -16px;
-  /* Straddle the right edge */
   left: auto;
 
-  /* Force circle shape despite .toggle-btn class */
   width: 32px !important;
   height: 32px !important;
   border-radius: 50% !important;
@@ -433,26 +389,21 @@ html {
 .toggle-control:hover {
   background: #0077ed;
   transform: scale(1.1);
-  /* Simple scale, no translation needed */
 }
 
 /* Collapsed State Toggle */
 #submit-wrapper.collapsed .toggle-control {
   right: auto;
-  /* Center in 60px panel: (60 - 32) / 2 = 14px */
   left: 14px;
   top: 313px;
-  /* Ensure match */
   transform: none;
-  /* No translation needed */
 }
 
 #submit-wrapper.collapsed .toggle-control:hover {
   transform: scale(1.1);
-  /* Simple scale */
 }
 
-/* ------------------------ UI Elements (Buttons, Inputs) ------------------------ */
+/* ------------ UI Elements (Buttons, Inputs) ------------ */
 .text,
 h5,
 h2 {
@@ -477,7 +428,6 @@ h2 {
   width: 100%;
   margin: 8px 0;
   text-transform: none;
-  /* Remove uppercase */
   letter-spacing: normal;
   height: auto;
   box-shadow: none;
@@ -500,12 +450,10 @@ h2 {
 
 .toggle-btn.active {
   background: #005bb5;
-  /* Darker blue for active */
   color: white;
   border-color: transparent;
 }
 
-/* Force Green/Red buttons to Blue if requested, or just keep uniform */
 #start-loki-analysis-btn {
   background: #0071e3 !important;
 }
@@ -552,7 +500,6 @@ h2 {
   width: 100%;
 }
 
-/* Customize Dash Uploader if possible via CSS */
 .fileupload-content {
   border: 2px dashed #0071e3 !important;
   background: rgba(0, 113, 227, 0.05) !important;
@@ -608,7 +555,7 @@ h2 {
   background: #ff453a !important;
 }
 
-/* ------------------------ Footer ------------------------ */
+/* ------------ Footer ------------ */
 #footer {
   width: 100%;
   padding: 30px 0;
@@ -619,7 +566,6 @@ h2 {
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   margin-top: 40px;
   position: relative;
-  /* Keep in flow, allow scrolling */
   z-index: 10;
 }
 
@@ -630,7 +576,6 @@ h2 {
 
 #footer i {
   font-size: 20px !important;
-  /* Override inline */
   color: #1d1d1f !important;
   margin: 0 15px;
   transition: all 0.2s ease;
@@ -648,7 +593,7 @@ h2 {
   font-weight: 500;
 }
 
-/* ------------------------ Hover Instructions ------------------------ */
+/* ------------ Hover Instructions ------------ */
 #submit-wrapper #submit-container .upload-instructions {
   opacity: 1 !important;
   transform: none;
@@ -662,7 +607,7 @@ h2 {
   pointer-events: none;
 }
 
-/* ------------------------ Progress Bar Animation ------------------------ */
+/* ------------ Progress Bar Animation ------------ */
 @keyframes progress-bar-stripes {
   from {
     background-position: 1rem 0;
@@ -856,7 +801,7 @@ h2 {
   flex: 0 0 auto;
 }
 
-/* ---- Agent Trace Card ---- */
+/* -- Agent Trace Card -- */
 .rag-trace-card {
   background: rgba(245, 245, 247, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -909,7 +854,7 @@ h2 {
   color: #8e8e93;
 }
 
-/* ---- Pathway Enrichment Panel ---- */
+/* -- Pathway Enrichment Panel -- */
 .rag-pathway-panel {
   background: rgba(245, 245, 247, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -973,7 +918,7 @@ h2 {
   transition: width 0.5s ease;
 }
 
-/* ---- DEG Bar Chart Panel ---- */
+/* -- DEG Bar Chart Panel -- */
 .rag-deg-panel {
   background: rgba(245, 245, 247, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -1058,7 +1003,7 @@ h2 {
   flex: 0 0 auto;
 }
 
-/* ---- Citation Chips ---- */
+/* -- Citation Chips -- */
 .rag-citation-row {
   display: flex;
   flex-wrap: wrap;

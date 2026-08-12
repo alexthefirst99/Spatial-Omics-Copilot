@@ -153,14 +153,14 @@ class ThorQuery:
 
     def process_data(self, sample_id,  height_width=None, img_path=None, mask_path=None, adata_cell_path=None, adata_spot_path=None):
         if img_path is not None:
-            # Ultra-fast dimensions check without loading into memory
+            # Read dimensions without decoding the image.
             if not str(img_path).startswith("s3://") and os.path.exists(img_path):
                 import pyvips
                 img = pyvips.Image.new_from_file(img_path)
                 return img.height, img.width
             else:
                 img = vio.open_image(img_path)
-                # DO NOT CALL img.load() which forces the entire image to be decoded into RAM!
+                # Avoid img.load(); it decodes the entire image into memory.
                 width, height = img.size
                 return height, width
         return None

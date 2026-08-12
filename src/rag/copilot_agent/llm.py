@@ -41,9 +41,7 @@ DEFAULT_MAX_RETRIES = 2
 #: docs call it DEEPINFRA_TOKEN; this project's .env uses DEEPINFRA_API_KEY.
 _API_KEY_ENV_VARS = ("DEEPINFRA_API_KEY", "DEEPINFRA_TOKEN")
 
-#: Environment variables checked for the model id, in order. ``LLM_MODEL`` is
-#: this team's existing convention and is checked first so the shared .env
-#: works without duplicating the value.
+#: Model environment variables in precedence order.
 _MODEL_ENV_VARS = ("LLM_MODEL", "DEEPINFRA_MODEL")
 
 #: Statuses worth retrying: rate limiting and transient server errors.
@@ -288,8 +286,7 @@ def call_deepinfra_chat(
                 url, json=body, headers=headers, timeout=request_timeout
             )
         except Exception as exc:  # noqa: BLE001 — never propagate to the turn.
-            # The exception text can echo the request; report only the type so
-            # a bearer token can never reach a log or the UI.
+            # Exception text may contain request data, so expose only its type.
             last_status = f"DeepInfra request failed ({type(exc).__name__})."
             if attempt < attempts:
                 time.sleep(_backoff(attempt))
@@ -366,10 +363,7 @@ def _parse_response(response: Any, model: str) -> LLMResponse:
             model=model, status_message="DeepInfra returned no completion choices."
         )
 
-    # An error page, a proxy, or a partially OpenAI-compatible provider can
-    # return 200 with choices like ["service unavailable"] or
-    # [{"message": "boom"}]. Attribute access on those raises AttributeError
-    # outside any try, which would escape all the way out of the agent turn.
+    # Some compatible providers return malformed choices with HTTP 200.
     first = choices[0] if isinstance(choices[0], dict) else {}
     message = first.get("message")
     if not isinstance(message, dict):

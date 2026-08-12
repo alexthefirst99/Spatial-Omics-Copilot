@@ -20,7 +20,7 @@ sys.path.insert(0, "src")
 
 LIVE = "--live" in sys.argv
 SHOW_PROMPT = "--prompt" in sys.argv
-questions = [a for a in sys.argv[1:] if not a.startswith("--")]
+questions = [a for a in sys.argv[1:] if not a.startswith("-")]
 
 if not questions:
     questions = [
@@ -91,7 +91,7 @@ for question in questions:
     if meta["citations"]:
         print(f"   citations   : {[c['pmid'] for c in meta['citations']]}")
     if SHOW_PROMPT:
-        print("   ---- prompt sent to the LLM ----")
+        print("   -- prompt sent to the LLM --")
         for line in result["context_str"].splitlines():
             print(f"   | {line}")
     print()

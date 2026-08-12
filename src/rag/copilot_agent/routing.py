@@ -22,8 +22,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-# Intent labels. These are stable strings: they appear in the agent trace and
-# in tests, so renaming one is a contract change.
+# Intent labels are part of the trace and test contract.
 INTENT_PATHWAY = "pathway"
 INTENT_GENE_FUNCTION = "gene_function"
 INTENT_LITERATURE = "literature"
@@ -67,7 +66,7 @@ def _terms(*words: str) -> tuple[re.Pattern[str], ...]:
     return tuple(patterns)
 
 
-# --- Signal vocabularies -------------------------------------------------
+# -- Signal vocabularies -------------------------
 #
 # Each vocabulary is scored independently, so "which pathways, and any papers?"
 # routes to two tools rather than forcing a single winner.
@@ -80,9 +79,7 @@ _PATHWAY_TERMS = _terms(
     "gene set", "gene sets", "over representation", "overrepresentation",
 )
 
-# Deliberately excludes bare interrogatives such as "what does" — those match
-# any question, including "what does this region look like?", and would starve
-# the image route of its own questions.
+# Bare interrogatives would capture unrelated image questions.
 _GENE_FUNCTION_TERMS = _terms(
     "gene", "genes", "marker", "markers", "deg", "degs",
     "differentially expressed", "differential expression",
@@ -101,12 +98,7 @@ _LITERATURE_TERMS = _terms(
     "prior work", "known from", "reported", "abstract", "abstracts",
 )
 
-# Strictly visual cues only. Words that merely *co-occur* with tissue talk —
-# "structure", "architecture", "pattern", "stroma", "colour" — were removed:
-# they made "explain the biology of the stromal compartment" an image question
-# (zero evidence tools), and "colour" collided with "colorectal" outright.
-# A term earns a place here only if a researcher using it is asking what the
-# tissue LOOKS LIKE.
+# Keep this vocabulary strictly visual to avoid starving evidence routes.
 _IMAGE_TERMS = _terms(
     "image", "images", "picture", "photo", "crop", "cropped", "thumbnail",
     "morphology", "morphological", "histology", "histological",
@@ -130,9 +122,7 @@ _SUMMARY_TERMS = _terms(
     "tumors", "tumours", "cancer", "disease", "biology", "biological",
     "clinical", "prognosis", "prognostic", "significance", "meaning",
     "why", "how come",
-    # Disease and tissue vocabulary. A question naming the tissue or a
-    # diagnosis is a biological question even with no other cue —
-    # "Is this region colorectal adenocarcinoma?" must gather evidence.
+    # Disease or tissue names alone should trigger biological evidence.
     "colorectal", "colon", "rectal", "adenocarcinoma", "carcinoma",
     "neoplasm", "malignant", "malignancy", "benign", "dysplasia", "dysplastic",
     "metastasis", "metastatic", "invasion", "invasive",
@@ -251,11 +241,7 @@ def _mentioned_genes(text: str, genes: Sequence[str]) -> list[str]:
         if len(symbol) < 2 or symbol.upper() in seen:
             continue
 
-        # CAT, SET, REST, MAX, ACHE, SHE, PIGS and TH are all real HGNC
-        # symbols and all ordinary English words. Matching those
-        # case-insensitively turns "what is the cat doing here?" into a gene
-        # question and fires a live NCBI lookup. A researcher naming a gene
-        # writes it in caps, so short symbols require an exact-case match.
+        # Short HGNC symbols that are English words require exact case.
         flags = 0 if len(symbol) <= _SHORT_SYMBOL_LEN else re.IGNORECASE
         if re.search(rf"\b{re.escape(symbol)}\b", text, flags):
             seen.add(symbol.upper())
@@ -321,9 +307,7 @@ def classify_question(question: str, genes: Sequence[str] = ()) -> str:
     if signals.summary:
         return INTENT_EXPLANATION
 
-    # Nothing tissue-related was recognised. Treat it as conversation rather
-    # than spending three network calls on it — docs/tickets.md requires that
-    # irrelevant queries skip the pathway and PubMed tools.
+    # Skip network tools for unrelated conversation.
     return INTENT_GENERAL
 
 

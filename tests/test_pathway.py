@@ -71,10 +71,7 @@ def test_successful_enrichment_parses_sorts_filters_and_preserves_source(monkeyp
     assert first["overlap"] == ["EPCAM", "KRAS", "TP53"]
     assert first["gene_count"] == 3
     assert first["set_size"] == 120
-    # run_pathway_enrichment queries each gene set library in its own call
-    # (gseapy.enrichr() silently drops all but one library when given several
-    # gene_sets in a single call), so both libraries are queried across two
-    # calls rather than one combined call.
+    # gseapy drops libraries from combined calls, so each gets one request.
     assert len(calls) == 2
     assert calls[0]["gene_list"] == ["EPCAM", "KRAS", "TP53"]
     assert calls[1]["gene_list"] == ["EPCAM", "KRAS", "TP53"]

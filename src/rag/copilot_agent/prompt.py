@@ -402,9 +402,7 @@ def _instructions(*, has_papers: bool, image_attached: bool | None) -> list[str]
             "tissue morphology, architecture, or staining."
         )
     else:
-        # Unknown. The turn may or may not carry an image (app/worker.py
-        # decides, after this text is built), so the rule is made conditional
-        # rather than asserting an attachment state that could be wrong.
+        # The worker may attach an image after this prompt is built.
         lines.append(
             "- Describe tissue appearance only if an image of this region is "
             "actually attached to this message and the feature is visible in "

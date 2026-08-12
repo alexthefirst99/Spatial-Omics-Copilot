@@ -66,10 +66,7 @@ from rag.copilot_agent.routing import (
 #: Hard cap on tool calls per turn (``docs/rules.md`` section 4).
 MAX_TOOL_CALLS = 5
 
-#: Extra LangGraph supersteps beyond the tool calls: route, synthesize, and the
-#: terminal step. LangGraph's recursion limit is off by one from intuition —
-#: the minimum workable value is (number of supersteps + 1) — so this slack is
-#: required, not cosmetic.
+#: Route, synthesis, terminal, and LangGraph's exclusive recursion bound.
 _RECURSION_SLACK = 4
 
 _ICONS = {
@@ -84,9 +81,7 @@ _TOOL_LABELS = {
     TOOL_GENE_ANNOTATION: "Gene annotation",
 }
 
-# Cached compiled graph. Compilation re-runs validation, so it is done once and
-# reused; the import of langgraph itself costs ~0.3s and is deferred to first
-# use so importing this module stays cheap for the web layer.
+# Compile lazily once to avoid validation and import cost on web startup.
 _COMPILED_GRAPH: Any = None
 _LANGGRAPH_AVAILABLE: bool | None = None
 
@@ -112,12 +107,7 @@ class AgentState(TypedDict, total=False):
     max_tool_calls: int
     semantic_rerank: bool
     disease: str
-    # Raw disease value as passed in, before the "or tools.DEFAULT_DISEASE"
-    # fallback below — needed because the evidence block (unlike the PubMed
-    # query) must not assert a guessed default; it has to be able to tell
-    # "the caller actually stated this" apart from "nothing was provided so
-    # this was defaulted", which `disease` alone can no longer distinguish
-    # once resolved.
+    # Preserve whether the caller stated a disease; evidence must not assert a default.
     disease_stated: str
     # Pre-computed results supplied by the integration pipeline.
     supplied: dict
@@ -136,7 +126,7 @@ class AgentState(TypedDict, total=False):
     trace: Annotated[list, operator.add]
 
 
-# --- Nodes ---------------------------------------------------------------
+# -- Nodes --------------------------------
 
 
 def route_node(state: AgentState) -> dict:
@@ -351,13 +341,7 @@ def synthesize_node(state: AgentState) -> dict:
         roi_image=state.get("roi_image"),
         image_attached=state.get("image_attached"),
         evidence_gaps=gaps,
-        # The raw stated value, not state["disease"] — that one is already
-        # resolved to tools.DEFAULT_DISEASE when nothing was provided (needed
-        # for the PubMed call below, which requires *some* query anchor).
-        # Asserting a guessed default to the LLM with "do not contradict
-        # this" would risk the same wrong-sample failure this is meant to
-        # prevent, so the evidence block only ever states this when the
-        # caller actually provided it.
+        # PubMed may use a default anchor, but the evidence block may not assert it.
         disease=state.get("disease_stated") or "",
     )
 
@@ -407,7 +391,7 @@ def _should_continue(state: AgentState) -> str:
     return "run_tool" if pending and used < budget else "synthesize"
 
 
-# --- Graph assembly ------------------------------------------------------
+# -- Graph assembly ---------------------------
 
 
 def _build_graph() -> Any:
@@ -486,7 +470,7 @@ def _invoke(state: dict, max_tool_calls: int) -> dict:
         return _run_without_langgraph(state)
 
 
-# --- Public entry points -------------------------------------------------
+# -- Public entry points -------------------------
 
 
 def run_copilot_agent(
@@ -546,9 +530,7 @@ def run_copilot_agent(
     if image_attached is None and roi_image is not None:
         # A roi_image was supplied, so its crop path is authoritative.
         image_attached = bool(adapters.get_field(roi_image, "crop_path"))
-    # Otherwise image_attached stays None — "unknown". run_agent cannot know:
-    # its signature carries no image, yet app/worker.py may still attach the
-    # crop to the same message when a vision model is selected.
+    # Otherwise attachment remains unknown because the worker may add an image later.
 
     supplied = {
         TOOL_GENE_ANNOTATION: gene_annotations,

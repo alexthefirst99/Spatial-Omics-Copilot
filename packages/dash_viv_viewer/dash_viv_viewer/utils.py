@@ -152,7 +152,7 @@ def serve_directory(directory_path, port=5001, host="127.0.0.1"):
     over HTTP with CORS and HTTP Range-Requests enabled (required for Viv).
     
     Parameters:
-    -----------
+    ------
     directory_path : str
         Absolute or relative path to the folder containing your OME-TIFF images.
     port : int, default=5001
@@ -161,7 +161,7 @@ def serve_directory(directory_path, port=5001, host="127.0.0.1"):
         The host address.
     
     Returns:
-    --------
+    ----
     server_url : str
         The base URL of the running server, e.g., "http://127.0.0.1:5001"
     """

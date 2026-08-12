@@ -1,11 +1,6 @@
-// ======================= WANG LAB CHATBOT + UI LOGIC =======================
-// Styles: Glassmorphism (Target Design)
-// Logic: Toggles + API Chat (Consolidated)
-
 let appInitialized = false;
 
 function initApp() {
-  // 1. Elements
   const sendBtn = document.getElementById("sendBtn");
   const chatInput = document.getElementById("chatInput");
   const chatMessages = document.getElementById("chatMessages");
@@ -14,27 +9,18 @@ function initApp() {
   const chatToggle = document.getElementById("chat-toggle");
   const chatPanel = document.querySelector(".chatbot-panel");
 
-  // Ensure key elements exist before init
   if (!sendBtn || !chatInput || !chatMessages) {
     return setTimeout(initApp, 250);
   }
 
-  // Prevent multiple initializations
   if (appInitialized) return;
   appInitialized = true;
 
-  // ---------------------------------------------------------------------------
-  // TOGGLE LOGIC (SIDEBAR & CHAT)
-  // ---------------------------------------------------------------------------
-
-  // Sidebar
-  // Sidebar
   if (sidebarToggle && submitWrapper) {
     sidebarToggle.addEventListener('click', (e) => {
       e.preventDefault();
       submitWrapper.classList.toggle('collapsed');
 
-      // Toggle Expanded Map Height
       const leftColumn = document.getElementById('left-column-temp');
       if (leftColumn) {
         leftColumn.classList.toggle('expanded-map');
@@ -45,12 +31,10 @@ function initApp() {
     });
   }
 
-  // Chat Panel
   if (chatToggle && chatPanel) {
     chatToggle.addEventListener('click', (e) => {
       e.preventDefault();
 
-      // Toggle layout container to resize width
       const chatContainer = document.getElementById('right-column-temp');
       if (chatContainer) chatContainer.classList.toggle('collapsed');
 
@@ -60,9 +44,7 @@ function initApp() {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // BODY-LEVEL TOOLTIP (escapes overflow:hidden parents)
-  // ---------------------------------------------------------------------------
+  // Attach tooltips to body so parent overflow does not clip them.
   let _tip = null;
   document.addEventListener('mouseover', e => {
     const el = e.target.closest('.rag-pathway-name');
@@ -74,7 +56,6 @@ function initApp() {
     const r = el.getBoundingClientRect();
     const tipW = _tip.offsetWidth;
     let left = r.left;
-    // keep within viewport
     if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
     _tip.style.left = left + 'px';
     _tip.style.top  = (r.top - _tip.offsetHeight - 6) + 'px';
@@ -85,12 +66,8 @@ function initApp() {
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // HELPER: Get workspace/session from URL
-  // ---------------------------------------------------------------------------
   function getSessionID() {
-    // URL format: /workspaces/{workspace}/...
-    // Legacy format: /app/{workspace}/...
+    // Support current and legacy workspace URLs.
     const parts = window.location.pathname.split('/');
     if (parts.length > 2 && (parts[1] === "workspaces" || parts[1] === "app") && parts[2]) {
       return parts[2];
@@ -103,9 +80,6 @@ function initApp() {
     return `/workspaces/${getSessionID()}`;
   }
 
-  // ---------------------------------------------------------------------------
-  // HELPER: ROI Paths (Placeholder / Mirror)
-  // ---------------------------------------------------------------------------
   function getROIPaths() {
     const mirrorEl = document.querySelector('[id="roi-data-mirror"]');
     if (mirrorEl && mirrorEl.dataset.dashStore) {
@@ -117,9 +91,6 @@ function initApp() {
     return [];
   }
 
-  // ---------------------------------------------------------------------------
-  // HELPER: Add Message to UI
-  // ---------------------------------------------------------------------------
   function cleanMarkdownText(text) {
     if (!text) return "";
     return String(text)
@@ -141,14 +112,12 @@ function initApp() {
     msg.style.opacity = 0;
     chatMessages.appendChild(msg);
 
-    // Smooth fade-in
     requestAnimationFrame(() => {
       msg.style.transition = "opacity 0.3s ease";
       msg.style.opacity = 1;
       chatMessages.scrollTop = chatMessages.scrollHeight;
     });
 
-    // Append ROI thumbnails if any
     if (imagePaths && imagePaths.length > 0) {
       const thumbs = document.createElement("div");
       thumbs.className = "roi-thumbs";
@@ -156,7 +125,6 @@ function initApp() {
       imagePaths.forEach((path) => {
         const token = getSessionID();
         const img = document.createElement("img");
-        // Cache-bust so the browser always fetches the latest crop file
         const freshSrc = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}&t=${Date.now()}`;
         img.src = freshSrc;
         img.onclick = () => window.open(freshSrc, "_blank");
@@ -168,10 +136,6 @@ function initApp() {
 
     return msg;
   }
-
-  // ---------------------------------------------------------------------------
-  // RAG UI BUILDERS
-  // ---------------------------------------------------------------------------
 
   function buildRagTraceCard(trace, label) {
     const card = document.createElement("div");
@@ -214,7 +178,6 @@ function initApp() {
     const panel = document.createElement("div");
     panel.className = "rag-pathway-panel";
 
-    // Header
     const header = document.createElement("div");
     header.className = "rag-deg-header";
     const left = document.createElement("div");
@@ -239,7 +202,6 @@ function initApp() {
       const row = document.createElement("div");
       row.className = "rag-pathway-row";
 
-      // Source tag (GO / Reactome / KEGG)
       if (p.source) {
         const src = document.createElement("span");
         src.className = "rag-pathway-source";
@@ -278,7 +240,6 @@ function initApp() {
     const panel = document.createElement("div");
     panel.className = "rag-deg-panel";
 
-    // Header
     const header = document.createElement("div");
     header.className = "rag-deg-header";
     const left = document.createElement("div");
@@ -294,12 +255,10 @@ function initApp() {
     header.appendChild(fcLabel);
     panel.appendChild(header);
 
-    // Divider
     const divider = document.createElement("div");
     divider.className = "rag-deg-divider";
     panel.appendChild(divider);
 
-    // Bars
     const maxFc = Math.max(...degs.map(d => d.log2fc), 1);
     degs.forEach(d => {
       const row = document.createElement("div");
@@ -322,7 +281,6 @@ function initApp() {
       panel.appendChild(row);
     });
 
-    // Citation chips
     if (citations && citations.length > 0) {
       const chips = document.createElement("div");
       chips.className = "rag-citation-row";
@@ -348,14 +306,10 @@ function initApp() {
     return panel;
   }
 
-  // ---------------------------------------------------------------------------
-  // CORE: AI Response Handler
-  // ---------------------------------------------------------------------------
   async function aiRespond(userText) {
     const roiPaths = getROIPaths();
     const token = getSessionID();
 
-    // 1. Thinking Indicator
     const thinking = document.createElement("div");
     thinking.classList.add("chat-message", "ai", "chat-thinking");
     thinking.setAttribute("role", "status");
@@ -377,11 +331,8 @@ function initApp() {
     chatMessages.appendChild(thinking);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    // HELPER: Detect Active Viewer Layer
     function getActiveLayerName() {
-      // New VivViewer control. It renders a small panel with a select whose
-      // options are "Image Layer 1", "Image Layer 2", etc. Return the zero-based
-      // numeric layer index so the backend can crop the same layer the user sees.
+      // Return the zero-based layer index used by the crop backend.
       const selects = document.querySelectorAll("select");
       for (const select of selects) {
         const optionLabels = Array.from(select.options || []).map(o => o.textContent.trim());
@@ -393,29 +344,24 @@ function initApp() {
         }
       }
 
-      // Find all checked inputs in the layer control
       const checkedInputs = document.querySelectorAll('.leaflet-control-layers-selector:checked');
       let activeName = "Original";
 
       checkedInputs.forEach(input => {
-        // Leaflet structure: <label> <input> <span> Name </span> </label>
-        // We need to find the text of the span sibling
         const span = input.nextElementSibling;
         if (span) {
           const name = span.textContent.trim();
-          // Prioritize specific overlays
           if (name.includes("cell type")) activeName = "Cell Type";
           else if (name.includes("cell selection")) activeName = "Cell Selection";
           else if (name.includes("cell detection")) activeName = "Cell Detection";
-          else if (name.includes("_min") || name.includes("_max")) activeName = "Gene Expression"; // Simple heuristic
-          else if (name !== "base layer" && activeName === "Original") activeName = name; // Fallback
+          else if (name.includes("_min") || name.includes("_max")) activeName = "Gene Expression";
+          else if (name !== "base layer" && activeName === "Original") activeName = name;
         }
       });
       return activeName;
     }
 
     try {
-      // 2. Send Request
       const modelSelect = document.getElementById("chatModelSelect");
       const selectedModel = modelSelect && modelSelect.value ? modelSelect.value : "ollama:qwen2.5:0.5b";
 
@@ -424,7 +370,7 @@ function initApp() {
         prompt: userText,
         images: roiPaths,
         session_id: token,
-        active_layer: getActiveLayerName() // Send active layer to backend
+        active_layer: getActiveLayerName()
       };
 
       const res = await fetch(`${getAppBasePath()}/chat`, {
@@ -438,8 +384,7 @@ function initApp() {
       const data = await res.json();
       if (data.status === "error") throw new Error(data.message);
 
-      // RAG: show all data panels immediately (before thinking dots)
-      // Order: 1. AGENT TRACE  2. PATHWAY PANEL  3. DEG PANEL  4. LLM response
+      // Render evidence panels before the streamed response.
       let ragMetadata = data.rag_metadata || null;
       if (ragMetadata) {
         const traceCard = buildRagTraceCard(ragMetadata.trace, ragMetadata.label);
@@ -454,55 +399,10 @@ function initApp() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      // --- NEW: Retroactively add images to User Message if returned by Backend ---
-      // The backend now returns 'images' and 'roi_image' which may have been generated server-side.
       let returnedImages = [];
       if (data.roi_image) {
         returnedImages.push(data.roi_image);
       }
-      // REMOVED Fallback to data.images to strictly follow "only show preview if area select"
-      // else if (data.images && data.images.length > 0) {
-      //   returnedImages = data.images;
-      // }
-
-      // [DISABLED] Retroactive user-side image append to keep user message clean
-      /*
-      if (returnedImages.length > 0) {
-        // Find the last user message (it was just added)
-        const userMessages = document.querySelectorAll('.chat-message.user');
-        const lastUserMsg = userMessages[userMessages.length - 1];
-
-        if (lastUserMsg) {
-          // Check if thumbs already exist (avoid duplicate)
-          if (!lastUserMsg.querySelector('.chat-thumbnails')) {
-            const thumbs = document.createElement("div");
-            thumbs.classList.add("chat-thumbnails");
-            thumbs.style.display = "flex";
-            thumbs.style.gap = "5px";
-            thumbs.style.marginTop = "5px";
-
-            returnedImages.forEach(path => {
-              const img = document.createElement("img");
-              img.src = `${getAppBasePath()}/preview?path=${encodeURIComponent(path)}`;
-              img.style.width = "60px";
-              img.style.height = "60px";
-              img.style.borderRadius = "4px";
-              img.style.objectFit = "cover";
-              img.style.cursor = "pointer";
-              img.style.border = "1px solid #ccc";
-
-              // Click to expand
-              img.onclick = () => window.open(img.src, '_blank');
-              thumbs.appendChild(img);
-            });
-            lastUserMsg.appendChild(thumbs);
-          }
-        }
-      }
-      */
-      // ---------------------------------------------------------------------------
-
-      // 3. Poll for Completion (Streaming)
       let aiMsgElement = null;
       let lastContentLength = 0;
 
@@ -519,32 +419,24 @@ function initApp() {
             const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
             if (!pollRes.ok) throw new Error(pollRes.statusText || "Failed to poll chat response");
             const pollData = await pollRes.json();
-            // console.log("Poll status:", pollData.status, "Length:", pollData.response ? pollData.response.length : 0);
-
             if (pollData.status === "streaming" || pollData.status === "done") {
 
-              // 1. Initialize Message Bubble if needed
               if (!aiMsgElement) {
-                thinking.remove();   // Remove thinking bubble
+                thinking.remove();
                 aiMsgElement = addMessage("", "ai", pollData.images);
               }
 
-              // 2. Update Content
               if (pollData.response && pollData.response.length > lastContentLength) {
-                // Only update if content changed/grew
                 aiMsgElement.textContent = cleanMarkdownText(pollData.response);
                 lastContentLength = pollData.response.length;
                 chatMessages.scrollTop = chatMessages.scrollHeight;
               }
 
-              // 3. Handle Completion
               if (pollData.status === "done") {
                 clearInterval(pollInterval);
-                // Ensure final content is set
                 aiMsgElement.textContent = cleanMarkdownText(pollData.response);
 
-                // Always replace thumbs on done so we show the final correct crop,
-                // not whatever stale path was present during the streaming phase.
+                // Replace any thumbnail created from an intermediate response.
                 if (pollData.images && pollData.images.length > 0) {
                   const existing = aiMsgElement.querySelector(".roi-thumbs");
                   if (existing) existing.remove();
@@ -588,9 +480,6 @@ function initApp() {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // EVENT HANDLERS
-  // ---------------------------------------------------------------------------
   let sendInFlight = false;
 
   function setChatInputValue(value) {
@@ -628,7 +517,6 @@ function initApp() {
     }
   });
 
-  // Clear Session
   const clearSessionBtn = document.getElementById("clearSessionBtn");
   if (clearSessionBtn) {
     clearSessionBtn.addEventListener("click", async () => {
@@ -653,64 +541,47 @@ function initApp() {
       }
     });
   }
-  // ---------------------------------------------------------------------------
-  // GLOBAL POLLER (To catch external triggers)
-  // ---------------------------------------------------------------------------
   let lastKnownResponse = "";
 
   function startGlobalPolling() {
     const token = getSessionID();
 
     setInterval(async () => {
-      // Don't poll if we are actively waiting for a response in aiRespond logic?
-      // Actually, separate logic is fine, but we need to deduplicate.
-
       try {
         const res = await fetch(`${getAppBasePath()}/chat/poll`);
         const data = await res.json();
 
         if (data.status === "done") {
-          // Check visibility flag (default true)
           if (data.visible === false) {
-            // Optimization: Update lastKnownResponse so we don't re-poll/re-notify this hidden msg
             if (data.response) lastKnownResponse = data.response;
             return;
           }
 
-          // Simple deduplication: Check if text is same as last known or last message in DOM
           const currentText = data.response;
 
           if (currentText && currentText !== lastKnownResponse) {
-            // Check if it's already the last message in the DOM to be safe
             const lastMsgEl = chatMessages.lastElementChild;
             if (lastMsgEl && lastMsgEl.textContent.includes(cleanMarkdownText(currentText))) {
               lastKnownResponse = currentText;
               return;
             }
 
-            // If getting here, it's a new message
             addMessage(currentText, "ai");
             lastKnownResponse = currentText;
           }
         }
       } catch (e) {
-        // Silent fail on poll errors to not spam console
+        // Polling is best-effort and should not add console noise.
       }
     }, 3000);
   }
 
-  // Start polling
-  // startGlobalPolling();
 }
 
-// ---------------------------------------------------------------------------
-// HERO SECTION: Parallax \u0026 Smooth Scroll
-// ---------------------------------------------------------------------------
 function initHero() {
   const scrollBtn = document.getElementById('scroll-to-app-btn');
   const heroSection = document.getElementById('hero-section');
 
-  // Smooth scroll to main app
   if (scrollBtn) {
     scrollBtn.addEventListener('click', function () {
       const mainApp = document.getElementById('main-app');
@@ -723,7 +594,6 @@ function initHero() {
     });
   }
 
-  // Parallax effect on scroll
   if (heroSection) {
     let ticking = false;
 
@@ -733,12 +603,9 @@ function initHero() {
           const scrolled = window.pageYOffset;
           const heroHeight = heroSection.offsetHeight;
 
-          // Only apply parallax when hero is visible
           if (scrolled < heroHeight) {
-            // Move hero slower than scroll (parallax effect)
             heroSection.style.transform = `translateY(${scrolled * 0.5}px)`;
 
-            // Fade out as user scrolls
             const opacity = 1 - (scrolled / heroHeight);
             heroSection.style.opacity = Math.max(0, opacity);
           }
@@ -750,9 +617,6 @@ function initHero() {
       }
     });
 
-    // ---------------------------------------------------------------------------
-    // CANVAS PARTICLE EFFECT (Antigravity Pattern + Data Packets)
-    // ---------------------------------------------------------------------------
     const canvas = document.getElementById('hero-canvas');
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -761,7 +625,6 @@ function initHero() {
       let particles = [];
       let packets = [];
 
-      // Mouse tracking
       let mouseX = -9999;
       let mouseY = -9999;
 
@@ -790,7 +653,7 @@ function initHero() {
         }
 
         draw() {
-          ctx.fillStyle = 'rgba(0, 113, 227, 0.6)'; // Blue particles
+          ctx.fillStyle = 'rgba(0, 113, 227, 0.6)';
           ctx.beginPath();
           ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
           ctx.closePath();
@@ -806,7 +669,6 @@ function initHero() {
           this.progress = 0;
           this.speed = 0.04;
           this.life = 0;
-          // [CHANGE] Increased base hops
           this.maxLife = 10;
         }
 
@@ -814,7 +676,6 @@ function initHero() {
           if (particles.length === 0) return;
 
           if (this.targetIdx === -1) {
-            // Find a neighbor
             let neighbors = [];
             let p1 = particles[this.currIdx];
             if (!p1) {
@@ -822,7 +683,7 @@ function initHero() {
               return;
             }
 
-            // Helper to get connection reach (must match animate loop logic)
+            // Match the reach calculation used when drawing connections.
             const getReach = (p) => {
               const dx = p.x - mouseX;
               const dy = p.y - mouseY;
@@ -839,10 +700,7 @@ function initHero() {
               let dy = p1.y - p2.y;
               let dist = Math.sqrt(dx * dx + dy * dy);
 
-              // STRICT VISUAL CHECK:
-              // The draw loop only draws if j > i and dist < reach(i)
-              // So line exists if:
-              // (curr < i && dist < reach(curr)) OR (i < curr && dist < reach(i))
+              // Only route packets over connections rendered by the draw loop.
               let visible = false;
               if (this.currIdx < i) {
                 if (dist < getReach(p1)) visible = true;
@@ -860,7 +718,6 @@ function initHero() {
               this.currIdx = Math.floor(Math.random() * particles.length);
             }
           } else {
-            // Move
             this.progress += this.speed;
             if (this.progress >= 1) {
               this.currIdx = this.targetIdx;
@@ -868,7 +725,6 @@ function initHero() {
               this.progress = 0;
               this.life++;
 
-              // [CHANGE] RECHARGE LOGIC
               let p = particles[this.currIdx];
               if (!p) {
                 this.currIdx = Math.floor(Math.random() * particles.length);
@@ -895,7 +751,7 @@ function initHero() {
             let x = p1.x + (p2.x - p1.x) * this.progress;
             let y = p1.y + (p2.y - p1.y) * this.progress;
 
-            ctx.fillStyle = '#ff9500'; // Orange spark
+            ctx.fillStyle = '#ff9500';
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#ff9500';
             ctx.beginPath();
@@ -915,7 +771,6 @@ function initHero() {
         }
       }
 
-      // Trigger immediately (small delay to ensure init)
       setTimeout(() => {
         if (particles.length > 0 && packets.length === 0) {
           packets.push(new DataPacket());
@@ -931,7 +786,6 @@ function initHero() {
       function animate() {
         ctx.clearRect(0, 0, width, height);
 
-        // Update Packets
         packets = packets.filter(p => p.life < p.maxLife);
         packets.forEach(p => { p.update(); p.draw(); });
 
@@ -954,7 +808,6 @@ function initHero() {
 
             if (distance < connectDistance) {
               ctx.beginPath();
-              // Opacity based on distance
               let opacity = (1 - distance / connectDistance) * 0.5;
               if (distMouse < 300) opacity *= 1.5;
 
@@ -984,11 +837,8 @@ function initHero() {
       animate();
     }
   }
-  // ---------------------------------------------------------------------------
-  // LEAFLET RESIZE FIX (Blank Map Issue)
-  // ---------------------------------------------------------------------------
   function fixLeafletMap() {
-    // Trigger a window resize event to force Leaflet to recalculate container size
+    // Leaflet needs a resize event after its container changes.
     setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
     }, 500);
@@ -998,10 +848,8 @@ function initHero() {
     }, 1500);
   }
 
-  // 1. Initial Trigger
   fixLeafletMap();
 
-  // 2. Trigger on Re-visualize click
   const revisualizeBtn = document.getElementById("visual-input");
   if (revisualizeBtn) {
     revisualizeBtn.addEventListener("click", () => {
@@ -1010,7 +858,6 @@ function initHero() {
     });
   }
 
-  // 3. Observer
   const mutationObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.addedNodes) {
@@ -1029,6 +876,4 @@ function initHero() {
   }
 }
 
-// Start
 setTimeout(initApp, 500);
-// setTimeout(initHero, 600); // Hero section disabled

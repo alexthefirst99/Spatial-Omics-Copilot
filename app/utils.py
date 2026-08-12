@@ -1,6 +1,5 @@
 def setup_work_dir():
-    # create a working directory under home directory to store user data
-    # the directory is named according to the current time starting with Mjolnir_, following by current time, ending with a random SHA1 hash
+    # Use a timestamp and UUID to avoid workspace collisions.
     import os
     import datetime
     import uuid

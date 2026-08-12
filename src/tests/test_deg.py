@@ -80,9 +80,9 @@ LEGACY_GENE_KEYS = {
 }
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Fixtures
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def _make_adata(
@@ -185,9 +185,9 @@ def _assert_pvalues_are_sane(result_dict: dict) -> None:
         assert np.isfinite(gene["statistic"])
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # T-008 — Wilcoxon rank-sum
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_planted_signal_ranks_first_with_small_adjusted_pvalue(planted_signal):
@@ -234,11 +234,7 @@ def test_zero_inflated_gene_produces_sane_pvalue_via_tie_correction():
     assert testable[0]
     assert np.isfinite(pvalue[0])
 
-    # Closed-form check against the tie-corrected normal approximation, with
-    # the 0.5 continuity correction. Asserting only "p is small" would NOT
-    # guard tie correction: on this input the UNcorrected variance still gives
-    # p = 1.5e-04. The corrected value is 1.1e-06, ~136x smaller, so comparing
-    # against the exact expected value is what makes this test meaningful.
+    # Check the tie-corrected approximation exactly; a loose bound misses regressions.
     values = counts[:, 0]
     n_roi = n_ref = 50
     n_total = 100
@@ -292,20 +288,7 @@ def test_too_few_spots_on_one_side_is_untestable(n_selected):
     assert set(reasons) == {REASON_INSUFFICIENT_SPOTS}
 
 
-# ---------------------------------------------------------------------------
-# Equivalence against scipy — the gate on the hand-rolled rank-sum
-# ---------------------------------------------------------------------------
-#
-# `wilcoxon_rank_sum` is implemented directly rather than by calling
-# `scipy.stats.mannwhitneyu(..., axis=0)`, which does not stay vectorised
-# through its `_axis_nan_policy` wrapper and dominated the DEG runtime.
-#
-# These tests are what make that reimplementation defensible: they run BOTH
-# implementations over fixed synthetic matrices covering the cases where a
-# hand-rolled rank-sum most plausibly diverges from a reference — heavy ties,
-# all-zero and constant genes, unequal group sizes, and tiny groups — and
-# require agreement to a tight tolerance. They are permanent; do not delete
-# them if the implementation changes again.
+# Compare the vectorized implementation with scipy across edge cases.
 
 
 def _equivalence_matrices() -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -378,9 +361,7 @@ def test_hand_rolled_rank_sum_matches_scipy(case_name):
     ref_p = np.clip(np.asarray(reference.pvalue, dtype=np.float64), 0.0, 1.0)
     ref_u = np.asarray(reference.statistic, dtype=np.float64)
 
-    # Constant genes are deliberately excluded rather than tested: scipy emits
-    # NaN for them (zero tie-corrected variance). Compare only where this
-    # module actually performed a test.
+    # scipy returns NaN for constant genes; compare only testable genes.
     compared = testable & np.isfinite(ref_p)
     assert compared.any(), f"{case_name} exercised no testable gene"
 
@@ -439,9 +420,9 @@ def test_hand_rolled_rank_sum_never_emits_invalid_pvalues():
         assert np.all(np.isfinite(statistic))
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # T-009 — Benjamini-Hochberg
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_benjamini_hochberg_matches_hand_computed_vector():
@@ -494,9 +475,9 @@ def test_benjamini_hochberg_handles_empty_input():
     assert n_tested == 0 and adjusted.size == 0
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # T-010 — candidate pre-filtering
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_detection_counts_match_between_sparse_and_dense():
@@ -585,9 +566,9 @@ def test_prefilter_removing_every_gene_reports_no_significant_genes(planted_sign
     assert result.n_genes_tested == 0
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Degenerate selections
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_empty_roi_returns_empty_selection_status(planted_signal):
@@ -640,9 +621,9 @@ def test_empty_gene_list_returns_no_data_status():
     assert result.status_message == MESSAGE_NO_DATA
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # T-044 — missing / corrupt data
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_no_data_message_literal_is_pinned():
@@ -698,9 +679,9 @@ def test_no_genes_are_ever_fabricated(workspace):
     assert result.to_dict()["top_genes"] == []
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Polygon validation
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -759,9 +740,9 @@ def test_roi_selection_rejects_bad_polygons_without_raising(workspace):
     assert result.top_genes == []
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Path traversal
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -803,9 +784,9 @@ def test_traversal_attempt_returns_none_from_the_public_wrapper(workspace):
     assert result is None
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # Backward compatibility (R6)
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_rank_high_expression_genes_orders_positive_fold_change_genes():
@@ -1008,9 +989,9 @@ def test_unknown_cluster_id_produces_empty_selection(workspace):
     assert result["top_genes"] == []
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------
 # run_roi_deg end to end
-# ---------------------------------------------------------------------------
+# --------------------------------------
 
 
 def test_run_roi_deg_applies_fdr_by_default(workspace):

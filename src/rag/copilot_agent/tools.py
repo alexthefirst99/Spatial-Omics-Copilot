@@ -41,14 +41,10 @@ from rag.copilot_agent.routing import (
     TOOL_PUBMED,
 )
 
-# The demo dataset is 10x Genomics Human Colorectal Cancer (T-028), so this is
-# the correct disease anchor for the demo. It is overridable through config —
-# it must not silently leak into a query about different tissue.
+# Default for the colorectal demo dataset; callers may override it.
 DEFAULT_DISEASE = "colorectal cancer"
 
-# Bounds the request-path cost. Upstream defaults (timeout=10s, max_retries=2)
-# allow roughly 100s of worst-case blocking across esearch + efetch; one retry
-# roughly halves that. Raise it once T-042 moves the agent off the request path.
+# Bound PubMed latency while calls remain on the request path.
 DEFAULT_PUBMED_TIMEOUT = 10.0
 DEFAULT_PUBMED_RETRIES = 1
 
@@ -119,7 +115,7 @@ def _is_failure_status_message(status_message: str) -> bool:
     return "unavailable" in (status_message or "").lower()
 
 
-# --- Pathway enrichment (T-012 upstream) ---------------------------------
+# -- Pathway enrichment (T-012 upstream) -----------------
 
 
 def run_pathway_tool(
@@ -184,7 +180,7 @@ def run_pathway_tool(
     return outcome
 
 
-# --- Gene annotation (T-049 upstream) ------------------------------------
+# -- Gene annotation (T-049 upstream) ------------------
 
 
 def run_gene_annotation_tool(
@@ -255,7 +251,7 @@ def run_gene_annotation_tool(
     return outcome
 
 
-# --- PubMed retrieval (T-015 upstream) -----------------------------------
+# -- PubMed retrieval (T-015 upstream) ------------------
 
 
 def run_pubmed_tool(
@@ -336,15 +332,7 @@ def run_pubmed_tool(
         outcome.status = STATUS_OK
         pmids = [adapters.clean_text(adapters.get_field(p, "pmid")) for p in papers]
         pmids = [pmid for pmid in pmids if pmid]
-        # The disease anchor leads because a wrong one is otherwise invisible:
-        # it silently returns confident, well-formed papers about the wrong
-        # cancer. Observed live — a breast-tissue ROI analysed with the config
-        # default of "colorectal cancer" returned three colorectal papers.
-        # Surfacing it in the trace makes the misconfiguration checkable.
-        #
-        # Naming the PMIDs here matters too: chat.js renders citation chips
-        # inside the DEG panel, so when no DEG rows exist the chips never
-        # appear and the trace is the only place the evidence is visible.
+        # Expose the disease anchor and PMIDs so retrieval can be audited in the trace.
         outcome.detail = f"{disease} · {len(papers)} abstract(s)" + (
             f" · PMID {', '.join(pmids[:3])}" if pmids else ""
         )
@@ -408,12 +396,7 @@ def _with_override(
     return merged
 
 
-# --- LangChain tool objects ----------------------------------------------
-#
-# The graph calls the plain functions above directly — they are already safe
-# and already return the trace metadata. These wrapped objects exist so the
-# agent exposes genuine LangChain tools (T-020), so their schemas can be handed
-# to a tool-calling model later, and so tests can assert on `.name`.
+# Wrappers expose schemas for LangChain and future tool-calling models.
 
 
 def _pathway_tool_fn(genes: list[str]) -> dict:
