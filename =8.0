@@ -1,5 +1,0 @@
-Requirement already satisfied: pytest in /home/qtnguy50/.conda/envs/spatial-copilot/lib/python3.11/site-packages (9.1.1)
-Requirement already satisfied: iniconfig>=1.0.1 in /home/qtnguy50/.conda/envs/spatial-copilot/lib/python3.11/site-packages (from pytest) (2.3.0)
-Requirement already satisfied: packaging>=22 in /home/qtnguy50/.conda/envs/spatial-copilot/lib/python3.11/site-packages (from pytest) (25.0)
-Requirement already satisfied: pluggy<2,>=1.5 in /home/qtnguy50/.conda/envs/spatial-copilot/lib/python3.11/site-packages (from pytest) (1.6.0)
-Requirement already satisfied: pygments>=2.7.2 in /home/qtnguy50/.conda/envs/spatial-copilot/lib/python3.11/site-packages (from pytest) (2.20.0)
