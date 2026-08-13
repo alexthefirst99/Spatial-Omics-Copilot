@@ -94,8 +94,13 @@ def convert_to_ome_tiff(
         save_compression = "deflate"
     
     if is_rgb:
+        # In OME-XML, SizeC is the total number of samples, even when one
+        # interleaved Channel stores all RGB(A) samples.  Declaring SizeC=1
+        # with SamplesPerPixel=3/4 makes the logical channel count zero for
+        # strict OME readers (including Viv's loader), so the image never
+        # reaches the renderer.
         channel_xml = f'<Channel ID="Channel:0:0" SamplesPerPixel="{img.bands}"><LightPath/></Channel>'
-        ome_pixels_attrs = f'SizeC="1" SizeT="1" SizeX="{img.width}" SizeY="{img.height}" SizeZ="1" Type="{ome_type}" Interleaved="true"'
+        ome_pixels_attrs = f'SizeC="{img.bands}" SizeT="1" SizeX="{img.width}" SizeY="{img.height}" SizeZ="1" Type="{ome_type}" Interleaved="true"'
     else:
         channel_xml = '<Channel ID="Channel:0:0" SamplesPerPixel="1"><LightPath/></Channel>'
         ome_pixels_attrs = f'SizeC="1" SizeT="1" SizeX="{img.width}" SizeY="{img.height}" SizeZ="1" Type="{ome_type}"'

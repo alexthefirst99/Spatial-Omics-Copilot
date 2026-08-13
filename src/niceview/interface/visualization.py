@@ -4,6 +4,7 @@ import niceview.utils.io as vio
 from types import SimpleNamespace
 from PIL import Image, ImageDraw
 from dash import html
+from rag.deg.coordinates import resolve_image_spatial_coordinates
 from niceview.pyplot.leaflet import create_viv_viewer
 from niceview.interface.data_io import (
     get_data_path_cache_path,
@@ -38,7 +39,7 @@ def get_wsi(folder_id, work_dir, local_img_path=None):
     vio.copy(vio.join_path(cache_path, cache["gis-img"]), vio.join_path(cache_path, cache["gis-img-file"]))
 
 
-def get_spatial_spot_overlay(work_dir, folder_id=""):
+def get_spatial_spot_overlay(work_dir, folder_id="", image_size=None):
     """Return spatial spot coordinates for viewer overlay."""
     state_path = f'{work_dir}/user{folder_id}/spatial_omics.json'
     if not vio.exists(state_path):
@@ -58,9 +59,10 @@ def get_spatial_spot_overlay(work_dir, folder_id=""):
                 adata.file.close()
             return []
 
-        spatial = np.asarray(adata.obsm["spatial"])
-        radius = None
-        radius_source = "fallback"
+        resolution = resolve_image_spatial_coordinates(adata, image_size=image_size)
+        spatial = resolution.coordinates
+        radius = resolution.spot_diameter / 2.0 if resolution.spot_diameter else None
+        radius_source = resolution.source if resolution.spot_diameter else "fallback"
         diameter_keys = (
             "spot_diameter_fullres",
             "spot_diameter",
@@ -82,7 +84,7 @@ def get_spatial_spot_overlay(work_dir, folder_id=""):
             return None, None
 
         spatial_uns = adata.uns.get("spatial", {}) if hasattr(adata, "uns") else {}
-        if isinstance(spatial_uns, dict):
+        if radius is None and isinstance(spatial_uns, dict):
             diameter, source = read_diameter_from_scalefactors(
                 spatial_uns.get("scalefactors"),
                 'adata.uns["spatial"]'
@@ -141,7 +143,10 @@ def get_spatial_spot_overlay(work_dir, folder_id=""):
 
         if getattr(adata, "file", None) is not None:
             adata.file.close()
-        print(f"Prepared {len(spots)} spatial spots for viewer overlay; spot_radius={radius:.3f} from {radius_source}.")
+        print(
+            f"Prepared {len(spots)} spatial spots for viewer overlay; "
+            f"coordinates={resolution.source}; spot_radius={radius:.3f} from {radius_source}."
+        )
         return spots
     except Exception as e:
         print(f"Failed to prepare spatial spot overlay: {e}")
@@ -243,7 +248,11 @@ def visualization_img_input(folder_id, work_dir, geojson_coords=None):
             html.P("Please ensure the file has been uploaded.")
         ], style={'padding': '20px', 'border': '1px solid red', 'borderRadius': '5px'})
 
-    spot_overlay = get_spatial_spot_overlay(work_dir, folder_id)
+    spot_overlay = get_spatial_spot_overlay(
+        work_dir,
+        folder_id,
+        image_size=args.get("heightWidth", [0, 0]),
+    )
     cluster_overlay_client = get_spatial_cluster_overlay_client(
         work_dir,
         folder_id,
@@ -251,6 +260,18 @@ def visualization_img_input(folder_id, work_dir, geojson_coords=None):
         args.get("heightWidth", [0, 0])
     )
     overlay_layers = [(cluster_overlay_client, "spatial clusters")] if cluster_overlay_client else []
+
+    # Keep the backend's layer index mapping identical to VivViewer's. Use the
+    # original base-image path so its selection-time ROI crop remains reusable.
+    chat_base_path = args.get("tutorialImagePath") or vio.join_path(
+        data_path, f"{args['sampleId']}-wsi-img.tiff"
+    )
+    args["imageLayers"] = [chat_base_path] + [
+        client.filename for client, _ in overlay_layers
+    ]
+    args["imageLayerLabels"] = ["Original"] + [label for _, label in overlay_layers]
+    args["activeLayer"] = 1 if overlay_layers else 0
+    vio.dump_json(args, f'{work_dir}/user{folder_id}/args.json')
 
     input_map = create_viv_viewer(
         'map-output',

@@ -32,6 +32,7 @@ from scipy.stats import mannwhitneyu, norm, rankdata
 from rag.deg import run_roi_deg
 from rag.deg.extraction import (
     _rank_high_expression_genes,
+    _two_group_mean_and_pct,
     compute_deg,
     get_cluster_high_expression_genes,
     get_roi_high_expression_genes,
@@ -202,6 +203,71 @@ def test_planted_signal_ranks_first_with_small_adjusted_pvalue(planted_signal):
     assert result.top_genes[0].log2_fold_change > 1.0
     assert result.fdr_applied is True
     _assert_pvalues_are_sane(result.to_dict())
+
+
+def test_effect_size_only_mode_skips_wilcoxon(planted_signal, monkeypatch):
+    adata, selected = planted_signal
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("Wilcoxon should not run in effect-size-only mode")
+
+    monkeypatch.setattr("rag.deg.extraction.wilcoxon_rank_sum", fail_if_called)
+
+    result = compute_deg(
+        adata,
+        selected,
+        top_n=5,
+        run_statistical_test=False,
+    )
+
+    assert result.status == "ok"
+    assert result.top_genes[0].gene == "GENE_0"
+    assert result.n_genes_tested == 0
+    assert result.fdr_applied is False
+    assert result.ranking_method.endswith("_effect_size_only")
+    assert all(not gene.testable for gene in result.top_genes)
+    assert all(
+        gene.untestable_reason == "statistical_test_not_requested"
+        for gene in result.top_genes
+    )
+
+
+@pytest.mark.parametrize("sparse", [False, True])
+def test_two_group_summary_matches_direct_slicing(sparse):
+    rng = np.random.default_rng(SEED + 101)
+    matrix = rng.poisson(1.5, size=(41, 13)).astype(np.float32)
+    matrix[rng.random(matrix.shape) < 0.7] = 0.0
+    matrix[0, 0] = -2.0
+    selected = np.zeros(matrix.shape[0], dtype=bool)
+    selected[[0, 2, 5, 8, 13, 21, 34]] = True
+    source = sp.csr_matrix(matrix) if sparse else matrix
+
+    actual = _two_group_mean_and_pct(source, selected)
+    expected = (
+        matrix[selected].mean(axis=0),
+        (matrix[selected] > 0).mean(axis=0),
+        matrix[~selected].mean(axis=0),
+        (matrix[~selected] > 0).mean(axis=0),
+    )
+
+    for actual_values, expected_values in zip(actual, expected):
+        np.testing.assert_allclose(actual_values, expected_values, rtol=1e-6)
+
+
+def test_fdr_filter_forces_wilcoxon_when_fast_mode_is_requested(planted_signal):
+    adata, selected = planted_signal
+
+    result = compute_deg(
+        adata,
+        selected,
+        top_n=5,
+        fdr_threshold=0.05,
+        run_statistical_test=False,
+    )
+
+    assert result.fdr_applied is True
+    assert result.n_genes_tested > 0
+    assert result.top_genes[0].adj_pvalue < 0.05
 
 
 def test_null_dataset_yields_no_significant_genes(null_dataset):
@@ -891,6 +957,64 @@ def test_legacy_roi_wrapper_still_returns_none_without_coords(workspace):
         )
         is None
     )
+
+
+def test_roi_wrapper_uses_image_aligned_feature_slice_coordinates(tmp_path):
+    """A CytAssist ROI must not be compared directly with microscope pixels."""
+
+    counts = np.array(
+        [
+            [40.0, 1.0],
+            [35.0, 1.0],
+            [30.0, 1.0],
+            [25.0, 1.0],
+            [1.0, 25.0],
+            [1.0, 30.0],
+            [1.0, 35.0],
+            [1.0, 40.0],
+        ]
+    )
+    adata = _make_adata(
+        counts,
+        gene_names=["ROI_GENE", "REFERENCE_GENE"],
+        spatial=np.column_stack([np.arange(8) + 1_000.0, np.arange(8) + 1_000.0]),
+        sparse=True,
+    )
+    adata.obs["array_row"] = np.arange(8)
+    adata.obs["array_col"] = np.arange(8)
+    adata.uns["source_h5_format"] = "10x_feature_slice"
+    adata.uns["binning_scale"] = 1
+    adata.uns["spatial"] = {
+        "metadata": {
+            "transform_matrices": {
+                "spot_colrow_to_cytassist_colrow": np.eye(3),
+            }
+        },
+        "scalefactors": {"bin_diameter_fullres": 8.0},
+    }
+
+    work_dir = tmp_path / "workspace"
+    user_dir = work_dir / "user"
+    user_dir.mkdir(parents=True)
+    h5ad_path = user_dir / "spatial_expression.h5ad"
+    adata.write_h5ad(h5ad_path)
+    state_path = user_dir / "spatial_omics.json"
+    state_path.write_text(json.dumps({"h5ad_path": str(h5ad_path)}), encoding="utf-8")
+    (user_dir / "args.json").write_text(
+        json.dumps({"heightWidth": [10, 10]}),
+        encoding="utf-8",
+    )
+
+    result = get_roi_high_expression_genes(
+        str(work_dir),
+        [[[-1.0, -1.0], [4.0, -1.0], [4.0, 4.0], [-1.0, 4.0]]],
+        top_n=2,
+    )
+
+    assert result is not None
+    assert result["selected_spots"] == 4
+    assert result["reference_spots"] == 4
+    assert result["top_genes"][0]["gene"] == "ROI_GENE"
 
 
 def test_legacy_roi_wrapper_returns_none_when_state_is_missing(tmp_path):

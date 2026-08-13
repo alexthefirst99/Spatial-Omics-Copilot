@@ -14,6 +14,54 @@ os.makedirs(TMP_BASE, exist_ok=True)
 
 OME_CACHE_LOCKS = {}
 OME_CACHE_LOCKS_GUARD = threading.Lock()
+OME_CACHE_FORMAT_VERSION = "v2-rgb-sizec"
+
+
+def get_viewer_image_layers(work_dir, args, folder_id=""):
+    """Return the image paths in the same zero-based order as VivViewer."""
+    sample_id = args.get("sampleId", "default")
+    base_path = args.get("tutorialImagePath") or os.path.join(
+        work_dir, "db", "data", f"{sample_id}-wsi-img.tiff"
+    )
+
+    registered_layers = args.get("imageLayers")
+    if isinstance(registered_layers, list) and registered_layers:
+        layers = [path for path in registered_layers if isinstance(path, str) and path]
+        if layers:
+            return layers
+
+    # Compatibility for workspaces created before imageLayers was persisted.
+    layers = [base_path]
+    sample_id_file = args.get("sampleIdFile")
+    legacy_overlay = (
+        os.path.join(
+            work_dir,
+            "db",
+            "cache",
+            f"{sample_id_file}-gis-blend-cell-type-img.tiff",
+        )
+        if sample_id_file
+        else None
+    )
+    spatial_overlay = os.path.join(
+        work_dir, f"user{folder_id}", "spatial_omics", "spatial_cluster_overlay.png"
+    )
+    for overlay_path in (legacy_overlay, spatial_overlay):
+        if overlay_path and os.path.exists(overlay_path):
+            layers.append(overlay_path)
+    return layers
+
+
+def resolve_active_image_path(work_dir, args, active_layer=None, folder_id=""):
+    """Resolve a frontend layer index to its real backing image path."""
+    layers = get_viewer_image_layers(work_dir, args, folder_id=folder_id)
+    try:
+        layer_index = int(active_layer)
+    except (TypeError, ValueError):
+        layer_index = 0
+    if layer_index < 0 or layer_index >= len(layers):
+        layer_index = 0
+    return layers[layer_index], layer_index, layers
 
 
 def crop_image_by_roi(image_path, roi_path, output_path):
@@ -108,7 +156,10 @@ def crop_image_by_roi(image_path, roi_path, output_path):
 
 def get_ome_cache_path(path, token):
     import hashlib
-    path_hash = hashlib.md5(path.encode()).hexdigest()[:12]
+    # Include the converter format version so a metadata fix cannot keep
+    # serving an older, browser-incompatible OME-TIFF forever.
+    cache_key = f"{OME_CACHE_FORMAT_VERSION}\0{path}"
+    path_hash = hashlib.md5(cache_key.encode()).hexdigest()[:12]
     basename = os.path.splitext(os.path.basename(path))[0]
     parent_cache_dir = os.path.join(TMP_BASE, "ome_tiff_cache")
     ome_cache_dir = os.path.join(parent_cache_dir, token)

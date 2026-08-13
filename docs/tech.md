@@ -14,7 +14,7 @@ spatial-omics-copilot/
 │   ├── layout.py                 # Dash UI layout
 │   ├── routes.py                 # Flask HTTP routes
 │   ├── worker.py                 # background job queue + LLM streaming
-│   ├── inference.py              # Ollama API wrapper
+│   ├── inference.py              # Ollama/DeepInfra provider wrapper
 │   ├── config.py                 # config/app.yaml + env var resolution
 │   ├── session.py                # thread-safe chat session read/write
 │   ├── image_utils.py            # ROI crop, OME-TIFF cache
@@ -295,6 +295,7 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 
 | **YAML key / env override** | **Required** | **Purpose** |
 | --- | --- | --- |
+| `.env: LLM_PROVIDER` | No | DeepInfra opt-in switch; only the exact value `deepinfra` enables it, otherwise Ollama is the default |
 | `ollama.model` / `OLLAMA_MODEL` | No | Local Ollama model; defaults to `qwen2.5vl:7b` |
 | `ollama.host` / `OLLAMA_HOST` | No | Ollama server URL; defaults to `http://localhost:11434` |
 | `ollama.num_predict` | No | Safety ceiling on generated tokens — the prompt itself instructs the model to answer in ~3-4 sentences, so this only needs to be large enough for that to actually finish rather than cut off mid-sentence |
@@ -307,7 +308,7 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 | `copilot_agent.semantic_rerank` | No | Re-rank retrieved abstracts against the question with ChromaDB; off by default |
 | `pathway_enrichment.*` | No | `gene_sets`, `organism`, `top_n`, `max_genes`, `adjusted_p_value_cutoff`, `significant_only` — real ORA query/filter parameters for `gseapy.enrichr()` |
 | `gene_annotation.*` | No | `organism`, `max_genes`, `timeout`, `max_retries`, `tool` — NCBI Gene ESearch/ESummary lookup parameters |
-| `deepinfra.*` / `.env: DEEPINFRA_API_KEY` | No | Optional alternate LLM provider; unset means Ollama is used |
+| `deepinfra.*` / `.env: DEEPINFRA_API_KEY`, `DEEPINFRA_MODEL` | For DeepInfra | Hosted chat provider settings; set `LLM_PROVIDER=deepinfra` to make it the default |
 | `paths.chat_dir` / `COPILOT_CHAT_DIR` | No | Chat session path |
 | `paths.workdir_base` / `COPILOT_WORKDIR_BASE` | No | Working directory base path |
 | `paths.tmp_base` / `COPILOT_TMP_BASE` | No | Temporary upload/OME-TIFF cache path |

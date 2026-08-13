@@ -10,7 +10,7 @@ import pytest
 ad = pytest.importorskip("anndata")
 
 import niceview.interface.upload as upload_module
-from niceview.interface.upload import upload_spatial_h5ad
+from niceview.interface.upload import _wait_for_file, upload_spatial_h5ad
 
 
 def _write_h5ad(path, n_obs=6, n_vars=4, with_spatial=True):
@@ -57,6 +57,7 @@ def test_upload_spatial_h5ad_valid_file_registers_state_and_starts_clustering(tm
 
     stored_path = state["h5ad_path"]
     assert ad.read_h5ad(stored_path).n_obs == 6
+    assert not source.exists()
 
     # Clustering is kicked off exactly once, on the stored (not source) copy.
     assert len(calls) == 1
@@ -103,3 +104,10 @@ def test_upload_spatial_h5ad_rejects_non_h5ad_extension(tmp_path, monkeypatch):
 def test_upload_spatial_h5ad_no_files_returns_no_update():
     assert upload_spatial_h5ad([], "", "/tmp/unused") is dash.no_update
     assert upload_spatial_h5ad(None, "", "/tmp/unused") is dash.no_update
+
+
+def test_wait_for_file_times_out_instead_of_polling_forever(tmp_path):
+    missing = tmp_path / "missing.h5ad"
+
+    with pytest.raises(FileNotFoundError, match="Please select the file and upload it again"):
+        _wait_for_file(str(missing), timeout_seconds=0, poll_seconds=0)

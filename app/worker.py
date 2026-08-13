@@ -14,7 +14,8 @@ try:
         safe_update_session, safe_update_streaming_message,
         safe_update_last_assistant_image,
     )
-    from app.inference import run_model_inference
+    from app.inference import get_default_model_spec, run_model_inference
+    from app.config import load_config
     from app.image_utils import crop_image_by_roi
 except ImportError:
     from session import (
@@ -24,7 +25,8 @@ except ImportError:
         safe_update_session, safe_update_streaming_message,
         safe_update_last_assistant_image,
     )
-    from inference import run_model_inference
+    from inference import get_default_model_spec, run_model_inference
+    from config import load_config
     from image_utils import crop_image_by_roi
 
 _bot_executor = concurrent.futures.ThreadPoolExecutor(max_workers=50)
@@ -111,7 +113,18 @@ def process_session(session_id):
         user_text = last_msg.get("content", "")
         print(f"[{session_id}] Processing: {user_text[:50]}...")
         selected_model = last_msg.get("model")
-        model_supports_images = bool(selected_model and "vl" in selected_model.lower())
+        selected_provider = last_msg.get("model_provider", "ollama")
+        try:
+            from rag.copilot_agent.multimodal import model_supports_vision
+
+            model_supports_images = model_supports_vision(
+                selected_model,
+                load_config() if selected_provider == "deepinfra" else {},
+            )
+        except ImportError:
+            model_supports_images = bool(
+                selected_model and "vl" in selected_model.lower()
+            )
 
         processed_images = []
         local_full_images = []
@@ -157,11 +170,10 @@ def process_session(session_id):
             stream_path = os.path.join(CHAT_DIR, session_id, "stream.txt")
             last_write = time.time()
             try:
-                model_provider = last_msg.get("model_provider", "ollama")
                 rag_context_str = last_msg.get("rag_context_str", "")
                 if rag_context_str and inference_messages:
                     inference_messages[-1]["content"] = inference_messages[-1].get("content", "") + rag_context_str
-                for chunk in run_model_inference(inference_messages, provider=model_provider, model_name=selected_model):
+                for chunk in run_model_inference(inference_messages, provider=selected_provider, model_name=selected_model):
                     full_text += chunk
                     if time.time() - last_write > 0.05:
                         try:
@@ -265,13 +277,10 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
     new_message["model"] = model
     if isinstance(model, str) and ":" in model:
         provider_name, model_name = model.split(":", 1)
-        new_message["model_provider"] = "ollama"
-        if provider_name == "ollama":
-            new_message["model"] = model_name
-        else:
-            new_message["model"] = None
+        new_message["model_provider"] = provider_name.strip().lower()
+        new_message["model"] = model_name.strip() or None
     else:
-        new_message["model_provider"] = "ollama"
+        new_message["model_provider"] = get_default_model_spec().split(":", 1)[0]
 
     if roi_path:
         new_message["roi_path"] = roi_path

@@ -8,20 +8,21 @@ import cv2
 import numpy as np
 
 from app.config import get_path
+from app.roi_context import ensure_roi_context
 
 try:
     from app.session import (
         CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
     )
     from app.worker import enqueue_chat_job, ensure_session_processing
-    from app.image_utils import TMP_BASE, ensure_ome_tiff_cached
+    from app.image_utils import TMP_BASE, ensure_ome_tiff_cached, resolve_active_image_path
     import niceview.utils.io as vio
 except ImportError:
     from session import (
         CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
     )
     from worker import enqueue_chat_job, ensure_session_processing
-    from image_utils import TMP_BASE, ensure_ome_tiff_cached
+    from image_utils import TMP_BASE, ensure_ome_tiff_cached, resolve_active_image_path
     import niceview.utils.io as vio
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -48,13 +49,9 @@ except ImportError:
     run_copilot_agent = None
 
 try:
-    from app.inference import run_model_inference
+    from app.inference import get_default_model_spec, run_model_inference
 except ImportError:
-    from inference import run_model_inference
-
-# The smaller model missed explicit context; cache this slower model's result.
-_DISEASE_EXTRACTION_MODEL = "qwen2.5vl:7b"
-
+    from inference import get_default_model_spec, run_model_inference
 
 def _disease_cache_path(work_dir, folder_id=""):
     return f"{work_dir}/user{folder_id}/disease_context.json"
@@ -94,16 +91,25 @@ def _extract_disease_context(work_dir, session_id, current_message, folder_id=""
             "words (e.g. \"colorectal cancer\"). If it was never stated, "
             "reply with exactly: unknown"
         )
+        model_spec = get_default_model_spec()
+        provider, model_name = model_spec.split(":", 1)
         response = "".join(
             run_model_inference(
                 [{"role": "user", "content": extraction_prompt}],
-                provider="ollama",
-                model_name=_DISEASE_EXTRACTION_MODEL,
+                provider=provider,
+                model_name=model_name or None,
             )
         ).strip()
 
         cleaned = response.strip().strip(".").strip()
-        if not cleaned or "unknown" in cleaned.lower() or len(cleaned) > 80:
+        error_prefixes = ("deepinfra ", "ollama ", "error ", "unsupported ")
+        if (
+            not cleaned
+            or "unknown" in cleaned.lower()
+            or "not configured" in cleaned.lower()
+            or cleaned.lower().startswith(error_prefixes)
+            or len(cleaned) > 80
+        ):
             return None
 
         try:
@@ -157,9 +163,36 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                     args['activeLayer'] = active_layer_index
                     vio.dump_json(args, f'{work_dir}/user/args.json')
 
-                sample_id = args.get('sampleId', 'default')
+                visual_option = args.get('visualizeOption', 'Original')
 
-                image_s3_path = args.get("tutorialImagePath") or f"{work_dir}/db/data/{sample_id}-wsi-img.tiff"
+                requested_layer = active_layer_index
+                if requested_layer is None and (
+                    "Cell Type" in visual_option or visual_option == "CNV"
+                ):
+                    requested_layer = 1
+
+                image_s3_path, resolved_layer_index, _image_layers = resolve_active_image_path(
+                    work_dir, args, requested_layer
+                )
+                layer_labels = args.get("imageLayerLabels")
+                if isinstance(layer_labels, list) and resolved_layer_index < len(layer_labels):
+                    active_layer_label = layer_labels[resolved_layer_index]
+                else:
+                    active_layer_label = "Original" if resolved_layer_index == 0 else os.path.basename(image_s3_path)
+                print(
+                    f"DEBUG: Active visual layer: {resolved_layer_index} "
+                    f"({active_layer_label})"
+                )
+                if requested_layer is not None and resolved_layer_index != requested_layer:
+                    print(
+                        f"DEBUG: Active layer {requested_layer} is unavailable; "
+                        "using image layer 0."
+                    )
+                elif resolved_layer_index > 0:
+                    print(
+                        f"DEBUG: Using active layer {resolved_layer_index} for chat crop: "
+                        f"{image_s3_path}"
+                    )
 
                 # Reuse a selection-time crop only when it belongs to this image.
                 selection_time_crop = None
@@ -176,30 +209,6 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                     images = [selection_time_crop]
                     preview_crop_path = selection_time_crop
                     roi_s3_path = None
-
-                visual_option = args.get('visualizeOption', 'Original')
-                print(f"DEBUG: Active Visual Option: {visual_option}")
-
-                if active_layer_index and active_layer_index > 0:
-                     sample_id_file = args.get('sampleIdFile')
-                     if sample_id_file:
-                         overlay_path = f"{work_dir}/db/cache/{sample_id_file}-gis-blend-cell-type-img.tiff"
-
-                         if vio.exists(overlay_path):
-                             image_s3_path = overlay_path
-                             print(f"DEBUG: Using active layer {active_layer_index} overlay for chat crop: {image_s3_path}")
-                         else:
-                             print(f"DEBUG: Active layer {active_layer_index} overlay not found: {overlay_path}")
-                elif "Cell Type" in visual_option or visual_option == "CNV":
-                     sample_id_file = args.get('sampleIdFile')
-                     if sample_id_file:
-                         overlay_path = f"{work_dir}/db/cache/{sample_id_file}-gis-blend-cell-type-img.tiff"
-
-                         if vio.exists(overlay_path):
-                             image_s3_path = overlay_path
-                             print(f"DEBUG: Using Specific Cell Type Overlay: {image_s3_path}")
-                         else:
-                             print(f"DEBUG: Specific Overlay not found: {overlay_path}")
 
                 # Prefer pixel coordinates written by save_roi().
                 user_coords_path = f"{work_dir}/user/coords.json"
@@ -446,11 +455,13 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                          with vio.open_file(last_img_path_files, 'w') as f_img:
                              f_img.write(image_s3_path)
 
-                else:
+                elif not selection_time_crop:
                     # Reset duplicate detection after the ROI is cleared.
                     if vio.exists(last_roi_path): vio.remove(last_roi_path)
                     if vio.exists(last_img_path_files): vio.remove(last_img_path_files)
                     print("DEBUG: No ROI selected. Sending text only (No Image).")
+                else:
+                    print("DEBUG: ROI selected. Using cached selection-time crop.")
 
                 # Avoid a remote existence check for S3 paths.
                 if send_image and (image_s3_path and (image_s3_path.startswith("s3://") or vio.exists(image_s3_path))):
@@ -479,10 +490,12 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                              print(f"DEBUG: Failed to save ROI: {e}")
 
                 else:
-                    if not images:
+                    if selection_time_crop:
+                         print("DEBUG: Using cached ROI crop as image context.")
+                    elif not images:
                          print("DEBUG: No new ROI/Image sent (Optimization active).")
                     else:
-                         print(f"DEBUG: No valid ROI found. Using full image context.")
+                         print("DEBUG: Image context present without ROI coordinates.")
 
             except Exception as e:
                 print(f"ERROR handling ROI/Image: {e}")
@@ -513,6 +526,24 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                     # Both context files persist, so use the most recently updated one.
                     _cluster_exists = vio.exists(_cluster_path)
                     _roi_exists = vio.exists(_roi_path)
+
+                    # ``coords.json`` is published before Dash finishes the
+                    # expensive DEG calculation.  Synchronize here so the
+                    # first chat turn cannot race ahead with image-only
+                    # context (and never reuse genes from a previous ROI).
+                    _coords_path = f'{work_dir}/user/coords.json'
+                    if vio.exists(_coords_path):
+                        try:
+                            _coords = vio.load_json(_coords_path)
+                            if _coords:
+                                ensure_roi_context(work_dir, _coords, top_n=25)
+                                _roi_exists = vio.exists(_roi_path)
+                        except Exception as _roi_context_error:
+                            print(
+                                "DEBUG: Could not synchronize ROI gene context: "
+                                f"{_roi_context_error}"
+                            )
+
                     _use_cluster = _cluster_exists and (
                         not _roi_exists
                         or os.path.getmtime(_cluster_path) >= os.path.getmtime(_roi_path)
@@ -539,7 +570,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
 
             status = enqueue_chat_job(
                 session_id=session_id,
-                model=data.get("model", "ollama:qwen2.5vl:7b"),
+                model=data.get("model") or get_default_model_spec(),
                 prompt=prompt,
                 images=images,
                 work_dir=work_dir,

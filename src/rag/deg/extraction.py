@@ -64,6 +64,7 @@ from typing import Any
 import numpy as np
 import scipy.sparse as sp
 
+from rag.deg.coordinates import resolve_image_spatial_coordinates
 from rag.deg.filtering import filter_deg_candidates_with_count
 from rag.deg.geometry import (
     PolygonValidationError,
@@ -85,7 +86,12 @@ from rag.deg.models import (
     DEGResult,
     GeneStat,
 )
-from rag.deg.stats import DEFAULT_CHUNK_SIZE, adjust_pvalues, wilcoxon_rank_sum
+from rag.deg.stats import (
+    DEFAULT_CHUNK_SIZE,
+    REASON_NOT_REQUESTED,
+    adjust_pvalues,
+    wilcoxon_rank_sum,
+)
 from rag.deg.workspace import (
     PathResolver,
     WorkspacePathError,
@@ -193,6 +199,86 @@ def _group_mean_and_pct(
     return mean, pct
 
 
+def _two_group_mean_and_pct(
+    matrix: Any,
+    mask: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Compute selected and reference summaries without slicing the reference.
+
+    On Visium HD data the reference commonly contains more than 100,000 rows.
+    Creating ``matrix[~mask]`` copies most of a large CSR matrix and dominated
+    the interactive DEG runtime. The reference sums and detection counts are
+    instead derived by subtracting the selected summaries from one full-matrix
+    pass.
+
+    Args:
+        matrix: Expression matrix, spots x genes.
+        mask: Boolean row mask selecting the ROI or cluster.
+
+    Returns:
+        Selected mean, selected detection fraction, reference mean, and
+        reference detection fraction, in that order.
+    """
+
+    selected_mask = np.asarray(mask, dtype=bool).ravel()
+    n_selected = int(selected_mask.sum())
+    n_reference = int(selected_mask.size - n_selected)
+    n_genes = int(matrix.shape[1])
+
+    if sp.issparse(matrix):
+        working = matrix.tocsr()
+        if not working.has_canonical_format:
+            working = working.copy()
+            working.sum_duplicates()
+
+        selected = working[selected_mask]
+        selected_sum = np.asarray(
+            selected.sum(axis=0, dtype=np.float64)
+        ).ravel()
+        total_sum = np.asarray(
+            working.sum(axis=0, dtype=np.float64)
+        ).ravel()
+
+        selected_positive = np.bincount(
+            selected.indices[selected.data > 0],
+            minlength=n_genes,
+        ).astype(np.float64, copy=False)
+        total_positive = np.bincount(
+            working.indices[working.data > 0],
+            minlength=n_genes,
+        ).astype(np.float64, copy=False)
+    else:
+        dense = np.asarray(matrix)
+        selected = dense[selected_mask]
+        selected_sum = np.asarray(selected.sum(axis=0, dtype=np.float64)).ravel()
+        total_sum = np.asarray(dense.sum(axis=0, dtype=np.float64)).ravel()
+        selected_positive = np.count_nonzero(selected > 0, axis=0).astype(
+            np.float64,
+            copy=False,
+        )
+        total_positive = np.count_nonzero(dense > 0, axis=0).astype(
+            np.float64,
+            copy=False,
+        )
+
+    mean_selected = selected_sum / n_selected
+    pct_selected = selected_positive / n_selected
+
+    if n_reference > 0:
+        mean_reference = (total_sum - selected_sum) / n_reference
+        pct_reference = (total_positive - selected_positive) / n_reference
+        # Floating point subtraction can leave tiny negative residuals when
+        # the reference is all zero. These values are counts and means, so a
+        # lower bound of zero is exact and prevents invalid fold changes.
+        mean_reference = np.maximum(mean_reference, 0.0)
+        pct_reference = np.maximum(pct_reference, 0.0)
+    else:
+        mean_reference = np.zeros(n_genes, dtype=np.float64)
+        pct_reference = np.zeros(n_genes, dtype=np.float64)
+
+    return mean_selected, pct_selected, mean_reference, pct_reference
+
+
 def _normalize_matrix(matrix: Any) -> Any:
     """Library-size normalize to 1e4 per spot, then log1p (opt-in).
 
@@ -253,6 +339,7 @@ def compute_deg(
     fdr_threshold: float | None = None,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     normalize: bool = False,
+    run_statistical_test: bool = True,
 ) -> DEGResult:
     """Run the full DEG engine over an in-memory AnnData.
 
@@ -271,6 +358,10 @@ def compute_deg(
             ranking is used unfiltered.
         chunk_size: Gene block width for the rank-sum test.
         normalize: Opt-in library-size normalization; see module docstring.
+        run_statistical_test: Run Wilcoxon and BH correction. Interactive
+            callers that only display fold-change rankings can disable this
+            expensive step. FDR filtering always enables the test because it
+            cannot be computed without p-values.
 
     Returns:
         A populated ``DEGResult``.
@@ -330,31 +421,47 @@ def compute_deg(
         )
 
     # -- Effect sizes ---------------------------
-    mean_selected, pct_selected = _group_mean_and_pct(matrix, mask)
     has_reference = reference_count > 0
+    (
+        mean_selected,
+        pct_selected,
+        mean_reference,
+        pct_reference,
+    ) = _two_group_mean_and_pct(matrix, mask)
     if has_reference:
-        mean_reference, pct_reference = _group_mean_and_pct(matrix, ~mask)
         log2fc = np.log2(
             (mean_selected + _PSEUDOCOUNT) / (mean_reference + _PSEUDOCOUNT)
         )
         ranking_method = ranking_label
     else:
-        mean_reference = np.zeros_like(mean_selected)
-        pct_reference = np.zeros_like(pct_selected)
         log2fc = np.zeros_like(mean_selected)
         ranking_method = f"{ranking_label}_mean_expression_only_no_reference"
 
     # -- T-008 / T-009: test, then correct -----------------
-    statistic, pvalue, testable, reasons = wilcoxon_rank_sum(
-        matrix,
-        mask,
-        chunk_size=chunk_size,
-    )
-    adj_pvalue, n_tested = adjust_pvalues(pvalue, testable)
+    # The interactive UI ranks by fold change and does not display or filter
+    # p-values. Densifying and ranking every spot for every gene can take
+    # several minutes on a Visium HD matrix, so that caller uses the explicit
+    # effect-size-only path below. Inferential callers retain the full test.
+    fdr_applied = fdr_threshold is not None
+    statistics_requested = bool(run_statistical_test) or fdr_applied
+    if statistics_requested:
+        statistic, pvalue, testable, reasons = wilcoxon_rank_sum(
+            matrix,
+            mask,
+            chunk_size=chunk_size,
+        )
+        adj_pvalue, n_tested = adjust_pvalues(pvalue, testable)
+    else:
+        statistic = np.zeros(n_candidates, dtype=np.float64)
+        pvalue = np.ones(n_candidates, dtype=np.float64)
+        adj_pvalue = np.ones(n_candidates, dtype=np.float64)
+        testable = np.zeros(n_candidates, dtype=bool)
+        reasons = np.full(n_candidates, REASON_NOT_REQUESTED, dtype=object)
+        n_tested = 0
+        ranking_method = f"{ranking_method}_effect_size_only"
     n_untestable = int(n_candidates - n_tested)
 
     # -- Selection policy -------------------------
-    fdr_applied = fdr_threshold is not None
     if fdr_applied:
         threshold = float(fdr_threshold)
         keep = testable & (adj_pvalue < threshold) & (log2fc > 0)
@@ -417,10 +524,16 @@ def compute_deg(
                 f"{float(fdr_threshold):g} out of {n_tested} tested."
             )
         else:
-            message = (
-                f"Ranked {len(genes)} gene(s) by fold change from "
-                f"{n_tested} tested; no FDR filter was applied."
-            )
+            if statistics_requested:
+                message = (
+                    f"Ranked {len(genes)} gene(s) by fold change from "
+                    f"{n_tested} tested; no FDR filter was applied."
+                )
+            else:
+                message = (
+                    f"Ranked {len(genes)} gene(s) by fold change; statistical "
+                    "testing was skipped for interactive performance."
+                )
     else:
         status = STATUS_NO_SIGNIFICANT
         message = (
@@ -688,7 +801,28 @@ def get_roi_high_expression_genes(
         if "spatial" not in adata.obsm:
             return None
         polygons = validate_polygons(coords)
-        mask = build_roi_mask(np.asarray(adata.obsm["spatial"]), polygons)
+        roi_bounds = (
+            min(polygon.bounds[0] for polygon in polygons),
+            min(polygon.bounds[1] for polygon in polygons),
+            max(polygon.bounds[2] for polygon in polygons),
+            max(polygon.bounds[3] for polygon in polygons),
+        )
+        image_size = None
+        args_path = os.path.join(os.path.dirname(state_path), "args.json")
+        if os.path.exists(args_path):
+            try:
+                image_size = read_json(args_path).get("heightWidth")
+            except Exception:
+                logger.info("Could not read image dimensions for ROI coordinate alignment")
+
+        resolution = resolve_image_spatial_coordinates(
+            adata,
+            image_size=image_size,
+            roi_bounds=roi_bounds,
+        )
+        if resolution.source != 'obsm["spatial"]':
+            logger.info("Using %s coordinates for ROI selection", resolution.source)
+        mask = build_roi_mask(resolution.coordinates, polygons)
     except PolygonValidationError as exc:
         logger.info("Rejected ROI polygon: %s", exc)
         return None
@@ -704,6 +838,7 @@ def get_roi_high_expression_genes(
             ranking_label="roi_vs_non_roi_log2fc",
             min_cells=min_cells,
             fdr_threshold=fdr_threshold,
+            run_statistical_test=fdr_threshold is not None,
         ).to_dict()
     except Exception:
         logger.exception("ROI DEG computation failed")
@@ -800,6 +935,7 @@ def get_cluster_high_expression_genes(
             ranking_label="cluster_vs_non_cluster_log2fc",
             min_cells=min_cells,
             fdr_threshold=fdr_threshold,
+            run_statistical_test=fdr_threshold is not None,
         )
         result.cluster_id = wanted
         result.cluster_key = str(cluster_state.get("cluster_key", "spatial_cluster"))
