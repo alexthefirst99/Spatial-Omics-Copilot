@@ -137,6 +137,16 @@ function initApp() {
     return msg;
   }
 
+  // Maps each TraceStep.status (rag.contracts) to a real icon + color instead
+  // of the old hardcoded green check, so a failed/empty/skipped step actually
+  // looks different from a successful one.
+  const RAG_TRACE_STATUS_ICON = {
+    ok: { glyph: "✓", cls: "rag-trace-status-ok" },
+    error: { glyph: "✗", cls: "rag-trace-status-error" },
+    empty: { glyph: "○", cls: "rag-trace-status-empty" },
+    skipped: { glyph: "⤳", cls: "rag-trace-status-skipped" },
+  };
+
   function buildRagTraceCard(trace, label) {
     const card = document.createElement("div");
     card.className = "rag-trace-card";
@@ -146,20 +156,32 @@ function initApp() {
     const title = document.createElement("span");
     title.className = "rag-trace-title";
     title.textContent = "AGENT TRACE";
+    const hint = document.createElement("span");
+    hint.className = "rag-trace-hint";
+    hint.textContent = "click a step to inspect";
     header.appendChild(title);
+    header.appendChild(hint);
     card.appendChild(header);
 
     (trace || []).forEach(step => {
       const row = document.createElement("div");
       row.className = "rag-trace-row";
+
+      const iconInfo = RAG_TRACE_STATUS_ICON[step.status] || RAG_TRACE_STATUS_ICON.ok;
       const check = document.createElement("span");
-      check.className = "rag-trace-check";
-      check.textContent = "✓";
+      check.className = `rag-trace-check ${iconInfo.cls}`;
+      check.textContent = iconInfo.glyph;
       const text = document.createElement("span");
       text.className = "rag-trace-text";
       text.textContent = step.step;
       row.appendChild(check);
       row.appendChild(text);
+      if (step.tool) {
+        const toolBadge = document.createElement("span");
+        toolBadge.className = "rag-trace-tool-badge";
+        toolBadge.textContent = step.tool;
+        row.appendChild(toolBadge);
+      }
       if (step.detail) {
         const detail = document.createElement("span");
         detail.className = "rag-trace-detail";
@@ -167,6 +189,46 @@ function initApp() {
         row.appendChild(detail);
       }
       card.appendChild(row);
+
+      // Collapsed by default so the card looks exactly as compact as before;
+      // click reveals what the step actually took in and returned. This is
+      // the "reasoning can be inspected" surface — retrieve/route/tool-call/
+      // synthesize all set input_summary/output_summary in rag.contracts.
+      if (step.input_summary || step.output_summary) {
+        const expand = document.createElement("div");
+        expand.className = "rag-trace-expand";
+        const addExpandLine = (labelText, valueText) => {
+          const line = document.createElement("div");
+          line.className = "rag-trace-expand-line";
+          const label = document.createElement("span");
+          label.className = "rag-trace-expand-label";
+          label.textContent = labelText;
+          line.appendChild(label);
+          // input_summary can contain the user's own chat message verbatim
+          // (the routing step logs question[:120]) — textContent only, never
+          // innerHTML, so a message can't inject markup into this panel.
+          line.appendChild(document.createTextNode(valueText));
+          expand.appendChild(line);
+        };
+        if (step.input_summary) addExpandLine("in", step.input_summary);
+        if (step.output_summary) addExpandLine("out", step.output_summary);
+        card.appendChild(expand);
+
+        row.classList.add("rag-trace-row-expandable");
+        row.setAttribute("role", "button");
+        row.setAttribute("tabindex", "0");
+        const toggle = () => {
+          const isOpen = expand.classList.toggle("rag-trace-expand-open");
+          row.classList.toggle("rag-trace-row-open", isOpen);
+        };
+        row.addEventListener("click", toggle);
+        row.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle();
+          }
+        });
+      }
     });
 
     return card;

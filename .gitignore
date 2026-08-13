@@ -5,6 +5,12 @@
 !.env.example
 .DS_Store
 
+# Virtual environments
+.venv/
+venv/
+env/
+venv_export/
+
 # Python / temp / cache
 tmp_data/
 data/*

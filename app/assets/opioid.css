@@ -828,6 +828,12 @@ h2 {
   color: #6e6e73;
 }
 
+.rag-trace-hint {
+  font-size: 10px;
+  color: #aeaeb2;
+  font-style: italic;
+}
+
 .rag-trace-row {
   display: flex;
   align-items: baseline;
@@ -836,22 +842,83 @@ h2 {
   line-height: 1.45;
 }
 
+.rag-trace-row-expandable {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.rag-trace-row-expandable:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.rag-trace-row-open {
+  background: rgba(0, 0, 0, 0.045);
+}
+
 .rag-trace-check {
-  color: #34c759;
   font-weight: 700;
   font-size: 13px;
   flex: 0 0 auto;
 }
+
+/* Real status colors — a failed/empty/skipped step no longer looks identical
+   to a successful one (previously every row got a hardcoded green check). */
+.rag-trace-status-ok { color: #34c759; }
+.rag-trace-status-error { color: #ff3b30; }
+.rag-trace-status-empty { color: #aeaeb2; }
+.rag-trace-status-skipped { color: #ff9500; }
 
 .rag-trace-text {
   color: #1d1d1f;
   font-weight: 500;
 }
 
+.rag-trace-tool-badge {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #5856d6;
+  background: rgba(88, 86, 214, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
 .rag-trace-detail {
   font-family: "SF Mono", ui-monospace, monospace;
   font-size: 11px;
   color: #8e8e93;
+}
+
+.rag-trace-expand {
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  margin: 2px 0 6px 21px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.035);
+  border-left: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.rag-trace-expand-open {
+  display: flex;
+}
+
+.rag-trace-expand-line {
+  font-size: 11px;
+  color: #48484a;
+  line-height: 1.4;
+}
+
+.rag-trace-expand-label {
+  display: inline-block;
+  min-width: 26px;
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8e8e93;
+  margin-right: 6px;
 }
 
 /* -- Pathway Enrichment Panel -- */
