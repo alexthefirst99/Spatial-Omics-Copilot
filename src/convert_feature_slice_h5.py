@@ -32,6 +32,25 @@ def _coo_group_to_arrays(group):
     return group["row"][:], group["col"][:], group["data"][:]
 
 
+def _valid_coo_entries(rows, cols, values, *, nrows, ncols):
+    """Return only finite, integer COO coordinates inside the matrix bounds."""
+    rows = np.asarray(rows)
+    cols = np.asarray(cols)
+    values = np.asarray(values)
+    valid = (
+        np.isfinite(rows)
+        & np.isfinite(cols)
+        & np.isfinite(values)
+        & (rows == np.floor(rows))
+        & (cols == np.floor(cols))
+        & (rows >= 0)
+        & (rows < nrows)
+        & (cols >= 0)
+        & (cols < ncols)
+    )
+    return rows[valid], cols[valid], values[valid]
+
+
 def _microscope_spatial_from_bins(bin_rows, bin_cols, metadata, binning_scale):
     raw_cols = (np.asarray(bin_cols, dtype=np.float64) + 0.5) * float(binning_scale)
     raw_rows = (np.asarray(bin_rows, dtype=np.float64) + 0.5) * float(binning_scale)
@@ -91,7 +110,14 @@ def convert_feature_slice_h5_to_h5ad(source_path, output_path, binning_scale=8):
             available = ", ".join(h5_file["masks"].keys())
             raise ValueError(f"Missing {mask_key} mask in feature_slice.h5. Available masks: {available}")
 
-        mask_rows, mask_cols, _ = _coo_group_to_arrays(h5_file["masks"][mask_key])
+        mask_rows, mask_cols, mask_values = _coo_group_to_arrays(h5_file["masks"][mask_key])
+        mask_rows, mask_cols, _ = _valid_coo_entries(
+            mask_rows,
+            mask_cols,
+            mask_values,
+            nrows=nrows_binned,
+            ncols=ncols_binned,
+        )
         mask_rows = mask_rows.astype(np.int64)
         mask_cols = mask_cols.astype(np.int64)
         obs_names = np.asarray([f"{mask_key}_{r}_{c}" for r, c in zip(mask_rows, mask_cols)], dtype=object)
@@ -121,6 +147,13 @@ def convert_feature_slice_h5_to_h5ad(source_path, output_path, binning_scale=8):
             group = feature_slices[str(feature_idx)]
             rows, cols, values = _coo_group_to_arrays(group)
             if values.size:
+                rows, cols, values = _valid_coo_entries(
+                    rows,
+                    cols,
+                    values,
+                    nrows=nrows,
+                    ncols=ncols,
+                )
                 binned_rows = rows.astype(np.int64) // int(binning_scale)
                 binned_cols = cols.astype(np.int64) // int(binning_scale)
                 linear = binned_rows * ncols_binned + binned_cols

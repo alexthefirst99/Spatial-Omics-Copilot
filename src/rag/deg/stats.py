@@ -75,6 +75,7 @@ DEFAULT_CHUNK_SIZE = 512
 REASON_INSUFFICIENT_SPOTS = "insufficient_spots"
 REASON_CONSTANT = "constant_expression"
 REASON_EMPTY_MATRIX = "no_genes"
+REASON_NOT_REQUESTED = "statistical_test_not_requested"
 # Defensive: the constant-gene guard should make this unreachable, but a
 # non-finite p-value must be labelled for what it is rather than silently
 # reported as a constant gene.
@@ -378,6 +379,7 @@ __all__ = [
     "REASON_CONSTANT",
     "REASON_EMPTY_MATRIX",
     "REASON_INSUFFICIENT_SPOTS",
+    "REASON_NOT_REQUESTED",
     "REASON_NON_FINITE",
     "adjust_pvalues",
     "benjamini_hochberg",

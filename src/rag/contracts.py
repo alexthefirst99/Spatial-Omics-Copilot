@@ -457,6 +457,9 @@ class AgentResult:
         label: Region label for panel headers, e.g. "Cluster 5" or "ROI".
         intent: Routing intent label from ``copilot_agent.routing``.
         tools_called: Tool names actually invoked, in call order.
+        tool_outcomes: JSON-safe observable inputs, statuses and outputs for
+            each tool invocation. This is evaluation/observability metadata;
+            it does not contain model reasoning or alter the UI contract.
         status_message: Human-readable state, surfaced when evidence is missing.
     """
 
@@ -471,6 +474,7 @@ class AgentResult:
     label: str = "selection"
     intent: str = ""
     tools_called: list[str] = field(default_factory=list)
+    tool_outcomes: dict[str, Any] = field(default_factory=dict)
     status_message: str = ""
 
     @property
@@ -518,6 +522,7 @@ class AgentResult:
             "context_str": self.context_str,
             "intent": _as_text(self.intent),
             "tools_called": list(self.tools_called),
+            "tool_outcomes": dict(self.tool_outcomes),
             "label": _as_text(self.label) or "selection",
             "status_message": _as_text(self.status_message),
         }

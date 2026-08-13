@@ -640,6 +640,11 @@ def _to_result(state: dict) -> AgentResult:
         if getattr(outcome, "status", None) is not None
     ]
 
+    tool_outcomes = {
+        name: _serialise_tool_outcome(outcome)
+        for name, outcome in outcomes.items()
+    }
+
     status_message = ""
     if not gene_objects:
         status_message = "No gene expression data loaded."
@@ -656,8 +661,53 @@ def _to_result(state: dict) -> AgentResult:
         label=state.get("label", "selection"),
         intent=state.get("intent", ""),
         tools_called=tools_called,
+        tool_outcomes=tool_outcomes,
         status_message=status_message,
     )
+
+
+def _json_safe_result(value: Any) -> Any:
+    """Return public, JSON-safe tool data without exposing model reasoning."""
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, "to_dict"):
+        try:
+            return _json_safe_result(value.to_dict())
+        except Exception:  # noqa: BLE001 - observability must not break a turn.
+            return None
+    if isinstance(value, dict):
+        return {str(key): _json_safe_result(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_result(item) for item in value]
+    return str(value)
+
+
+def _serialise_tool_outcome(outcome: Any) -> dict[str, Any]:
+    """Expose one tool's observable call metadata and returned evidence."""
+
+    # Results supplied by the integration pipeline are not ToolOutcome
+    # envelopes; preserve their public payload and mark that provenance.
+    if not hasattr(outcome, "status"):
+        return {
+            "status": "supplied",
+            "detail": "pre-computed result supplied by caller",
+            "input_summary": "",
+            "output_summary": "",
+            "error": "",
+            "extras": {},
+            "result": _json_safe_result(outcome),
+        }
+
+    return {
+        "status": str(getattr(outcome, "status", "") or ""),
+        "detail": str(getattr(outcome, "detail", "") or ""),
+        "input_summary": str(getattr(outcome, "input_summary", "") or ""),
+        "output_summary": str(getattr(outcome, "output_summary", "") or ""),
+        "error": str(getattr(outcome, "error", "") or ""),
+        "extras": _json_safe_result(getattr(outcome, "extras", {}) or {}),
+        "result": _json_safe_result(getattr(outcome, "result", None)),
+    }
 
 
 def run_agent(

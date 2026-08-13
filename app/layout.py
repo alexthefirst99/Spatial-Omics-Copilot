@@ -7,6 +7,11 @@ import dash
 import plotly.graph_objs as go
 from dash import html, dcc
 
+try:
+    from app.inference import get_default_model_spec
+except ImportError:
+    from inference import get_default_model_spec
+
 def custom_spinner(children, spinner_type="orbit", label="Loading visualization"):
     """Create a custom CSS-based loading indicator."""
     return dcc.Loading(
@@ -82,6 +87,31 @@ def create_layout(work_dir, folder_id):
         pass
 
     gene_chosen = None
+    default_model_spec = get_default_model_spec()
+    chat_model_choices = [
+        ("Ollama fast text  qwen2.5:0.5b", "ollama:qwen2.5:0.5b"),
+        ("Ollama vision  qwen2.5vl:7b", "ollama:qwen2.5vl:7b"),
+        ("Ollama local  qwen2.5vl:32b", "ollama:qwen2.5vl:32b"),
+    ]
+    if default_model_spec.startswith("deepinfra:"):
+        deepinfra_model = default_model_spec.split(":", 1)[1]
+        chat_model_choices.append(
+            (
+                f"DeepInfra  {deepinfra_model or 'set DEEPINFRA_MODEL'}",
+                default_model_spec,
+            )
+        )
+    elif default_model_spec not in {value for _, value in chat_model_choices}:
+        chat_model_choices.append(
+            (
+                f"Ollama configured  {default_model_spec.split(':', 1)[-1]}",
+                default_model_spec,
+            )
+        )
+    chat_model_options = [
+        html.Option(label, value=value, selected=value == default_model_spec)
+        for label, value in chat_model_choices
+    ]
 
     hist = go.Figure(
         data=go.Histogram(),
@@ -246,11 +276,7 @@ def create_layout(work_dir, folder_id):
                                         id="chatModelSelect",
                                         className="chat-model-select",
                                         title="Choose model",
-                                        children=[
-                                            html.Option("Ollama fast text  qwen2.5:0.5b", value="ollama:qwen2.5:0.5b"),
-                                            html.Option("Ollama vision  qwen2.5vl:7b", value="ollama:qwen2.5vl:7b", selected=True),
-                                            html.Option("Ollama local  qwen2.5vl:32b", value="ollama:qwen2.5vl:32b"),
-                                        ],
+                                        children=chat_model_options,
                                     ),
                                 ]),
                                 html.Div(id="chatMessages", className="chat-messages"),

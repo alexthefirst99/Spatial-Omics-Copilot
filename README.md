@@ -1,269 +1,419 @@
 # Spatial Omics Copilot
 
-An AI-powered copilot for spatial transcriptomics research. Researchers load a
-gigapixel histopathology image, draw a region of interest (ROI) on the tissue,
-and immediately receive biologically grounded, literature-backed interpretations
-— without leaving the visualization tool.
+<!--
+Architecture diagram goes here.
 
-## Features
+Example:
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="Spatial Omics Copilot architecture" width="900">
+</p>
+-->
 
-- Interactive gigapixel whole-slide image viewer with ROI drawing.
-- Gene expression overlay from h5ad spatial transcriptomics data.
-- Top differentially expressed genes extracted from any selected tissue region.
-- Prototype pathway enrichment over GO/KEGG-labeled gene sets.
-- Live NCBI PubMed ESearch/EFetch retrieval with bounded retries and no unrelated result padding; a ChromaDB semantic-search API is ready for agent integration.
-- RAG pipeline with a LangGraph-compatible entry point and sequential fallback.
-- Streaming Ollama chat interface for follow-up questions about selected regions; this is the conversational UI for the copilot, not a general-purpose medical chatbot.
+Spatial Omics Copilot is a research app for exploring spatial transcriptomics together with pathology images.
 
-## Supported Data Formats
+The basic workflow is:
 
 ```text
-Whole-slide image:  .tiff, .ome.tiff, .svs
-Gene expression:    .h5ad
+ROI / cluster
+    → differential-expression genes
+    → agent router
+    → NCBI Gene / Enrichr / PubMed
+    → grounded LLM response
 ```
 
-### Convert 10x Visium HD Feature Slice H5
+You can load a whole-slide image and a matching `.h5ad` file, select a region of interest, inspect genes, and ask questions about gene function, pathways, and supporting literature.
 
-The app upload accepts `.h5ad`. If you have a 10x Visium HD
-`feature_slice.h5`, convert it first:
+> This is a research prototype, not a clinical decision-support tool.
+
+---
+
+## What it supports
+
+- Whole-slide pathology images
+- Spatial gene-expression overlays
+- Polygon, rectangle, and point ROIs
+- Differential-expression analysis
+- NCBI Gene lookup
+- Enrichr pathway enrichment
+- PubMed retrieval
+- Local Ollama or hosted DeepInfra models
+- Reproducible evaluation and test scripts
+
+---
+
+## Requirements
+
+- macOS or Linux
+- Conda / Miniforge
+- Python 3.11
+- `libvips` 8.18.2 or compatible
+- Internet access for NCBI, Enrichr, PubMed, or DeepInfra
+- Ollama only if you want to run the LLM locally
+
+Supported input files:
+
+| Data | Format |
+|---|---|
+| Pathology image | `.tif`, `.tiff`, `.ome.tif`, `.ome.tiff`, `.svs` |
+| Spatial expression | `.h5ad` |
+
+Run the commands below from the repository root.
+
+---
+
+## 1. Set up the environment
+
+Create the Conda environment:
+
+```bash
+conda create -n spatial-copilot -c conda-forge \
+  python=3.11 libvips=8.18.2 pip setuptools wheel \
+  --solver=libmamba -y
+```
+
+Activate it:
+
+```bash
+conda activate spatial-copilot
+```
+
+Check Python:
+
+```bash
+python --version
+```
+
+It should show Python 3.11.
+
+Install the project:
+
+```bash
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e . --no-deps
+python -m pip install -r requirements.txt
+```
+
+Create your local environment file:
+
+```bash
+cp .env.example .env
+```
+
+If the editable install fails with a `_distutils_hack` `AssertionError`, use:
+
+```bash
+SETUPTOOLS_USE_DISTUTILS=stdlib python -m pip install -e . --no-deps
+```
+
+---
+
+## 2. Put the data in place
+
+For local development, the simplest layout is:
+
+```text
+data/
+└── demo/
+    ├── sample.ome.tif
+    └── sample.h5ad
+```
+
+For example:
+
+```text
+data/demo/Visium_HD_Human_Colon_Cancer_image.tif
+data/demo/Visium_HD_Human_Colon_Cancer_feature_slice.h5ad
+```
+
+The image and `.h5ad` file must come from the **same tissue sample**.
+
+You do not have to hard-code these paths into the app. Once the server is running, upload/select the image and `.h5ad` file from the workspace UI.
+
+If your 10x data is `feature_slice.h5`, convert it with the script in `src`:
 
 ```bash
 python src/convert_feature_slice_h5.py \
-  Visium_HD_Human_Colon_Cancer_feature_slice.h5 \
-  Visium_HD_Human_Colon_Cancer_feature_slice.h5ad
+  data/demo/Visium_HD_Human_Colon_Cancer_feature_slice.h5 \
+  data/demo/Visium_HD_Human_Colon_Cancer_feature_slice.h5ad
 ```
 
-By default, the converter bins 2 um feature-slice data into 16 um bins
-(`--binning-scale 8`) and writes sparse AnnData with `obsm["spatial"]`.
-Upload the generated `.h5ad` file in the Gene Expression Matrix box.
+Then start the server and select the matching image and generated `.h5ad` in the workspace UI. Conversion may take several minutes.
 
-## Configuration
+---
 
-General app settings live in `config/app.yaml`.
+## 3. Configure the LLM
 
-```yaml
-ollama:
-  host: "http://localhost:11434"
-  model: "qwen2.5vl:7b"
-  vision_model: "qwen2.5vl:7b"
-  timeout: 120
-  num_predict: 220
-  keep_alive: "10m"
-  warmup: true          # load the model at startup instead of on first message
+Choose either Ollama or DeepInfra.
 
-paths:
-  chat_dir: "data/chat_sessions"
-  status_dir: "data/status_data"
-  workspace_map: "data/workspace_map.json"
-  workdir_base: "tmp_data/workdirs"
-  tmp_base: "tmp_data"
-  tutorial_image: "tutorial/loki_tutorial_hskin_melanoma_downsampled.ome.tif"
+### Ollama
 
-app:
-  hot_reload: false
-```
-
-Secrets stay in a local `.env` file. Use `.env.example` as a starting point.
-
-```bash
-PUBMED_API_KEY=...                         # optional; enables NCBI's 10 req/s tier
-PUBMED_EMAIL=developer@example.org         # recommended by NCBI
-PUBMED_TOOL=spatial_omics_copilot
-PUBMED_CHROMA_DIR=data/pubmed_chroma
-```
-
-Environment variables can override YAML settings for deployment. Common
-overrides include `OLLAMA_HOST`, `OLLAMA_MODEL`, `COPILOT_CHAT_DIR`,
-`COPILOT_STATUS_DIR`, `COPILOT_WORKSPACE_MAP`, `COPILOT_WORKDIR_BASE`,
-`COPILOT_TMP_BASE`, `COPILOT_TUTORIAL_IMAGE`, `COPILOT_HOT_RELOAD`, and the
-four PubMed variables above.
-
-Live literature retrieval needs outbound HTTPS access to NCBI. The client
-limits itself to 3 requests/second without an API key and 10 requests/second
-with one. ChromaDB is loaded only when semantic search is requested; its
-default embedding model may be downloaded on first use.
-
-PubMed records are supplied by NCBI/NLM. Review the
-[NCBI disclaimer and copyright notice](https://www.ncbi.nlm.nih.gov/home/about/policies/)
-before redistributing abstracts or using the service outside this class
-prototype.
-
-Calling the live backend sends the selected gene symbols, pathway labels,
-disease context, and configured developer contact to NCBI over HTTPS (using
-POST); it does not send the tissue image or expression matrix. The final UI
-integration must disclose this external request and provide the required
-consent/opt-out before enabling live retrieval for sensitive research data.
-
-## Ollama Setup
-
-The default local model provider is Ollama. Install and start Ollama before
-launching the app if you want local chat responses.
-
-Install Ollama:
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-Start the Ollama server:
+Start Ollama:
 
 ```bash
 ollama serve
 ```
 
-In another terminal, pull the default vision-language model (the chat UI
-selects this one by default so it can inspect ROI crops/images directly).
-This model is heavier and can be slow on CPU-only machines:
+Keep that terminal open.
+
+In another terminal:
 
 ```bash
 ollama pull qwen2.5vl:7b
-```
-
-Optional: pull the smaller, faster text-only model too if you want a quick
-option for turns that don't need image input.
-
-```bash
-ollama pull qwen2.5:0.5b
-```
-
-Verify Ollama is reachable:
-
-```bash
 ollama list
-curl http://localhost:11434/api/tags
 ```
 
-To change the Ollama host or default model, edit `config/app.yaml`:
+In `.env`:
 
-```yaml
-ollama:
-  host: "http://localhost:11434"
-  model: "qwen2.5vl:7b"
-  vision_model: "qwen2.5vl:7b"
+```env
+LLM_PROVIDER=ollama
 ```
 
-The chat UI includes a heavier vision model (`qwen2.5vl:7b`, selected by
-default) and a faster text-only model (`qwen2.5:0.5b`); make sure the
-selected model has been pulled locally.
+Optional overrides:
 
-## Quick Start
+```env
+OLLAMA_HOST=
+OLLAMA_MODEL=
+OLLAMA_VISION_MODEL=
+```
 
-Python 3.11 is recommended. `pyvips` and the native `libvips` library are
-required for OME-TIFF pyramid generation. Installing Python and `libvips` in a
-single transaction avoids an extra Conda dependency-solving pass.
+### DeepInfra
+
+In `.env`:
+
+```env
+LLM_PROVIDER=deepinfra
+DEEPINFRA_API_KEY=your_api_key
+DEEPINFRA_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
+```
+
+`DEEPINFRA_TOKEN` can be used instead of `DEEPINFRA_API_KEY`.
+
+### PubMed
+
+Recommended `.env` settings:
+
+```env
+PUBMED_API_KEY=
+PUBMED_EMAIL=
+PUBMED_TOOL=
+PUBMED_CHROMA_DIR=data/pubmed_chroma
+```
+
+`PUBMED_API_KEY` is optional. `PUBMED_EMAIL` is recommended for NCBI requests.
+
+---
+
+## 4. Run the app
+
+Activate the environment:
 
 ```bash
-conda create -n spatial-copilot -c conda-forge \
-  python=3.11 libvips=8.18.2 pip --solver=libmamba -y
 conda activate spatial-copilot
+```
 
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install -e . --no-deps
+Start the app:
 
-cp .env.example .env
+```bash
 spatial-copilot --port 8081 --workspace demo
 ```
 
-The final editable install uses `--no-deps` because `requirements.txt` has
-already installed the application dependencies. This prevents pip from
-resolving the same dependency tree twice.
+Then open:
 
-Open `http://localhost:8081/workspaces/demo` in your browser.
+```text
+http://localhost:8081/workspaces/demo
+```
 
-For local development, the app can also be launched directly:
+You can also run it directly with Python:
 
 ```bash
 python app/app.py --port 8081 --workspace demo
 ```
 
-## Demo Dataset
+For development:
 
-- VisiumHD CytAssist Gene Expression — Human Colorectal Cancer (CRC), 10x Genomics
-  https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-human-crc
-
-## Project Structure
-
-```text
-spatial-omics-copilot/
-├── README.md
-├── pyproject.toml
-├── requirements.txt
-├── config/
-│   └── app.yaml                  # general app settings
-├── app/                         # Dash/Flask application layer
-│   ├── app.py                   # Dash entry point + callbacks
-│   ├── layout.py                # Dash UI layout
-│   ├── routes.py                # Flask HTTP routes
-│   ├── worker.py                # background job queue + LLM streaming
-│   ├── inference.py             # Ollama API wrapper
-│   ├── config.py                # config/app.yaml + env var resolution
-│   ├── session.py               # chat session read/write
-│   ├── image_utils.py           # ROI crop, OME-TIFF caching
-│   ├── status_store.py          # upload progress tracking
-│   ├── utils.py                 # shared utilities
-│   └── assets/
-│       ├── chat.js              # chat UI: AGENT TRACE, pathway/DEG panels
-│       ├── chat.css             # chat panel styling
-│       ├── opioid.css           # main application layout styling
-│       ├── s3_upload.js         # browser-side upload handling
-│       ├── spinner.css          # loading state styling
-│       ├── upload_styles.css    # upload drop zone/progress styling
-│       ├── tutorial.js          # tutorial button behavior
-│       ├── tutorial.css         # tutorial controls styling
-│       └── font.css             # font imports
-├── src/                         # installable Python packages
-│   ├── niceview/                # UI/domain helpers
-│   │   ├── interface/
-│   │   │   ├── upload.py        # image + h5ad upload handlers
-│   │   │   ├── visualization.py # spot overlay, VivViewer setup
-│   │   │   ├── actions.py       # re-visualize, save ROI
-│   │   │   ├── callback.py      # Dash callbacks
-│   │   │   ├── interface.py     # shared interface state
-│   │   │   └── data_io.py       # session data helpers
-│   │   ├── pyplot/
-│   │   │   └── leaflet.py       # VivViewer component builder + cluster legend
-│   │   └── utils/               # io, colors, dataset, aristotle helpers
-│   └── rag/                     # analysis pipeline
-│       ├── contracts.py         # shared result types (PreprocessResult, ClusterResult,
-│       │                        # ROISelection, ROIImageResult, DEGResult, AgentResult, ...)
-│       ├── pipeline.py          # run_integration_pipeline(): preprocess -> cluster ->
-│       │                        # ROI resolution -> DEG -> annotation -> pathway -> PubMed -> agent
-│       ├── preprocessing.py     # QC, normalize, HVG, PCA (cached to disk)
-│       ├── clustering.py        # Leiden / KMeans spatial clustering (cached to disk)
-│       ├── deg/                 # DEG: Wilcoxon rank-sum + BH correction
-│       ├── pathway_enrichment/  # real GO / KEGG ORA via gseapy/Enrichr
-│       ├── gene_annotation/     # NCBI Gene functional annotation retrieval
-│       ├── pubmed_retrieval/    # NCBI E-utilities retrieval + Chroma semantic search
-│       ├── copilot_agent/       # the real LangGraph agent: dynamic tool routing,
-│       │                        # multimodal prompt, DeepInfra client, disease-context
-│       │                        # extraction hooks
-│       ├── agent/               # back-compat re-export of copilot_agent.run_agent
-│       ├── pathway/              # back-compat import path for pathway_enrichment
-│       └── pubmed/               # back-compat import path for pubmed_retrieval
-│   └── tests/                    # niceview/app-layer tests (upload, clustering, DEG, session, ...)
-├── tests/                        # RAG-layer tests (agent, pathway, pubmed, gene annotation, e2e pipeline)
-├── packages/
-│   └── dash_viv_viewer/         # VivViewer React component package
-├── data/                        # local runtime files
-│   ├── demo/                    # 10x Visium HD Human Colon Cancer demo dataset
-│   ├── chat_sessions/
-│   ├── status_data/
-│   └── workspace_map.json       # generated at runtime
-└── docs/
-    ├── PRD.md
-    ├── specs.md
-    ├── tech.md
-    ├── rules.md
-    ├── tickets.md
-    ├── validation/               # per-person biological/functional validation notes
-    └── planning/
+```bash
+python app/app.py --port 8081 --workspace demo --hot-reload
 ```
 
-## More Docs
+---
 
-- [Product Requirements](docs/PRD.md)
-- [Specifications](docs/specs.md)
-- [Technical Design](docs/tech.md)
-- [Rules](docs/rules.md)
-- [Tickets](docs/tickets.md)
+## 5. Use the workspace
+
+Once the page opens:
+
+1. Upload/select the pathology image.
+2. Upload/select the matching `.h5ad` file.
+3. Wait for the slide and spatial data to load.
+4. Draw an ROI or select a cluster.
+5. Open the gene panel.
+6. Ask the copilot a question.
+
+Examples:
+
+```text
+What genes are highly expressed in this ROI?
+```
+
+```text
+What are the top differentially expressed genes in this region?
+```
+
+```text
+What pathways are associated with these genes?
+```
+
+```text
+What does the literature say about these genes?
+```
+
+---
+
+## 6. Run the evaluation
+
+### One-command full metrics
+
+With the default app data in `data/demo` and provider credentials/model set in
+`.env`, run:
+
+```bash
+./run_full_metrics
+```
+
+This validates the default `.h5ad` and `.tif` assets, automatically uses the
+provider/model selected in `.env`, runs all 28 benchmark cases with generation,
+and writes everything to `evaluation_outputs_full/`. The main machine-readable
+result is `evaluation_outputs_full/full_metrics.json`; the directory also
+contains category metrics, raw results, the readable summary, and human-review
+sheets.
+
+The audited 28-case benchmark uses controlled synthetic ROI fixtures. The demo
+assets are preflighted and recorded in `dataset_manifest.json`, but they are not
+presented as real-ROI biological ground truth because the demo directory does
+not contain audited ROI polygons or labels.
+
+For route/tool metrics without LLM generation:
+
+```bash
+./run_full_metrics --no-generation
+```
+
+### Advanced commands
+
+Run the benchmark with the provider configured in `.env`:
+
+```bash
+python -m evaluation.runner \
+  --config evaluation/eval_cases.json \
+  --output-dir evaluation_outputs
+```
+
+Run with DeepInfra explicitly:
+
+```bash
+python -m evaluation.runner \
+  --config evaluation/eval_cases.json \
+  --output-dir evaluation_outputs \
+  --provider deepinfra \
+  --model Qwen/Qwen2.5-VL-7B-Instruct
+```
+
+To test routing and retrieval without an LLM call:
+
+```bash
+python -m evaluation.runner \
+  --config evaluation/eval_cases.json \
+  --output-dir evaluation_outputs \
+  --no-generation
+```
+
+Results are written to:
+
+```text
+evaluation_outputs/
+```
+
+Main outputs:
+
+| File | What it contains |
+|---|---|
+| `raw_results.jsonl` | Full result for each case |
+| `metrics_summary.csv` | Automatic metrics |
+| `evaluation_summary.md` | Readable benchmark summary |
+| `human_review.csv` | Manual scientific review sheet |
+| `business_metrics_review.csv` | Manual workflow review sheet |
+
+The included benchmark uses synthetic workflow cases. It is not a clinical benchmark.
+
+---
+
+## 7. Run tests
+
+Run everything:
+
+```bash
+python -m pytest -q
+```
+
+Useful focused tests:
+
+```bash
+python -m pytest tests/test_evaluation_runner.py -q
+python -m pytest tests/test_agent.py -q
+```
+
+The normal test suite uses mocks and does not call paid APIs.
+
+---
+
+## 8. Reset local state
+
+Use this if an old upload, chat session, or workspace state is causing problems.
+
+Stop the app first, then run:
+
+```bash
+rm -rf tmp_data
+
+find data/chat_sessions -mindepth 1 ! -name .gitkeep -exec rm -rf {} +
+find data/status_data -mindepth 1 ! -name .gitkeep -exec rm -rf {} +
+
+rm -f data/workspace_map.json
+```
+
+This clears runtime state but keeps files under:
+
+```text
+data/demo/
+```
+
+Start the app again:
+
+```bash
+spatial-copilot --port 8081 --workspace demo
+```
+
+---
+
+## Repository layout
+
+```text
+Spatial-Omics-Copilot/
+├── app/                        # Dash/Flask app
+├── config/
+│   └── app.yaml                # application defaults
+├── data/
+│   ├── demo/                   # put local demo/sample data here
+│   ├── chat_sessions/          # generated runtime state
+│   └── status_data/            # generated runtime state
+├── evaluation/                 # benchmark and evaluation code
+├── packages/
+│   └── dash_viv_viewer/        # whole-slide viewer
+├── src/
+│   ├── rag/                    # routing, tools, retrieval, RAG
+│   └── niceview/               # upload and visualization helpers
+├── tests/
+├── docs/
+├── requirements.txt
+├── pyproject.toml
+└── README.md
+```

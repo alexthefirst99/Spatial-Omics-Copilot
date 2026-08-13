@@ -96,6 +96,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
     const [loaders, setLoaders] = useState([]);
     const [internalActiveLayer, setInternalActiveLayer] = useState(active_layer);
     const [viewMode, setViewMode] = useState('single'); // 'single' | 'side-by-side'
+    const [showCompatibilityPreview, setShowCompatibilityPreview] = useState(true);
 
     // Sync Dash active_layer -> local
     useEffect(() => {
@@ -125,6 +126,7 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
     const [viewState, setViewState] = useState(null);
     const [initialViewState, setInitialViewState] = useState(null);
     const [sharedViewState, setSharedViewState] = useState(null);
+    const [containerSize, setContainerSize] = useState({ width: width || 800, height });
 
     const VIV_EXTENSIONS = useMemo(() => [new ColorPaletteExtension()], []);
 
@@ -142,8 +144,6 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
             }
         }
     }, [loaders, containerSize, viewMode]);
-    const [containerSize, setContainerSize] = useState({ width: width || 800, height });
-
     /* Drawing state */
     const [drawMode, setDrawMode] = useState(null); // null | 'rect' | 'polygon'
     const [spotSelectMode, setSpotSelectMode] = useState(false);
@@ -692,6 +692,43 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
         containerSize.height, containerSize.width, initialViewState, VIV_EXTENSIONS
     ]);
 
+    // Some browser/GPU combinations decode TIFF tiles successfully but never
+    // present Viv's WebGL canvas. A browser-native preview using the same
+    // camera coordinates keeps the histology visible and aligned with ROIs.
+    const compatibilityPreviewUrl = useMemo(() => {
+        const baseUrl = Array.isArray(image_url) ? image_url[0] : image_url;
+        if (typeof baseUrl !== 'string') return null;
+        return baseUrl.replace('/ome_tiff?', '/preview?');
+    }, [image_url]);
+
+    const compatibilityPreviewStyle = useMemo(() => {
+        const pyramid = loaders[0];
+        const source = Array.isArray(pyramid) ? pyramid[0] : pyramid;
+        if (!source || !viewState || !Array.isArray(viewState.target)) return null;
+        const xIndex = source.labels?.indexOf('x') ?? -1;
+        const yIndex = source.labels?.indexOf('y') ?? -1;
+        if (xIndex < 0 || yIndex < 0) return null;
+        const imageWidth = Number(source.shape[xIndex]);
+        const imageHeight = Number(source.shape[yIndex]);
+        if (!(imageWidth > 0 && imageHeight > 0)) return null;
+
+        const paneWidth = viewMode === 'side-by-side' && loaders.length >= 2
+            ? containerSize.width / 2
+            : containerSize.width;
+        const scale = Math.pow(2, Number(viewState.zoom) || 0);
+        return {
+            position: 'absolute',
+            zIndex: 100,
+            pointerEvents: 'none',
+            userSelect: 'none',
+            maxWidth: 'none',
+            left: paneWidth / 2 - Number(viewState.target[0]) * scale,
+            top: containerSize.height / 2 - Number(viewState.target[1]) * scale,
+            width: imageWidth * scale,
+            height: imageHeight * scale,
+        };
+    }, [containerSize, loaders, viewMode, viewState]);
+
     console.log('[VivViewer] rendering, containerSize:', containerSize);
 
     return (
@@ -710,6 +747,15 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                             randomize
                             onViewStateChange={handleBaseViewStateChange}
                             viewStates={viewerConfig.viewStates}
+                        />
+                    )}
+
+                    {showCompatibilityPreview && compatibilityPreviewUrl && compatibilityPreviewStyle && (
+                        <img
+                            src={compatibilityPreviewUrl}
+                            alt="Histopathology compatibility preview"
+                            draggable={false}
+                            style={compatibilityPreviewStyle}
                         />
                     )}
 
@@ -863,6 +909,11 @@ const VivViewer = ({ id, image_url, height = 600, width, bg_color = '#111', acti
                         boxShadow: '0 1px 5px rgba(0,0,0,0.4)', overflow: 'hidden',
                         pointerEvents: 'auto'
                     }}>
+                        <button
+                            title={showCompatibilityPreview ? 'Hide compatibility image preview' : 'Show compatibility image preview'}
+                            onClick={() => setShowCompatibilityPreview(value => !value)}
+                            style={btnStyle(showCompatibilityPreview, false)}
+                        >▧</button>
                         {hasSpots && <button title={spotSelectMode ? 'Turn off spot selection' : `Show/select spatial spots (${spotList.length})`} onClick={() => { const next = !spotSelectMode; setSpotSelectMode(next); if (!next) { setSelectedSpotId(null); setHoverSpot(null); if (setProps) setProps({ selected_spot: null }); } setDrawMode(null); cancelPolygon(); }} style={btnStyle(spotSelectMode, false)}>•</button>}
                         <button title="Draw rectangle ROI" onClick={() => { setDrawMode(m => m === 'rect' ? null : 'rect'); setSpotSelectMode(false); cancelPolygon(); }} style={btnStyle(drawMode === 'rect', false)}>▭</button>
                         <button title="Draw polygon ROI" onClick={() => { setDrawMode(m => m === 'polygon' ? null : 'polygon'); setSpotSelectMode(false); setRectDraft(null); }} style={btnStyle(drawMode === 'polygon', false)}>⬡</button>

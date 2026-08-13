@@ -83,7 +83,7 @@ except ImportError:
     import niceview.utils.io as vio
 
 try:
-    from app.inference import DEFAULT_OLLAMA_MODEL, run_model_inference
+    from app.inference import DEFAULT_OLLAMA_MODEL, get_default_model_spec, run_model_inference
     from app.session import (
         CHAT_DIR as _CHAT_DIR_mod,
         _session_path,
@@ -103,7 +103,7 @@ try:
     )
     from app.routes import register_chat_routes
 except ImportError:
-    from inference import DEFAULT_OLLAMA_MODEL, run_model_inference
+    from inference import DEFAULT_OLLAMA_MODEL, get_default_model_spec, run_model_inference
     from session import (
         CHAT_DIR as _CHAT_DIR_mod,
         _session_path,
@@ -141,7 +141,8 @@ gene_chosen = None
 from niceview.interface.callback import (
     upload_image, upload_spatial_h5ad, reset, save_roi, clear_cache_forcall
 )
-from rag.deg import get_roi_high_expression_genes, get_cluster_high_expression_genes
+from rag.deg import get_cluster_high_expression_genes
+from app.roi_context import ensure_roi_context
 
 from niceview.interface.interface import (
     prepare_file_folder, update_data_cache,
@@ -385,17 +386,22 @@ def main():
                 if vio.exists(crop_meta_path):
                     vio.remove(crop_meta_path)
 
-            deg_result = get_roi_high_expression_genes(
+            roi_context = ensure_roi_context(
                 work_dir, coords, folder_id=folder_id, top_n=25
-            )
-            gene_objects = deg_result["top_genes"] if deg_result and deg_result.get("top_genes") else []
-
-            vio.dump_json({"gene_objects": gene_objects}, f'{work_dir}/user{folder_id}/roi_context.json')
+            ) or {}
+            gene_objects = roi_context.get("gene_objects", [])
+            selected_spots = roi_context.get("selected_spots", 0)
 
             if not gene_objects:
+                if not roi_context.get("analysis_available", False):
+                    empty_message = "Spatial expression data is unavailable for this ROI."
+                elif selected_spots == 0:
+                    empty_message = "No spatial spots overlap this ROI. Check image alignment."
+                else:
+                    empty_message = "No enriched genes were found for this ROI."
                 return status, html.Div(className="roi-gene-card", children=[
                     html.Div("ROI marker genes", className="roi-gene-title"),
-                    html.Div("Upload a spatial .h5ad file to see enriched genes.", className="roi-gene-empty"),
+                    html.Div(empty_message, className="roi-gene-empty"),
                 ])
 
             gene_rows = [
@@ -404,7 +410,7 @@ def main():
                     html.Span(f"log2FC {g['log2_fold_change']:.2g}", className="roi-gene-score"),
                 ]) for g in gene_objects[:25]
             ]
-            n_spots = deg_result.get("selected_spots", 0)
+            n_spots = selected_spots
             return status, html.Div(className="roi-gene-card", children=[
                 html.Div(className="roi-gene-header", children=[
                     html.Div("ROI marker genes", className="roi-gene-title"),
@@ -508,7 +514,10 @@ def main():
             except Exception as e:
                 print(f"DEBUG: Warmup failed ({model_name}): {e}")
 
-    if get_bool("ollama.warmup", default=False, env="OLLAMA_WARMUP"):
+    if (
+        get_default_model_spec().startswith("ollama:")
+        and get_bool("ollama.warmup", default=False, env="OLLAMA_WARMUP")
+    ):
         threading.Thread(target=warmup_ollama, daemon=True).start()
 
     url = f"http://localhost:{args.port}{APP_BASE_PATH}"

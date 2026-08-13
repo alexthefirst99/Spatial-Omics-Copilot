@@ -17,6 +17,21 @@ from niceview.interface.interface import (
 )
 
 
+FILE_WAIT_TIMEOUT_SECONDS = 30
+
+
+def _wait_for_file(path, timeout_seconds=FILE_WAIT_TIMEOUT_SECONDS, poll_seconds=0.25):
+    """Wait briefly for an upload to become visible, then fail instead of polling forever."""
+    deadline = time.monotonic() + max(0, float(timeout_seconds))
+    while not vio.exists(path):
+        if time.monotonic() >= deadline:
+            raise FileNotFoundError(
+                f"Uploaded file was not found after {timeout_seconds:g} seconds: {path}. "
+                "Please select the file and upload it again."
+            )
+        time.sleep(poll_seconds)
+
+
 def _spatial_omics_state_path(work_dir, folder_id=""):
     return f'{work_dir}/user{folder_id}/spatial_omics.json'
 
@@ -137,9 +152,7 @@ def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=No
 
     status_store.update_status(upload_uuid, 5, "Checking file availability...")
     print(f"DEBUG_CHECKPOINT: Checking vio.exists for {filenames_upload_image[0]}", flush=True)
-    while not vio.exists(filenames_upload_image[0]):
-        print("DEBUG: Waiting for file...")
-        time.sleep(5)
+    _wait_for_file(filenames_upload_image[0])
 
     print("DEBUG: File found. Starting processing.")
     status_store.update_status(upload_uuid, 20, "Processing Data Dimensions...")
@@ -209,8 +222,7 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
         status_store.update_status(job_id, 5, "Checking h5ad file...")
 
     try:
-        while not vio.exists(source_path):
-            time.sleep(1)
+        _wait_for_file(source_path)
 
         spatial_dir = _spatial_omics_dir(work_dir, folder_id)
         vio.ensure_dir(spatial_dir)
@@ -221,7 +233,10 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
 
         if job_id:
             status_store.update_status(job_id, 20, "Saving h5ad file...")
-        vio.copy(source_path, stored_path)
+        # Chunk uploads and the workspace live on the same local filesystem.
+        # An atomic move avoids a second full-size copy (the demo h5ad is ~1.3 GB),
+        # which is both much faster and important on machines low on free space.
+        os.replace(source_path, stored_path)
 
         if job_id:
             status_store.update_status(job_id, 45, "Validating spatial coordinates...")
