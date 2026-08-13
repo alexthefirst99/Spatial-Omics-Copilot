@@ -166,6 +166,13 @@ function initApp() {
     (trace || []).forEach(step => {
       const row = document.createElement("div");
       row.className = "rag-trace-row";
+      // Tagged so the poll-completion handler can flip this row from "handed
+      // off" to "succeeded"/"failed" once the streamed answer actually
+      // finishes — at build time we only know the handoff happened, not the
+      // outcome (routes.py returns this before enqueue_chat_job runs).
+      if (step.step === "Synthesizing answer") {
+        row.dataset.synthesizeRow = "true";
+      }
 
       const iconInfo = RAG_TRACE_STATUS_ICON[step.status] || RAG_TRACE_STATUS_ICON.ok;
       const check = document.createElement("span");
@@ -232,6 +239,51 @@ function initApp() {
     });
 
     return card;
+  }
+
+  // A byte count ("911 characters generated") proves the step ran but shows
+  // nothing a reviewer could actually inspect. Quoting the real start of the
+  // answer is what makes this row inspectable like the others (route's OUT
+  // is a reason, pathway's OUT is real pathway names — this should match).
+  function buildAnswerPreview(text) {
+    const trimmed = (text || "").trim();
+    const preview = trimmed.length > 140 ? trimmed.slice(0, 140) + "…" : trimmed;
+    return `"${preview}" (${trimmed.length} chars)`;
+  }
+
+  // Flips the "Synthesizing answer" row from "handed off" (assumed ok at
+  // build time) to what actually happened, once /chat/poll reports the
+  // generation finished or failed. Without this, a real Ollama error would
+  // still show a green check on the one trace step that most needs to
+  // report failure honestly.
+  function updateSynthesizeTraceStatus(traceCard, ok, detailText) {
+    if (!traceCard) return;
+    const row = traceCard.querySelector('[data-synthesize-row="true"]');
+    if (!row) return;
+
+    const iconInfo = ok ? RAG_TRACE_STATUS_ICON.ok : RAG_TRACE_STATUS_ICON.error;
+    const check = row.querySelector(".rag-trace-check");
+    if (check) {
+      check.className = `rag-trace-check ${iconInfo.cls}`;
+      check.textContent = iconInfo.glyph;
+    }
+
+    // The expand block was appended as this row's next sibling in
+    // buildRagTraceCard, in the same order every time.
+    const expand = row.nextElementSibling;
+    if (expand && expand.classList.contains("rag-trace-expand")) {
+      const outLine = expand.querySelector(".rag-trace-expand-line:last-child");
+      if (outLine) {
+        // Rebuild instead of touching textContent piecemeal, so the "out"
+        // label stays and only the value changes.
+        while (outLine.firstChild) outLine.removeChild(outLine.firstChild);
+        const label = document.createElement("span");
+        label.className = "rag-trace-expand-label";
+        label.textContent = "out";
+        outLine.appendChild(label);
+        outLine.appendChild(document.createTextNode(detailText));
+      }
+    }
   }
 
   function buildPathwayPanel(pathways, label) {
@@ -448,9 +500,10 @@ function initApp() {
 
       // Render evidence panels before the streamed response.
       let ragMetadata = data.rag_metadata || null;
+      let ragTraceCard = null;
       if (ragMetadata) {
-        const traceCard = buildRagTraceCard(ragMetadata.trace, ragMetadata.label);
-        chatMessages.insertBefore(traceCard, thinking);
+        ragTraceCard = buildRagTraceCard(ragMetadata.trace, ragMetadata.label);
+        chatMessages.insertBefore(ragTraceCard, thinking);
 
         const pathwayPanel = buildPathwayPanel(ragMetadata.pathways, ragMetadata.label);
         if (pathwayPanel) chatMessages.insertBefore(pathwayPanel, thinking);
@@ -514,11 +567,28 @@ function initApp() {
                   aiMsgElement.appendChild(thumbs);
                 }
 
+                // Now we finally know whether synthesis actually succeeded,
+                // not just that it was handed off — reflect that on the trace.
+                const finalText = pollData.response || "";
+                const failed = finalText.includes("[Error during generation:");
+                if (ragTraceCard) {
+                  updateSynthesizeTraceStatus(
+                    ragTraceCard,
+                    !failed,
+                    failed
+                      ? finalText.slice(finalText.indexOf("[Error during generation:"))
+                      : buildAnswerPreview(finalText)
+                  );
+                }
+
                 ragMetadata = null;
                 resolve();
               }
 
             } else if (pollData.status === "error") {
+              if (ragTraceCard) {
+                updateSynthesizeTraceStatus(ragTraceCard, false, pollData.message || "generation failed");
+              }
               throw new Error(pollData.message);
             }
           } catch (pollErr) {

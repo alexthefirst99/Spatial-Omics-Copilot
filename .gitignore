@@ -10,6 +10,10 @@
 venv/
 env/
 venv_export/
+venv_export.zip
+
+# Local documents / deliverables
+Addendum_Group2_SpatialOmicsCopilot.docx
 
 # Python / temp / cache
 tmp_data/

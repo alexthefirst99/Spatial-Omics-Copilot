@@ -534,6 +534,22 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                         rag_context_str = _rag["context_str"]
                         rag_metadata = _rag["metadata"]
                         print(f"DEBUG: RAG ran for {rag_metadata['label']}")
+
+                        # The graph's own trace ends at "route"/"tool call" — the
+                        # actual answer is generated below by enqueue_chat_job,
+                        # outside the graph, so record that handoff explicitly.
+                        # Without this, the AGENT TRACE card silently stops one
+                        # step short of what was actually asked for (T-022 addendum).
+                        _synth_model = data.get("model", "ollama:qwen2.5vl:7b")
+                        rag_metadata.setdefault("trace", []).append({
+                            "step": "Synthesizing answer",
+                            "detail": "",
+                            "icon": "agent",
+                            "tool": _synth_model,
+                            "status": "ok",
+                            "input_summary": f"{len(rag_context_str)} chars of evidence context",
+                            "output_summary": "handed off for streamed answer generation",
+                        })
             except Exception as e:
                 print(f"DEBUG: RAG pipeline failed: {e}")
 
