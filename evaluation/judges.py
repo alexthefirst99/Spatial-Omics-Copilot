@@ -23,7 +23,15 @@ Return compact JSON only, exactly this shape:
 
 Use only listed IDs, include every supplied P and W item once, keep claims short, and output no reasons or markdown."""
 
-VISION_JUDGE_PROMPT = """You are a strict multimodal spatial-omics judge. Inspect the attached real H&E ROI crop, then compare it with the actual ROI DEG genes and generated answer. Return PASS only if the answer explicitly and plausibly connects at least one visible morphological feature to at least one actual ROI gene, while distinguishing visual observation from gene-based inference. Otherwise return FAIL. Do not award PASS for discussing morphology and genes separately.
+VISION_JUDGE_PROMPT = """You are a fair but evidence-grounded multimodal spatial-omics judge. Inspect the attached real H&E ROI crop, then compare it with the actual ROI DEG genes and generated answer.
+
+Return PASS when all of the following are true:
+1. The answer describes at least one morphological feature that is reasonably visible in the ROI crop.
+2. The answer mentions at least one gene from the supplied actual ROI DEG list.
+3. The answer makes a biologically plausible connection between that visible morphology and the ROI gene evidence. The connection may be stated directly or clearly implied across adjacent sentences; wording such as "consistent with", "aligns with", "may reflect", or equivalent cautious language is acceptable.
+4. The answer does not claim that morphology alone proves gene expression. It should keep visual observation distinct from gene-based inference.
+
+Return FAIL when morphology and genes are merely listed separately with no meaningful connection, when the connected gene is not in the supplied ROI DEG list, when the claimed morphology is not supported by the crop, or when the answer overclaims that the image directly demonstrates gene expression. Do not fail a scientifically reasonable connection only because it is not phrased with a specific linking formula.
 
 Return JSON only: {"verdict":"PASS","reason":"short explanation"}."""
 
@@ -103,7 +111,7 @@ def _rows(payload: Any, key: str, limit: int | None = None) -> list[dict[str, An
 
 
 def _judge_evidence(record: dict[str, Any]) -> dict[str, Any]:
-    genes = _rows(record.get("deg"), "top_genes")[:10]
+    genes = _rows(record.get("deg"), "top_genes")[:25]
     annotations = _rows(record.get("gene_annotations"), "genes")[:6]
     pathways = _rows(record.get("pathways"), "pathways")[:5]
     papers = _rows(record.get("pubmed"), "papers")[:3]
@@ -238,7 +246,7 @@ def judge_roi(record: dict[str, Any], client: JudgeClient) -> dict[str, Any]:
     text_result["unsupported_mentioned_genes"] = sorted(set(mentioned) - gene_evidence)
     return {
         "status": "completed" if not errors else "partial",
-        "fixed_prompt_versions": {"text": "v1", "vision": "v1"},
+        "fixed_prompt_versions": {"text": "v1", "vision": "v2"},
         "evidence_presented_to_text_judge": evidence,
         "text": text_result,
         "vision": vision_result,

@@ -45,7 +45,7 @@
 
 ## 6. Session and State Rules
 
-- One session per workspace; stored in `data/chat_sessions/<session_id>/`.
+- One session per workspace; stored in `data/chat_sessions/<session_id>/session.json`.
 - Use fcntl file locking for all session reads and writes.
 - Write atomically using a `.tmp` file and `os.replace()`.
 - Clear the session only when the user explicitly clicks Reset.

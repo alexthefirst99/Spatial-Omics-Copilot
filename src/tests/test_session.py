@@ -6,63 +6,143 @@ import threading
 import app.session as session
 
 
-def _pending_metadata():
+def _pending_rag():
     return {
+        "schema_version": 1,
         "label": "ROI",
-        "trace": [
-            {
-                "step": "Synthesizing answer",
-                "tool": "ollama:qwen2.5vl:7b",
+        "intent": "literature",
+        "status": "pending",
+        "evidence": {"degs": [], "pathways": [], "citations": []},
+        "workflow": {
+            "steps": [
+                {
+                    "name": "Retrieved PubMed abstracts",
+                    "status": "ok",
+                    "tool": "pubmed_tool",
+                    "detail": "",
+                    "input": "ROI genes",
+                    "output": "3 papers",
+                }
+            ],
+            "tools_called": ["pubmed_tool"],
+            "generation": {
+                "model": "ollama:qwen2.5vl:7b",
                 "status": "pending",
-                "input_summary": "120 chars of evidence context",
-                "output_summary": "handed off for streamed answer generation",
-            }
-        ],
+                "input": "120 chars of evidence context",
+                "output": "handed off for streamed answer generation",
+            },
+        },
+        "image": {"used_roi_image": True},
+        "status_message": "",
     }
 
 
-def test_finalize_rag_metadata_records_success_without_mutating_pending_trace():
-    pending = _pending_metadata()
+def test_finalize_rag_record_records_success_without_mutating_pending_workflow():
+    pending = _pending_rag()
 
-    finalized = session.finalize_rag_metadata(
+    finalized = session.finalize_rag_record(
         pending,
         success=True,
         content="A real generated answer.",
     )
 
-    assert pending["trace"][-1]["status"] == "pending"
-    assert finalized["trace"][-1]["status"] == "ok"
-    assert finalized["trace"][-1]["output_summary"] == (
+    assert pending["workflow"]["generation"]["status"] == "pending"
+    assert finalized["status"] == "ok"
+    assert finalized["workflow"]["generation"]["status"] == "ok"
+    assert finalized["workflow"]["generation"]["output"] == (
         '"A real generated answer." (24 chars)'
     )
 
 
-def test_finalize_rag_metadata_records_real_error():
-    finalized = session.finalize_rag_metadata(
-        _pending_metadata(),
+def test_finalize_rag_record_records_real_error():
+    finalized = session.finalize_rag_record(
+        _pending_rag(),
         success=False,
         error="Chat generation timed out.",
     )
 
-    assert finalized["trace"][-1]["status"] == "error"
-    assert finalized["trace"][-1]["output_summary"] == (
+    assert finalized["status"] == "error"
+    assert finalized["workflow"]["generation"]["status"] == "error"
+    assert finalized["workflow"]["generation"]["output"] == (
         "Chat generation timed out."
     )
+
+
+def test_build_rag_record_converts_agent_metadata_to_readable_schema():
+    record = session.build_rag_record(
+        {
+            "label": "ROI",
+            "intent": "pathway",
+            "workflow_steps": [
+                {
+                    "step": "Pathway enrichment",
+                    "status": "ok",
+                    "tool": "pathway_tool",
+                    "detail": "top pathways",
+                    "input_summary": "TP53, MYC",
+                    "output_summary": "Cell cycle",
+                }
+            ],
+            "degs": [{"gene": "TP53", "log2fc": 2.1}],
+            "pathways": [{"name": "Cell cycle", "neg_log10p": 4.0}],
+            "citations": [],
+            "tools_called": ["pathway_tool"],
+            "used_roi_image": False,
+        },
+        generation_model="deepinfra:model",
+        context_chars=321,
+    )
+
+    assert "trace" not in record
+    assert record["evidence"]["degs"][0]["gene"] == "TP53"
+    assert record["workflow"]["steps"][0]["name"] == "Pathway enrichment"
+    assert record["workflow"]["generation"] == {
+        "model": "deepinfra:model",
+        "status": "pending",
+        "input": "321 chars of evidence context",
+        "output": "handed off for streamed answer generation",
+    }
 
 
 def test_session_write_read_and_append_are_persisted(tmp_path, monkeypatch):
     monkeypatch.setattr(session, "CHAT_DIR", str(tmp_path))
 
     assert session._write_session("demo", {"session_id": "demo", "messages": []})
-    assert session._read_session("demo") == {"session_id": "demo", "messages": []}
+    assert session._read_session("demo") == {"schema_version": 2, "session_id": "demo", "messages": []}
 
     assert session.safe_update_session("demo", {"role": "user", "content": "hello"})
 
     data = session._read_session("demo")
+    assert data["schema_version"] == 2
     assert data["session_id"] == "demo"
     assert data["messages"] == [{"role": "user", "content": "hello"}]
     assert isinstance(data["updated_at"], float)
 
+
+
+def test_session_storage_uses_one_json_and_no_trace_files(tmp_path, monkeypatch):
+    monkeypatch.setattr(session, "CHAT_DIR", str(tmp_path))
+    session._write_session(
+        "demo",
+        {
+            "session_id": "demo",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "answer",
+                    "rag": _pending_rag(),
+                }
+            ],
+        },
+    )
+
+    session_dir = tmp_path / "demo"
+    json_files = list(session_dir.glob("*.json"))
+    assert [path.name for path in json_files] == ["session.json"]
+    assert list(session_dir.glob("*.trace")) == []
+    stored_text = (session_dir / "session.json").read_text()
+    assert '"trace"' not in stored_text
+    assert '"rag_metadata"' not in stored_text
 
 def test_streaming_update_only_changes_last_assistant_message(tmp_path, monkeypatch):
     monkeypatch.setattr(session, "CHAT_DIR", str(tmp_path))
@@ -118,7 +198,8 @@ def test_low_level_session_write_uses_valid_json_file(tmp_path):
 
     session._lock_and_write_session(str(path), payload)
 
-    assert json.loads(path.read_text()) == payload
+    stored = json.loads(path.read_text())
+    assert stored == {**payload, "schema_version": 2}
 
 
 def test_session_read_recovers_trailing_close_brace(tmp_path):

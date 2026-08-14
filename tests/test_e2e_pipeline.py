@@ -249,7 +249,7 @@ def test_run_integration_pipeline_end_to_end_with_mocked_external_apis(tmp_path,
     assert result["gene_objects"]
     assert result["context_str"].startswith("\n\n")
     assert "metadata" in result
-    assert result["metadata"]["trace"]
+    assert result["metadata"]["workflow_steps"]
 
 
 def test_run_integration_pipeline_without_image_path_skips_roi_image(tmp_path, monkeypatch):

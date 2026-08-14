@@ -21,7 +21,7 @@ spatial-omics-copilot/
 │   ├── status_store.py           # upload progress tracking
 │   ├── utils.py                  # shared utilities
 │   └── assets/
-│       ├── chat.js               # chat transport + AGENT TRACE/pathway/DEG panels
+│       ├── chat.js               # chat transport + AGENT WORKFLOW/pathway/DEG panels
 │       ├── chat.css              # chat panel styling
 │       ├── opioid.css            # main application layout styling
 │       ├── s3_upload.js          # browser-side upload handling and progress
@@ -131,7 +131,7 @@ Browser (Dash + VivViewer)
       → routes.py calls run_copilot_agent(question, deg, label, disease, ...)
         directly, not the frozen run_agent() wrapper, so the extracted
         disease value and other newer parameters can actually reach it
-      → routes.py enqueues the job with {rag_context_str, rag_metadata}
+      → routes.py enqueues the job with {rag_context_str, rag}
       → worker.py appends context_str to the latest message, attaches the
         cropped ROI image if a vision model is selected, and sends the
         last 4 turns of conversation (bounded — Ollama re-processes the
@@ -251,7 +251,7 @@ The frozen legacy contract, `run_agent(gene_objects, message="", label="selectio
     "gene_objects": [...],   # gene list passed back through (from input)
     "context_str":  "...",   # evidence string → prepended to LLM prompt (worker.py)
     "metadata": {
-        "trace":     [...],  # steps the agent actually ran → AGENT TRACE card in chat UI
+        "workflow_steps": [...],  # steps the agent actually ran → normalized into rag.workflow.steps
         "degs":      [...],  # top 8 DEGs → bar chart in chat UI
         "pathways":  [...],  # enriched pathways → bar chart in chat UI
         "citations": [...],  # PubMed abstracts → citation list in chat UI (clickable PMID links)

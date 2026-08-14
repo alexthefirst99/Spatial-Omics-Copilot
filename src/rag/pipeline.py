@@ -83,7 +83,7 @@ def _run_sequential(
     context_str = build_prompt_context(genes, pathways, abstracts, label=label)
 
     # -- Build UI metadata --
-    trace = [
+    workflow_steps = [
         {
             "step": "Extracted top DEGs",
             "detail": f"{len(genes)} genes · {label}",
@@ -127,7 +127,7 @@ def _run_sequential(
         "gene_objects": gene_objects,
         "context_str": context_str,
         "metadata": {
-            "trace": trace,
+            "workflow_steps": workflow_steps,
             "degs": degs,
             "pathways": pathway_bars,
             "citations": citations,
@@ -407,7 +407,7 @@ def run_integration_pipeline(
         A dict with every intermediate result (``preprocess``, ``cluster``,
         ``roi``, ``roi_image``, ``deg``, ``gene_annotations``, ``pathways``,
         ``pubmed``) plus the ``{gene_objects, context_str, metadata}`` legacy
-        shape ``app/routes.py`` expects, and the richer ``answer``/``trace``/
+        shape ``app/routes.py`` expects, and the richer ``answer``/``workflow_steps``/
         ``citations`` fields for callers that want the full ``AgentResult``.
     """
 

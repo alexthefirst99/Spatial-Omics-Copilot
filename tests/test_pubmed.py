@@ -13,6 +13,7 @@ from rag.pubmed_retrieval import (
     build_pubmed_query,
     parse_esearch_xml,
     parse_pubmed_xml,
+    rerank_pubmed_result,
     retrieve_abstracts,
     search_pubmed,
     semantic_search_abstracts,
@@ -371,6 +372,47 @@ def test_legacy_adapter_returns_fewer_real_results_without_padding():
     assert len(abstracts) == 1
     assert set(abstracts[0]) == {"pmid", "title", "journal", "year", "snippet"}
     assert abstracts[0]["pmid"] == "111"
+
+
+def test_deterministic_rerank_promotes_roi_specific_papers():
+    result = PubMedResult(
+        papers=[
+            PubMedPaper(
+                "101",
+                "Colorectal cancer overview",
+                "A broad review of colorectal cancer treatment and prognosis.",
+                "General Oncology",
+                2024,
+            ),
+            PubMedPaper(
+                "202",
+                "EPCAM-high epithelial states in colorectal cancer",
+                "Spatial regions with EPCAM expression showed epithelial programs.",
+                "Spatial Biology",
+                2025,
+            ),
+            PubMedPaper(
+                "303",
+                "Wnt signalling programs in colorectal tumours",
+                "Wnt signalling was associated with tumour-cell states.",
+                "Cancer Systems",
+                2023,
+            ),
+        ],
+        query="colorectal cancer",
+    )
+
+    ranked = rerank_pubmed_result(
+        result,
+        genes=["EPCAM", "KRAS"],
+        pathways=["Wnt signaling pathway"],
+        disease="colorectal cancer",
+        question="Connect the ROI genes to a plausible biological state.",
+        top_k=2,
+    )
+
+    assert [paper.pmid for paper in ranked.papers] == ["202", "303"]
+    assert "ROI-focused" in ranked.status_message
 
 
 class FakeCollection:

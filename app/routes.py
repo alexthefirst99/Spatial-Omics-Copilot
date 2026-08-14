@@ -13,7 +13,7 @@ from app.roi_context import ensure_roi_context
 try:
     from app.session import (
         CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
-        finalize_rag_metadata,
+        build_rag_record, finalize_rag_record,
     )
     from app.worker import enqueue_chat_job, ensure_session_processing
     from app.image_utils import TMP_BASE, ensure_ome_tiff_cached, resolve_active_image_path
@@ -21,7 +21,7 @@ try:
 except ImportError:
     from session import (
         CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
-        finalize_rag_metadata,
+        build_rag_record, finalize_rag_record,
     )
     from worker import enqueue_chat_job, ensure_session_processing
     from image_utils import TMP_BASE, ensure_ome_tiff_cached, resolve_active_image_path
@@ -506,7 +506,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
             prompt += "\n\nRespond in 1-2 concise sentences. Be direct."
 
             # Popup callbacks cache the gene objects used here.
-            rag_metadata = None
+            rag_record = None
             try:
                 if run_agent:
                     _cluster_path = f'{work_dir}/user/cluster_context.json'
@@ -565,24 +565,19 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
 
                     if _rag:
                         rag_context_str = _rag["context_str"]
-                        rag_metadata = _rag["metadata"]
-                        print(f"DEBUG: RAG ran for {rag_metadata['label']}")
+                        _agent_metadata = _rag["metadata"]
+                        print(f"DEBUG: RAG ran for {_agent_metadata['label']}")
 
-                        # The graph's own trace ends at "route"/"tool call" — the
-                        # actual answer is generated below by enqueue_chat_job,
-                        # outside the graph, so record that handoff explicitly.
-                        # Without this, the AGENT TRACE card silently stops one
-                        # step short of what was actually asked for (T-022 addendum).
+                        # Generation happens outside the agent graph. Persist it as
+                        # a dedicated workflow block instead of appending a synthetic
+                        # trace step. This keeps session.json readable and avoids any
+                        # persisted ``*.trace`` field.
                         _synth_model = data.get("model") or get_default_model_spec()
-                        rag_metadata.setdefault("trace", []).append({
-                            "step": "Synthesizing answer",
-                            "detail": "",
-                            "icon": "agent",
-                            "tool": _synth_model,
-                            "status": "pending",
-                            "input_summary": f"{len(rag_context_str)} chars of evidence context",
-                            "output_summary": "handed off for streamed answer generation",
-                        })
+                        rag_record = build_rag_record(
+                            _agent_metadata,
+                            generation_model=_synth_model,
+                            context_chars=len(rag_context_str),
+                        )
             except Exception as e:
                 print(f"DEBUG: RAG pipeline failed: {e}")
 
@@ -594,7 +589,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 work_dir=work_dir,
                 roi_path=roi_s3_path,
                 rag_context_str=rag_context_str if 'rag_context_str' in locals() else "",
-                rag_metadata=rag_metadata,
+                rag=rag_record,
             )
             if status == "busy":
                 return jsonify({
@@ -611,7 +606,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 "status": status,
                 "images": images,
                 "roi_image": preview_img,
-                "rag_metadata": rag_metadata,
+                "rag": rag_record,
             })
         except Exception as e:
             print(f"ERROR in chat_api: {e}")
@@ -641,8 +636,8 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                                     last_msg["streaming"] = False
                                     if not last_msg.get("content") or last_msg.get("content") == "...":
                                         last_msg["content"] = timeout_message
-                                    last_msg["rag_metadata"] = finalize_rag_metadata(
-                                        last_msg.get("rag_metadata"),
+                                    last_msg["rag"] = finalize_rag_record(
+                                        last_msg.get("rag") or last_msg.get("rag_metadata"),
                                         success=False,
                                         error=timeout_message,
                                     )
@@ -666,7 +661,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                                 "response": response_content,
                                 "images": last_msg.get("images", []),
                                 "visible": last_msg.get("visible", True),
-                                "rag_metadata": last_msg.get("rag_metadata"),
+                                "rag": build_rag_record(last_msg.get("rag") or last_msg.get("rag_metadata")),
                             })
                         if last_msg.get("role") == "user":
                             ensure_session_processing(session_id)

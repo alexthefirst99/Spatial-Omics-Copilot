@@ -10,7 +10,7 @@
 6. When a chat message is sent, `routes.py` calls `run_copilot_agent(question, deg, label, disease, ...)` directly (the extensible entry point, not the frozen `run_agent()` — see section 3.4).
 7. Agent decides whether to call gene_annotation_tool, pathway_tool, and/or pubmed_tool based on the question; results are formatted into a context string injected into the LLM prompt.
 8. LLM response streams token by token to the chat interface.
-9. Chat UI shows AGENT TRACE card, pathway bar chart, DEG bar chart, then streamed text.
+9. Chat UI shows AGENT WORKFLOW card, pathway bar chart, DEG bar chart, then streamed text.
 10. Researcher can ask follow-up questions; agent continues with full region context.
 
 ## 2. Data Input Contract
@@ -166,11 +166,11 @@ Fallback: if `gene_objects` is empty, the system must clearly state that no ROI-
     # Must start with "\n\n". Contains genes, pathways, and abstract snippets.
 
     "metadata": {
-        "trace": [
-            {"step": str, "detail": str, "icon": str},
+        "workflow_steps": [
+            {"step": str, "status": str, "tool": str, "detail": str, "input_summary": str, "output_summary": str},
             ...
         ],
-        # Steps the agent actually ran — shown in the AGENT TRACE card in the UI.
+        # Steps the agent actually ran. app/session.py normalizes these into `rag.workflow.steps` for persistence and UI display.
         # icon values: "deg", "pathway", "pubmed"
 
         "degs": [{"gene": str, "log2fc": float}, ...],
@@ -210,7 +210,7 @@ The LangGraph agent in `src/rag/copilot_agent/graph.py` (`src/rag/agent/` is a b
 6. Returns the structured result dict above.
 
 Required behavior:
-- `trace` must reflect what the agent actually ran — not a hardcoded list. DEG appears when valid DEG context exists; otherwise the trace should clearly show that DEG context is unavailable.
+- `workflow_steps` must reflect what the agent actually ran — not a hardcoded list. DEG appears when valid DEG context exists; otherwise the workflow should clearly show that DEG context is unavailable.
 - Agent decides gene annotation, pathway, and/or PubMed based on the user message — any combination, including none.
 - Must not invent gene functions, pathway names, or citations.
 - A tool's connection failure must be distinguishable from it genuinely finding nothing — both used to collapse into the same "empty" status, silently presenting a network/API failure as if it were a real negative result.
@@ -223,7 +223,7 @@ Required behavior:
 
 - One session per workspace; stored in `data/chat_sessions/<session_id>/session.json`.
 - LLM responses stream token by token.
-- Chat UI renders in order: AGENT TRACE → PATHWAY panel → DEG panel → LLM text.
+- Chat UI renders in order: AGENT WORKFLOW → PATHWAY panel → DEG panel → LLM text.
 - ROI thumbnails attach to the relevant assistant message.
 - Session persists across page reloads; cleared only on Reset.
 

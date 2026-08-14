@@ -148,7 +148,28 @@ function initApp() {
     pending: { glyph: "…", cls: "rag-trace-status-pending" },
   };
 
-  function buildRagTraceCard(trace, label) {
+  function buildRagWorkflowCard(rag) {
+    const label = rag && rag.label ? rag.label : "selection";
+    const workflow = rag && rag.workflow ? rag.workflow : {};
+    const steps = Array.isArray(workflow.steps) ? workflow.steps.map(step => ({
+      step: step.name || "Workflow step",
+      status: step.status || "ok",
+      tool: step.tool || "",
+      detail: step.detail || "",
+      input_summary: step.input || "",
+      output_summary: step.output || "",
+    })) : [];
+    if (workflow.generation) {
+      steps.push({
+        step: "Generate answer",
+        status: workflow.generation.status || "pending",
+        tool: workflow.generation.model || "",
+        detail: "",
+        input_summary: workflow.generation.input || "",
+        output_summary: workflow.generation.output || "",
+        is_generation: true,
+      });
+    }
     const card = document.createElement("div");
     card.className = "rag-trace-card";
 
@@ -156,7 +177,7 @@ function initApp() {
     header.className = "rag-trace-header";
     const title = document.createElement("span");
     title.className = "rag-trace-title";
-    title.textContent = "AGENT TRACE";
+    title.textContent = "AGENT WORKFLOW";
     const hint = document.createElement("span");
     hint.className = "rag-trace-hint";
     hint.textContent = "click a step to inspect";
@@ -164,15 +185,15 @@ function initApp() {
     header.appendChild(hint);
     card.appendChild(header);
 
-    (trace || []).forEach(step => {
+    steps.forEach(step => {
       const row = document.createElement("div");
       row.className = "rag-trace-row";
       // Tagged so the poll-completion handler can flip this row from "handed
       // off" to "succeeded"/"failed" once the streamed answer actually
       // finishes — at build time we only know the handoff happened, not the
       // outcome (routes.py returns this before enqueue_chat_job runs).
-      if (step.step === "Synthesizing answer") {
-        row.dataset.synthesizeRow = "true";
+      if (step.is_generation || step.step === "Generate answer") {
+        row.dataset.generationRow = "true";
       }
 
       const iconInfo = RAG_TRACE_STATUS_ICON[step.status] || RAG_TRACE_STATUS_ICON.ok;
@@ -257,9 +278,9 @@ function initApp() {
   // generation finished or failed. Without this, a real Ollama error would
   // still show a green check on the one trace step that most needs to
   // report failure honestly.
-  function updateSynthesizeTraceStatus(traceCard, ok, detailText) {
-    if (!traceCard) return;
-    const row = traceCard.querySelector('[data-synthesize-row="true"]');
+  function updateGenerationStatus(workflowCard, ok, detailText) {
+    if (!workflowCard) return;
+    const row = workflowCard.querySelector('[data-generation-row="true"]');
     if (!row) return;
 
     const iconInfo = ok ? RAG_TRACE_STATUS_ICON.ok : RAG_TRACE_STATUS_ICON.error;
@@ -287,11 +308,14 @@ function initApp() {
     }
   }
 
-  function getSynthesizeTraceStep(ragMetadata) {
-    const trace = ragMetadata && Array.isArray(ragMetadata.trace)
-      ? ragMetadata.trace
-      : [];
-    return [...trace].reverse().find(step => step.step === "Synthesizing answer") || null;
+  function getGenerationStatus(rag) {
+    return rag && rag.workflow && rag.workflow.generation
+      ? rag.workflow.generation
+      : null;
+  }
+
+  function getRagEvidence(rag) {
+    return rag && rag.evidence ? rag.evidence : {};
   }
 
   function buildPathwayPanel(pathways, label) {
@@ -507,16 +531,17 @@ function initApp() {
       if (data.status === "error") throw new Error(data.message);
 
       // Render evidence panels before the streamed response.
-      let ragMetadata = data.rag_metadata || null;
-      let ragTraceCard = null;
-      if (ragMetadata) {
-        ragTraceCard = buildRagTraceCard(ragMetadata.trace, ragMetadata.label);
-        chatMessages.insertBefore(ragTraceCard, thinking);
+      let rag = data.rag || null;
+      let ragWorkflowCard = null;
+      if (rag) {
+        const evidence = getRagEvidence(rag);
+        ragWorkflowCard = buildRagWorkflowCard(rag);
+        chatMessages.insertBefore(ragWorkflowCard, thinking);
 
-        const pathwayPanel = buildPathwayPanel(ragMetadata.pathways, ragMetadata.label);
+        const pathwayPanel = buildPathwayPanel(evidence.pathways, rag.label);
         if (pathwayPanel) chatMessages.insertBefore(pathwayPanel, thinking);
 
-        const degPanel = buildDegPanel(ragMetadata.degs, ragMetadata.label, ragMetadata.citations);
+        const degPanel = buildDegPanel(evidence.degs, rag.label, evidence.citations);
         if (degPanel) chatMessages.insertBefore(degPanel, thinking);
 
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -570,39 +595,39 @@ function initApp() {
                 }
 
                 // Now we finally know whether synthesis actually succeeded,
-                // not just that it was handed off — reflect that on the trace.
+                // not just that it was handed off — reflect that on the workflow card.
                 const finalText = pollData.response || "";
-                const finalSynthesis = getSynthesizeTraceStep(pollData.rag_metadata);
-                const failed = finalSynthesis
-                  ? finalSynthesis.status === "error"
+                const finalGeneration = getGenerationStatus(pollData.rag);
+                const failed = finalGeneration
+                  ? finalGeneration.status === "error"
                   : finalText.includes("[Error during generation:");
-                if (ragTraceCard) {
-                  updateSynthesizeTraceStatus(
-                    ragTraceCard,
+                if (ragWorkflowCard) {
+                  updateGenerationStatus(
+                    ragWorkflowCard,
                     !failed,
-                    finalSynthesis && finalSynthesis.output_summary
-                      ? finalSynthesis.output_summary
+                    finalGeneration && finalGeneration.output
+                      ? finalGeneration.output
                       : failed
                         ? finalText.slice(finalText.indexOf("[Error during generation:"))
                         : buildAnswerPreview(finalText)
                   );
                 }
 
-                ragMetadata = null;
+                rag = null;
                 resolve();
               }
 
             } else if (pollData.status === "error") {
-              if (ragTraceCard) {
-                updateSynthesizeTraceStatus(ragTraceCard, false, pollData.message || "generation failed");
+              if (ragWorkflowCard) {
+                updateGenerationStatus(ragWorkflowCard, false, pollData.message || "generation failed");
               }
               throw new Error(pollData.message);
             }
           } catch (pollErr) {
             console.error("Polling Error:", pollErr);
             clearInterval(pollInterval);
-            if (ragTraceCard) {
-              updateSynthesizeTraceStatus(ragTraceCard, false, pollErr.message || "generation failed");
+            if (ragWorkflowCard) {
+              updateGenerationStatus(ragWorkflowCard, false, pollErr.message || "generation failed");
             }
             thinking.remove();
             if (!aiMsgElement) {
@@ -708,10 +733,8 @@ function initApp() {
               return;
             }
 
-            if (data.rag_metadata) {
-              chatMessages.appendChild(
-                buildRagTraceCard(data.rag_metadata.trace, data.rag_metadata.label)
-              );
+            if (data.rag) {
+              chatMessages.appendChild(buildRagWorkflowCard(data.rag));
             }
             addMessage(currentText, "ai");
             lastKnownResponse = currentText;

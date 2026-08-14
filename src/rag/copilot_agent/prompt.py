@@ -311,6 +311,15 @@ def build_evidence_context(
     )
 
     gene_lines = _format_genes(gene_objects, limit=max_genes)
+    allowed_gene_symbols = [
+        adapters.clean_text(row.get("gene")).upper()
+        for row in (gene_objects or ())
+        if isinstance(row, dict) and adapters.clean_text(row.get("gene"))
+    ]
+    # Preserve rank order while removing duplicates. This list can be longer
+    # than the compact DEG display above; it is a safety whitelist, not another
+    # results table.
+    allowed_gene_symbols = list(dict.fromkeys(allowed_gene_symbols))
     if gene_lines:
         body.append("")
         body.append(
@@ -318,6 +327,16 @@ def build_evidence_context(
             "tissue; positive log2FC means enriched here):"
         )
         body.extend(gene_lines)
+        body.append("")
+        body.append(
+            "AUTHORIZED ROI GENE SYMBOLS (measured DEG evidence for this turn): "
+            + ", ".join(allowed_gene_symbols)
+        )
+        body.append(
+            "Only gene symbols in this whitelist may be named as genes from this "
+            "ROI. Do not introduce textbook markers, plausible companion genes, "
+            "or literature-only genes as if they were measured here."
+        )
     else:
         body.append("")
         body.append(f"GENE EXPRESSION: {_NO_DATA_MESSAGE}")
@@ -389,12 +408,25 @@ def _instructions(*, has_papers: bool, image_attached: bool | None) -> list[str]
         "annotations, the pathways, or a numbered paper. If the evidence does not "
         "support a claim, say so rather than filling the gap."
     )
+    lines.append(
+        "- When you name an ROI gene, use only a symbol listed under AUTHORIZED ROI "
+        "GENE SYMBOLS. Do not add a biologically plausible gene from memory just to "
+        "complete a pathway or cell-state story."
+    )
 
     if image_attached:
         lines.append(
             "- A cropped image of this region is attached. Describe tissue "
             "appearance only if it is actually visible in that image, and keep "
             "visual description separate from what the gene data shows."
+        )
+        lines.append(
+            "- For a question that asks you to connect morphology with molecular "
+            "evidence, make the bridge explicit: first state one visible feature, "
+            "then state one or more AUTHORIZED ROI genes that are measured here, "
+            "then explain that the combination is consistent with (not proof of) "
+            "a pathway or biological state. Never imply that H&E directly measured "
+            "or predicted the gene expression."
         )
     elif image_attached is False:
         lines.append(

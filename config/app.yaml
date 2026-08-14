@@ -33,8 +33,18 @@ pathway_enrichment:
   max_genes: 100
   adjusted_p_value_cutoff: 0.05
   significant_only: true
+  # Single-gene ontology hits are often statistically valid but too generic
+  # to support an ROI-specific interpretation. Keep pathways backed by at
+  # least two measured ROI DEGs and rank stronger overlap ahead of FDR ties.
+  min_overlap_genes: 2
   timeout: 30
   max_retries: 2
+
+pubmed_retrieval:
+  # Fetch a broader NCBI relevance-sorted pool in one ESearch/EFetch round,
+  # then locally retain the 3 papers most specific to the measured ROI genes,
+  # enriched pathways and the research question. This adds no extra API round.
+  candidate_pool: 15
 
 gene_annotation:
   organism: "Homo sapiens"

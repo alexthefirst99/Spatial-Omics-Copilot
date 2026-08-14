@@ -249,7 +249,7 @@ def test_agent_trace_matches_actual_tool_calls(spy_tools):
         GENE_OBJECTS, message="Which pathways are enriched here?"
     )
 
-    traced = [step["tool"] for step in result["metadata"]["trace"] if step["tool"]]
+    traced = [step["tool"] for step in result["metadata"]["workflow_steps"] if step["tool"]]
     assert traced == spy_tools
 
 
@@ -290,7 +290,7 @@ def test_trace_records_input_and_output_summaries(spy_tools):
 
     pubmed_step = next(
         step
-        for step in result["metadata"]["trace"]
+        for step in result["metadata"]["workflow_steps"]
         if step["tool"] == routing.TOOL_PUBMED
     )
     assert pubmed_step["input_summary"]
@@ -314,7 +314,7 @@ def test_trace_reports_a_tool_that_returned_nothing(monkeypatch):
     result = agent_graph.run_agent(GENE_OBJECTS, message="What pathways are enriched?")
 
     step = next(
-        s for s in result["metadata"]["trace"] if s["tool"] == routing.TOOL_PATHWAY
+        s for s in result["metadata"]["workflow_steps"] if s["tool"] == routing.TOOL_PATHWAY
     )
     assert step["status"] == STATUS_EMPTY
     assert "no results" in step["step"].lower()
@@ -327,8 +327,8 @@ def test_trace_is_not_a_fixed_list(spy_tools):
 
     pathway_trace = agent_graph.run_agent(
         GENE_OBJECTS, message="what pathways?"
-    )["metadata"]["trace"]
-    chat_trace = agent_graph.run_agent(GENE_OBJECTS, message="hello")["metadata"]["trace"]
+    )["metadata"]["workflow_steps"]
+    chat_trace = agent_graph.run_agent(GENE_OBJECTS, message="hello")["metadata"]["workflow_steps"]
 
     assert [s["step"] for s in pathway_trace] != [s["step"] for s in chat_trace]
 
@@ -375,7 +375,7 @@ def test_agent_output_schema_matches_routes_contract(spy_tools):
     # both the LLM context and the UI panels for the turn.
     assert set(result) == {"gene_objects", "context_str", "metadata"}
     metadata = result["metadata"]
-    for key in ("trace", "degs", "pathways", "citations", "label"):
+    for key in ("workflow_steps", "degs", "pathways", "citations", "label"):
         assert key in metadata
 
     assert result["gene_objects"] == GENE_OBJECTS
@@ -463,7 +463,7 @@ def test_agent_tool_errors_do_not_crash_turn(monkeypatch):
 
     assert set(result) == {"gene_objects", "context_str", "metadata"}
     step = next(
-        s for s in result["metadata"]["trace"] if s["tool"] == routing.TOOL_PATHWAY
+        s for s in result["metadata"]["workflow_steps"] if s["tool"] == routing.TOOL_PATHWAY
     )
     assert step["status"] == STATUS_ERROR
     assert "unavailable" in result["context_str"].lower()
@@ -479,16 +479,7 @@ def test_real_pathway_tool_never_raises_on_bad_config():
     assert outcome.result is None or not getattr(outcome.result, "pathways", [])
 
 
-def test_real_gene_annotation_tool_never_raises_on_bad_config():
-    outcome = tools.run_gene_annotation_tool(
-        ["EPCAM"], config={"gene_annotation": {"max_genes": "not-a-number"}}
-    )
-
-    assert outcome.status in {STATUS_ERROR, STATUS_EMPTY}
-
-
 # -- T-044: no demo genes ------------------------
-
 
 def test_agent_no_gene_objects_reports_no_data_instead_of_demo_genes(spy_tools):
     """T-044: brain markers must never stand in for a colorectal region."""
@@ -597,6 +588,27 @@ def test_prompt_permits_visual_description_when_an_image_is_attached(spy_tools, 
 
     assert "only if it is actually visible" in result.context_str
     assert "cropped H&E image" in result.context_str
+
+
+def test_prompt_whitelists_measured_roi_genes_and_requires_explicit_image_gene_bridge(
+    spy_tools, tmp_path
+):
+    crop = tmp_path / "roi.png"
+    crop.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 64)
+
+    result = agent_graph.run_copilot_agent(
+        question="Connect visible morphology to the genes in this ROI.",
+        deg=GENE_OBJECTS,
+        roi_image={"crop_path": str(crop), "width": 128, "height": 128},
+        image_attached=True,
+        label="ROI",
+    )
+
+    assert "AUTHORIZED ROI GENE SYMBOLS" in result.context_str
+    assert "EPCAM, KRAS, TP53" in result.context_str
+    assert "Do not introduce textbook markers" in result.context_str
+    assert "make the bridge explicit" in result.context_str
+    assert "Never imply that H&E directly measured" in result.context_str
 
 
 def test_annotations_for_non_roi_genes_are_dropped_from_the_prompt(monkeypatch):

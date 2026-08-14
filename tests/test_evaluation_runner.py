@@ -156,7 +156,7 @@ def test_metrics_and_reporter_emit_exact_required_outputs(tmp_path):
         },
     )
 
-    assert set(metrics) == {"technical", "business"}
+    assert set(metrics) == {"technical", "business", "coverage"}
     assert len(metrics["technical"]) == 7
     assert len(metrics["business"]) == 5
     assert {path.name for path in tmp_path.iterdir()} == {
@@ -184,4 +184,4 @@ def test_missing_judgments_remain_na():
 
     assert metrics["technical"]["pubmed_retrieval_relevance"]["precision_at_k"] is None
     assert metrics["technical"]["image_to_gene_connection"]["pass_rate"] is None
-    assert metrics["business"]["time_saved"]["mean_time_saved_seconds"] == 14390.0
+    assert metrics["business"]["time_saved"]["mean_time_saved_seconds"] is None

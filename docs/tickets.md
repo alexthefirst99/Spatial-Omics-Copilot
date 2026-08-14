@@ -13,7 +13,7 @@
 | T-003 | Preprocessing — QC, normalize, HVG, PCA (`src/rag/preprocessing.py`) | ✓ Done |
 | T-004 | Clustering — Leiden / KMeans, saves cluster JSON (`src/rag/clustering.py`) | ✓ Done |
 | T-005 | Mock RAG pipeline — sequential fallback (`src/rag/pipeline.py`) | ✓ Done |
-| T-006 | Chat UI — AGENT TRACE card, pathway bar chart, DEG bar chart | ✓ Done |
+| T-006 | Chat UI — AGENT WORKFLOW card, pathway bar chart, DEG bar chart | ✓ Done |
 | T-007 | Folder structure — `src/rag/deg/`, `src/rag/pathway/`, `src/rag/pubmed/`, `src/rag/agent/` | ✓ Done |
 
 ## Phase 2: Preprocessing (src/rag/preprocessing.py) ✓ (Zainab — done)
@@ -155,7 +155,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 | --- | --- | --- | --- |
 | T-020 | Define LangChain tools in `tools.py`: `pathway_tool` and `pubmed_tool` | Agent can call both tools (DEG is not a tool — it runs automatically before the agent) | ✓ Done — `gene_annotation_tool` was added too, beyond the original two |
 | T-021 | Implement real LangGraph agent in `graph.py` | Agent dynamically decides which tools to call based on the message | ✓ Done |
-| T-022 | Dynamic `trace` field | `metadata.trace` reflects what the agent actually called, not a fixed list | ✓ Done |
+| T-022 | Dynamic `workflow_steps` field | `metadata.workflow_steps` reflects what the agent actually called, not a fixed list | ✓ Done |
 | T-023 | Add max-iteration guard | Agent stops after 5 tool calls | ✓ Done |
 | T-024 | Write `test_agent.py` | Agent calls at least one tool and returns complete output dict | ✓ Done |
 
@@ -171,7 +171,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 - Preserve `run_agent(gene_objects, message="", label="selection") -> dict`.
 - Keep `_run_sequential()` only as an explicit fallback if it remains useful for local/offline operation.
 - DEG remains pre-computed by the UI; do not move DEG into the agent as a tool unless the specs change.
-- `metadata.trace` must reflect actual tool calls, not a hardcoded list.
+- `metadata.workflow_steps` must reflect actual tool calls, not a hardcoded list.
 - Maintain the max-tool-call / max-iteration guard from the desired architecture.
 
 **Acceptance criteria:**
@@ -228,7 +228,7 @@ review notes are in `docs/validation/person4_pubmed_notes.md`.
 | T-028 | Download and validate spatial omics demo dataset | h5ad loads, spots overlay correctly, clustering runs | ✓ Done — 10x Visium HD Human Colon Cancer dataset in `data/demo/` |
 | T-029 | End-to-end test with real data | Draw ROI → DEG → pathway → PubMed → streamed answer with citations | ✓ Done — verified live against the demo dataset, plus `tests/test_e2e_pipeline.py` |
 | T-030 | Evaluate biological relevance of outputs | Genes and pathways make sense for the tissue type | ✓ Done — see `docs/validation/person2_deg_notes.md` and `docs/validation/person3_pathway_notes.md` |
-| T-031 | Record demo video | Shows ROI selection, AGENT TRACE, tool calls, streamed response | ✓ Done |
+| T-031 | Record demo video | Shows ROI selection, AGENT WORKFLOW, tool calls, streamed response | ✓ Done |
 | T-032 | Freeze final submission | Repo, docs, and demo complete | Todo |
 | T-044 | Replace domain-inappropriate demo fallback genes | Empty ROI/no h5ad paths clearly say no gene context, or use only explicitly labeled CRC/demo-dataset genes | ✓ Done |
 | T-045 | Add automated test coverage for h5ad upload validation | `test_upload.py` exercises spatial-key validation, non-.h5ad rejection, and the empty-filenames no-op | ✓ Done — see `src/tests/test_upload.py` |

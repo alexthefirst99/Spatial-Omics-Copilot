@@ -14,41 +14,149 @@ CHAT_DIR = get_path('paths.chat_dir', os.path.join(_DATA_DIR, 'chat_sessions'), 
 os.makedirs(CHAT_DIR, exist_ok=True)
 
 
-def finalize_rag_metadata(rag_metadata, *, success, content="", error=""):
-    """Return a copy of ``rag_metadata`` with the synthesis step finalized.
+def _workflow_status(record):
+    workflow = record.get("workflow") if isinstance(record, dict) else None
+    if not isinstance(workflow, dict):
+        return "idle"
 
-    Live generation happens outside the agent graph, so the graph cannot know
-    whether it succeeded. Keeping this transition on the server makes the
-    persisted trace and every polling client agree on the final outcome.
+    generation = workflow.get("generation")
+    if isinstance(generation, dict):
+        status = generation.get("status")
+        if status in {"pending", "error", "ok"}:
+            return status
+
+    steps = workflow.get("steps")
+    if isinstance(steps, list):
+        statuses = {
+            step.get("status")
+            for step in steps
+            if isinstance(step, dict) and step.get("status")
+        }
+        if "error" in statuses:
+            return "error"
+        if steps:
+            return "ok"
+    return "idle"
+
+
+def build_rag_record(agent_metadata, *, generation_model="", context_chars=0):
+    """Convert agent metadata into the persisted/UI RAG schema.
+
+    The agent graph still uses its internal ``TraceStep`` objects, but chat
+    storage intentionally does not expose or persist a ``*.trace`` field.
+    Each message instead stores a readable ``rag`` object with evidence and a
+    workflow split into analysis/tool ``steps`` plus one ``generation`` block.
     """
 
-    if not isinstance(rag_metadata, dict):
+    if not isinstance(agent_metadata, dict):
         return None
 
-    metadata = copy.deepcopy(rag_metadata)
-    trace = metadata.get("trace")
-    if not isinstance(trace, list):
-        return metadata
+    # Already in the new schema: return a defensive copy and only fill the
+    # generation handoff when the caller explicitly supplies a model.
+    if isinstance(agent_metadata.get("workflow"), dict) and isinstance(
+        agent_metadata.get("evidence"), dict
+    ):
+        record = copy.deepcopy(agent_metadata)
+    else:
+        legacy_steps = agent_metadata.get("workflow_steps")
+        if legacy_steps is None:
+            # Read-only compatibility for sessions created before schema v2.
+            legacy_steps = agent_metadata.get("trace")
+        steps = []
+        generation = None
+        if isinstance(legacy_steps, list):
+            for item in legacy_steps:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("step") == "Synthesizing answer":
+                    generation = {
+                        "model": str(item.get("tool") or ""),
+                        "status": str(item.get("status") or "pending"),
+                        "input": str(item.get("input_summary") or ""),
+                        "output": str(item.get("output_summary") or ""),
+                    }
+                    continue
+                step = {
+                    "name": str(item.get("step") or "Workflow step"),
+                    "status": str(item.get("status") or "ok"),
+                }
+                optional_fields = {
+                    "tool": item.get("tool"),
+                    "detail": item.get("detail"),
+                    "input": item.get("input_summary"),
+                    "output": item.get("output_summary"),
+                }
+                for key, value in optional_fields.items():
+                    text = str(value or "").strip()
+                    if text:
+                        step[key] = text
+                steps.append(step)
 
-    synthesis_step = next(
-        (
-            step
-            for step in reversed(trace)
-            if isinstance(step, dict) and step.get("step") == "Synthesizing answer"
-        ),
-        None,
-    )
-    if synthesis_step is None:
-        return metadata
+        record = {
+            "schema_version": 1,
+            "label": str(agent_metadata.get("label") or "selection"),
+            "intent": str(agent_metadata.get("intent") or ""),
+            "status": "idle",
+            "evidence": {
+                "degs": copy.deepcopy(agent_metadata.get("degs") or []),
+                "pathways": copy.deepcopy(agent_metadata.get("pathways") or []),
+                "citations": copy.deepcopy(agent_metadata.get("citations") or []),
+            },
+            "workflow": {
+                "steps": steps,
+                "tools_called": list(agent_metadata.get("tools_called") or []),
+                "generation": generation,
+            },
+            "image": {
+                "used_roi_image": bool(agent_metadata.get("used_roi_image", False)),
+            },
+        }
+        status_message = str(agent_metadata.get("status_message") or "").strip()
+        if status_message:
+            record["status_message"] = status_message
 
-    synthesis_step["status"] = "ok" if success else "error"
+    if generation_model:
+        workflow = record.setdefault("workflow", {})
+        workflow["generation"] = {
+            "model": str(generation_model),
+            "status": "pending",
+            "input": f"{int(context_chars or 0)} chars of evidence context",
+            "output": "handed off for streamed answer generation",
+        }
+
+    record["status"] = _workflow_status(record)
+    return record
+
+
+def finalize_rag_record(rag_record, *, success, content="", error=""):
+    """Finalize the generation block without mutating the pending record."""
+
+    record = build_rag_record(rag_record)
+    if not isinstance(record, dict):
+        return None
+
+    workflow = record.setdefault("workflow", {})
+    generation = workflow.get("generation")
+    if not isinstance(generation, dict):
+        generation = {
+            "model": "",
+            "status": "pending",
+            "input": "",
+            "output": "",
+        }
+        workflow["generation"] = generation
+
+    generation["status"] = "ok" if success else "error"
     if success:
         normalized = " ".join(str(content or "").split())
         preview = normalized[:140] + ("…" if len(normalized) > 140 else "")
-        synthesis_step["output_summary"] = f'"{preview}" ({len(normalized)} chars)'
+        generation["output"] = f'"{preview}" ({len(normalized)} chars)'
     else:
-        synthesis_step["output_summary"] = str(error or content or "generation failed")
-    return metadata
+        generation["output"] = str(error or content or "generation failed")
+
+    record["status"] = _workflow_status(record)
+    return record
+
 
 
 def _ensure_parent_dir(path):
@@ -80,12 +188,32 @@ def _read_session_unlocked(path):
         raise exc
 
 
+def _normalize_session_for_storage(data):
+    """Return the canonical schema-v2 session document written to disk."""
+
+    if not isinstance(data, dict):
+        return data
+    payload = copy.deepcopy(data)
+    payload["schema_version"] = 2
+    for message in payload.get("messages", []):
+        if not isinstance(message, dict):
+            continue
+        legacy = message.pop("rag_metadata", None)
+        current = message.get("rag")
+        if current is not None:
+            message["rag"] = build_rag_record(current)
+        elif legacy is not None:
+            message["rag"] = build_rag_record(legacy)
+    return payload
+
+
 def _write_session_unlocked(path, data):
     _ensure_parent_dir(path)
+    data = _normalize_session_for_storage(data)
     tmp_path = f"{path}.{os.getpid()}.{threading.get_ident()}.{time.time_ns()}.tmp"
     try:
         with open(tmp_path, 'w') as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, path)
@@ -149,8 +277,9 @@ def safe_update_session(session_id, new_message):
     while retries > 0:
         try:
             def updater(data):
-                data = data or {"session_id": session_id, "messages": []}
+                data = data or {"schema_version": 2, "session_id": session_id, "messages": []}
                 data["messages"].append(new_message)
+                data["schema_version"] = max(int(data.get("schema_version") or 1), 2)
                 data["updated_at"] = time.time()
                 return data
 
@@ -163,8 +292,32 @@ def safe_update_session(session_id, new_message):
     return False
 
 
+def safe_begin_assistant_message(session_id, new_message):
+    """Append an assistant message and compact the completed user request.
+
+    RAG workflow data is moved to the assistant message, so a completed turn
+    has one readable copy in ``session.json`` instead of duplicate metadata on
+    both the user and assistant messages.
+    """
+
+    def updater(data):
+        if not data:
+            return None
+        messages = data.setdefault("messages", [])
+        if messages and messages[-1].get("role") == "user":
+            user_msg = messages[-1]
+            for key in ("rag", "rag_metadata", "rag_context_str", "work_dir", "src_images", "roi_path"):
+                user_msg.pop(key, None)
+        messages.append(copy.deepcopy(new_message))
+        data["schema_version"] = max(int(data.get("schema_version") or 1), 2)
+        data["updated_at"] = time.time()
+        return data
+
+    return _lock_and_update_session(_session_path(session_id), updater)
+
+
 def safe_update_streaming_message(
-    session_id, content, streaming=True, rag_metadata=None
+    session_id, content, streaming=True, rag=None
 ):
     retries = 5
     while retries > 0:
@@ -175,8 +328,8 @@ def safe_update_streaming_message(
                 msgs = data.get("messages", [])
                 if msgs and msgs[-1]["role"] == "assistant":
                     msgs[-1]["content"] = content
-                    if rag_metadata is not None:
-                        msgs[-1]["rag_metadata"] = copy.deepcopy(rag_metadata)
+                    if rag is not None:
+                        msgs[-1]["rag"] = build_rag_record(rag)
                     if streaming:
                         msgs[-1]["streaming"] = True
                     else:

@@ -488,7 +488,7 @@ class AgentResult:
         """Return the ``metadata`` block consumed by chat.js."""
 
         return {
-            "trace": [step.to_dict() for step in self.trace],
+            "workflow_steps": [step.to_dict() for step in self.trace],
             "degs": [bar.to_dict() for bar in self.degs],
             "pathways": [bar.to_dict() for bar in self.pathways],
             "citations": [citation.to_dict() for citation in self.citations],
@@ -517,7 +517,7 @@ class AgentResult:
 
         return {
             "answer": self.answer,
-            "trace": [step.to_dict() for step in self.trace],
+            "workflow_steps": [step.to_dict() for step in self.trace],
             "citations": [citation.to_dict() for citation in self.citations],
             "used_roi_image": bool(self.used_roi_image),
             "context_str": self.context_str,

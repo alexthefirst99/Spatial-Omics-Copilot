@@ -47,6 +47,7 @@ DEFAULT_DISEASE = "colorectal cancer"
 # Bound PubMed latency while calls remain on the request path.
 DEFAULT_PUBMED_TIMEOUT = 10.0
 DEFAULT_PUBMED_RETRIES = 1
+DEFAULT_PUBMED_CANDIDATE_POOL = 15
 
 DEFAULT_TOP_PATHWAYS = 6
 DEFAULT_MAX_ABSTRACTS = 3
@@ -297,7 +298,12 @@ def run_pubmed_tool(
         return outcome
 
     try:
-        from rag.pubmed_retrieval import build_pubmed_query, search_pubmed
+        from rag.pubmed_retrieval import (
+            PubMedResult,
+            build_pubmed_query,
+            rerank_pubmed_result,
+            search_pubmed,
+        )
 
         query = build_pubmed_query(
             list(genes or ()),
@@ -312,12 +318,74 @@ def run_pubmed_tool(
         outcome.extras["query"] = query
         outcome.input_summary = f"{_genes_summary(genes)} · {disease}"
 
-        result = search_pubmed(
+        candidate_pool = max(
+            max_results,
+            _int_config(
+                config,
+                "pubmed_retrieval",
+                "candidate_pool",
+                DEFAULT_PUBMED_CANDIDATE_POOL,
+                minimum=max_results,
+                maximum=30,
+            ),
+        )
+        candidate_result = search_pubmed(
             query,
-            max_results=max_results,
+            max_results=candidate_pool,
             timeout=timeout,
             max_retries=max_retries,
         )
+        result = rerank_pubmed_result(
+            candidate_result,
+            genes=genes,
+            pathways=pathways or (),
+            disease=disease,
+            question=question,
+            top_k=max_results,
+        )
+
+        outcome.extras["candidate_pool_requested"] = candidate_pool
+        outcome.extras["candidate_count"] = len(adapters.iter_papers(candidate_result))
+        outcome.extras["ranking"] = "deterministic_roi_evidence"
+
+        # Optional embedding re-ranking is now a real ranking step rather than
+        # trace-only metadata. It runs over the same current-call candidate
+        # corpus and, when successful, replaces the deterministic order.
+        if semantic_rerank and question and adapters.iter_papers(candidate_result):
+            semantic_query = (
+                f"{question}\nTissue context: {disease}.\n"
+                f"ROI genes: {', '.join(list(genes or ())[:10])}.\n"
+                f"ROI pathways: {', '.join(list(pathways or ())[:5])}."
+            )
+            semantic_rows = _semantic_rerank(
+                candidate_result,
+                semantic_query,
+                max_results,
+            )
+            outcome.extras["semantic"] = semantic_rows
+            semantic_pmids = [
+                adapters.clean_text(row.get("pmid"))
+                for row in semantic_rows
+                if isinstance(row, dict)
+            ]
+            semantic_pmids = [pmid for pmid in semantic_pmids if pmid]
+            if semantic_pmids:
+                by_pmid = {
+                    adapters.clean_text(adapters.get_field(paper, "pmid")): paper
+                    for paper in adapters.iter_papers(candidate_result)
+                }
+                selected = [by_pmid[pmid] for pmid in semantic_pmids if pmid in by_pmid]
+                if selected:
+                    result = PubMedResult(
+                        papers=selected[:max_results],
+                        query=query,
+                        status_message=(
+                            f"Retrieved {len(adapters.iter_papers(candidate_result))} "
+                            f"PubMed candidate(s); retained {len(selected[:max_results])} "
+                            "semantically ROI-focused paper(s)."
+                        ),
+                    )
+                    outcome.extras["ranking"] = "semantic_roi_evidence"
     except Exception as exc:  # noqa: BLE001 — a tool must never raise.
         outcome.status = STATUS_ERROR
         outcome.error = f"{type(exc).__name__}: {exc}"
@@ -338,8 +406,6 @@ def run_pubmed_tool(
         )
         outcome.output_summary = f"retrieved {len(papers)} abstract(s)"
 
-        if semantic_rerank and question:
-            outcome.extras["semantic"] = _semantic_rerank(result, question, max_results)
     else:
         pubmed_status = adapters.status_of(result)
         if _is_failure_status_message(pubmed_status):
@@ -390,10 +456,38 @@ def _with_override(
     merged = dict(config)
     existing = merged.get(section)
     section_values = dict(existing) if isinstance(existing, dict) else {}
+    # Function arguments are the immediate call contract and therefore take
+    # precedence over a broader application default. The old setdefault()
+    # meant run_pathway_tool(top_n=6) silently returned config top_n=10.
     for key, value in overrides.items():
-        section_values.setdefault(key, value)
+        section_values[key] = value
     merged[section] = section_values
     return merged
+
+
+def _int_config(
+    config: object | None,
+    section: str,
+    key: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    """Read one bounded integer from a dict config without ever raising."""
+
+    value: Any = default
+    if isinstance(config, dict):
+        block = config.get(section)
+        if isinstance(block, dict) and key in block:
+            value = block.get(key)
+        elif key in config:
+            value = config.get(key)
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        parsed = default
+    return min(max(parsed, minimum), maximum)
 
 
 # Wrappers expose schemas for LangChain and future tool-calling models.
@@ -487,6 +581,7 @@ __all__ = [
     "DEFAULT_DISEASE",
     "DEFAULT_MAX_ABSTRACTS",
     "DEFAULT_MAX_ANNOTATED_GENES",
+    "DEFAULT_PUBMED_CANDIDATE_POOL",
     "DEFAULT_PUBMED_RETRIES",
     "DEFAULT_PUBMED_TIMEOUT",
     "DEFAULT_TOP_PATHWAYS",

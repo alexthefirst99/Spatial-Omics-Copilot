@@ -35,7 +35,7 @@ and an agentic LLM pipeline in a single interface.
 - PubMed NCBI E-utilities retrieval based on genes and pathways when literature evidence is needed.
 - LangGraph agentic loop that dynamically decides which tools to call.
 - ChromaDB semantic-search module for fetched PubMed abstracts, with PMID metadata preserved; wired into the agent via `copilot_agent.semantic_rerank` (off by default).
-- Streaming chat interface with AGENT TRACE, pathway, and DEG panels.
+- Streaming chat interface with AGENT WORKFLOW, pathway, and DEG panels.
 - Session persistence so chat history survives page reloads.
 
 ### Out of Scope
@@ -54,6 +54,6 @@ and an agentic LLM pipeline in a single interface.
 | ROI gene extraction | Top N genes returned for any drawn region within 5 seconds on a coarsely-binned or downsampled dataset (~17k spots or fewer); the reference group is always the full remaining dataset regardless of ROI size, so a full-resolution dataset costs much more — on the shipped ~137k-spot demo dataset this is closer to ~2 minutes, not 5 seconds. See `docs/tickets.md` T-010 and `docs/validation/person2_deg_notes.md`. |
 | Pathway enrichment | GO / KEGG returns at least one enriched pathway for a valid gene list |
 | PubMed retrieval | Up to 3 relevant abstracts returned when literature evidence is requested; no unrelated padding |
-| Agent tool use | Agent calls the appropriate tools based on the user question, and the trace reflects the tools actually used |
+| Agent tool use | Agent calls the appropriate tools based on the user question, and the workflow record reflects the tools actually used |
 | Response streaming | First token appears within 3 seconds of submitting a query |
 | Chat history | Messages persist across page reloads within the same session |

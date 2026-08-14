@@ -32,7 +32,7 @@ INTENT_SUMMARY = "roi_summary"
 INTENT_GENERAL = "general_chat"
 
 # Tool names. These match the callables exposed by ``copilot_agent.tools`` and
-# are what ``metadata.trace`` reports, so they are also a contract.
+# are what ``metadata.workflow_steps`` reports, so they are also a contract.
 TOOL_PATHWAY = "pathway_tool"
 TOOL_GENE_ANNOTATION = "gene_annotation_tool"
 TOOL_PUBMED = "pubmed_tool"

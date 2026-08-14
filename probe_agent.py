@@ -82,8 +82,8 @@ for question in questions:
     print(f"Q: {question}")
     print(f"   intent      : {meta['intent']}")
     print(f"   tools run   : {meta['tools_called'] or '(none)'}")
-    print("   AGENT TRACE :")
-    for step in meta["trace"]:
+    print("   AGENT WORKFLOW :")
+    for step in meta["workflow_steps"]:
         detail = f"  — {step['detail']}" if step["detail"] else ""
         print(f"      [{step['status']:7s}] {step['step']}{detail}")
     if meta["pathways"]:

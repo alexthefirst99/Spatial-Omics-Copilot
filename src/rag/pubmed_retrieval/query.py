@@ -65,9 +65,12 @@ def build_pubmed_query(
     Empty groups are omitted rather than producing invalid ``()`` clauses.
     """
 
-    # Limit URL size while retaining the highest-ranked upstream evidence.
-    gene_terms = _terms(genes)[:20]
-    pathway_terms = _pathway_labels(pathways)[:10]
+    # Keep the query focused on the highest-ranked upstream evidence. Broadly
+    # OR-ing twenty-five ROI genes makes ESearch drift toward generic disease
+    # papers that happen to mention one weak tail gene. A larger candidate pool
+    # is fetched downstream, so precision here is more useful than URL breadth.
+    gene_terms = _terms(genes)[:10]
+    pathway_terms = _pathway_labels(pathways)[:5]
     disease_terms = _terms([disease])
 
     clauses: list[str] = []

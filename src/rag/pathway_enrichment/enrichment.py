@@ -233,6 +233,7 @@ def _records_from_enrichr(
     gene_sets: Sequence[str],
     adjusted_p_value_cutoff: float,
     significant_only: bool,
+    min_overlap_genes: int,
     top_n: int,
 ) -> tuple[list[PathwayEntry], int]:
     frame = getattr(enrichr_result, "res2d", None)
@@ -283,6 +284,11 @@ def _records_from_enrichr(
         overlap_genes = _parse_overlap_genes(
             _column_lookup(row, "Genes", "Overlap genes", default="")
         )
+        effective_overlap = (
+            overlap_count if overlap_count is not None else len(overlap_genes)
+        )
+        if effective_overlap < min_overlap_genes:
+            continue
         pathways.append(
             PathwayEntry(
                 name=name,
@@ -299,7 +305,32 @@ def _records_from_enrichr(
             )
         )
 
-    pathways.sort(key=lambda item: (item.adjusted_p_value, item.name.casefold()))
+    def evidence_rank(item: PathwayEntry) -> tuple[float, float, float, float, str]:
+        """Prefer pathways supported by more ROI genes, then stronger statistics.
+
+        FDR alone can rank a very broad one-gene ontology term above a pathway
+        that is supported by several of the actual ROI DEGs. For biological
+        interpretation the latter is usually more ROI-specific, so overlap
+        support is the primary key while FDR/combined score remain important
+        tie-breakers.
+        """
+
+        overlap_count = float(item.overlap_count or len(item.overlap_genes) or 0)
+        overlap_fraction = (
+            overlap_count / float(item.gene_set_size)
+            if item.gene_set_size
+            else 0.0
+        )
+        combined = float(item.combined_score or 0.0)
+        return (
+            -overlap_count,
+            -overlap_fraction,
+            item.adjusted_p_value,
+            -combined,
+            item.name.casefold(),
+        )
+
+    pathways.sort(key=evidence_rank)
     return pathways[:top_n], valid_rows
 
 
@@ -384,6 +415,20 @@ def run_pathway_enrichment(
             True,
         )
     )
+    min_overlap_genes = max(
+        1,
+        int(
+            _config_value(
+                config,
+                (
+                    "pathway_enrichment.min_overlap_genes",
+                    "pathway.min_overlap_genes",
+                    "min_overlap_genes",
+                ),
+                2,
+            )
+        ),
+    )
     timeout = max(
         1.0,
         float(
@@ -446,6 +491,7 @@ def run_pathway_enrichment(
             gene_sets=gene_sets,
             adjusted_p_value_cutoff=cutoff,
             significant_only=significant_only,
+            min_overlap_genes=min_overlap_genes,
             top_n=top_n,
         )
     except Exception as exc:  # Requests/pandas expose several failure classes.
@@ -469,8 +515,9 @@ def run_pathway_enrichment(
         )
     if valid_rows and significant_only:
         status = (
-            "Enrichr returned pathway results, but none passed the adjusted "
-            f"p-value cutoff of {cutoff:g}."
+            "Enrichr returned pathway results, but none passed the configured "
+            f"evidence filters (adjusted p-value <= {cutoff:g}; at least "
+            f"{min_overlap_genes} ROI gene(s) overlapping)."
         )
     else:
         status = "No enriched pathways were returned by Enrichr."

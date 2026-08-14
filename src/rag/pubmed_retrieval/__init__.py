@@ -11,7 +11,7 @@ from .client import (
 )
 from .models import PubMedPaper, PubMedResult
 from .query import build_pubmed_query
-from .retrieval import retrieve_abstracts, search_pubmed
+from .retrieval import rerank_pubmed_result, retrieve_abstracts, search_pubmed
 from .vector_store import semantic_search_abstracts
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     "parse_esearch_xml",
     "parse_pubmed_xml",
     "retrieve_abstracts",
+    "rerank_pubmed_result",
     "search_pubmed",
     "semantic_search_abstracts",
 ]

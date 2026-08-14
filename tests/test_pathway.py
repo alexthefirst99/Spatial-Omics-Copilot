@@ -93,6 +93,54 @@ def test_successful_enrichment_parses_sorts_filters_and_preserves_source(monkeyp
     assert calls[0]["max_retries"] == 2
 
 
+def test_pathway_ranking_prefers_multi_gene_roi_support_and_filters_singletons(monkeypatch):
+    def fake_fetch(genes, gene_sets, *, timeout, max_retries):
+        return (
+            [
+                pd.DataFrame(
+                    [
+                        {
+                            "Gene_set": "GO_Biological_Process_2023",
+                            "Term": "single gene generic process",
+                            "Overlap": "1/40",
+                            "Adjusted P-value": 0.00001,
+                            "Combined Score": 80.0,
+                            "Genes": "EPCAM",
+                        },
+                        {
+                            "Gene_set": "KEGG_2021_Human",
+                            "Term": "Wnt signaling pathway",
+                            "Overlap": "3/120",
+                            "Adjusted P-value": 0.01,
+                            "Combined Score": 25.0,
+                            "Genes": "EPCAM;KRAS;TP53",
+                        },
+                        {
+                            "Gene_set": "GO_Biological_Process_2023",
+                            "Term": "epithelial cell proliferation",
+                            "Overlap": "2/80",
+                            "Adjusted P-value": 0.002,
+                            "Combined Score": 50.0,
+                            "Genes": "EPCAM;KRAS",
+                        },
+                    ]
+                )
+            ],
+            [],
+        )
+
+    install_fake_enrichr(monkeypatch, fake_fetch)
+    result = run_pathway_enrichment(
+        ["EPCAM", "KRAS", "TP53"],
+        config={"pathway_enrichment": {"top_n": 5, "min_overlap_genes": 2}},
+    )
+
+    assert [path.name for path in result.pathways] == [
+        "Wnt signaling pathway",
+        "epithelial cell proliferation",
+    ]
+
+
 def test_empty_gene_list_returns_safe_result_without_calling_enrichr(monkeypatch):
     def unexpected_fetch(*args, **kwargs):
         raise AssertionError("Enrichr should not be called for an empty gene list")

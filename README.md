@@ -32,7 +32,7 @@ ROI / cluster
 - NCBI Gene lookup
 - Enrichr pathway enrichment
 - PubMed retrieval
-- Per-turn agent trace cards for routed RAG questions
+- Per-turn agent workflow cards for routed RAG questions
 - Local Ollama or hosted DeepInfra models
 - Reproducible evaluation and test scripts
 
@@ -265,14 +265,71 @@ What does the literature say about these genes?
 
 ---
 
-### Trace storage
+### Session and workflow storage
 
-Agent traces are displayed in the chat interface and saved with the corresponding
-chat session. Session files are created automatically at runtime under
-`data/chat_sessions/`.
+Chat history and RAG observability are persisted together in **one JSON file per
+workspace**:
 
-Each RAG-enabled message stores its trace in `rag_metadata.trace`, allowing the
-agent's routing, tool calls, and generation status to be inspected later.
+```text
+data/chat_sessions/<session_id>/session.json
+```
+
+No separate trace file is created. Completed RAG data is stored once on the
+assistant message under `rag`, with evidence and workflow information separated
+for readability:
+
+```json
+{
+  "schema_version": 2,
+  "session_id": "workspace-123",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "...",
+      "rag": {
+        "schema_version": 1,
+        "label": "ROI",
+        "intent": "literature",
+        "status": "ok",
+        "evidence": {
+          "degs": [],
+          "pathways": [],
+          "citations": []
+        },
+        "workflow": {
+          "steps": [
+            {
+              "name": "Retrieved PubMed abstracts",
+              "status": "ok",
+              "tool": "pubmed_tool",
+              "input": "ROI genes and pathways",
+              "output": "3 papers"
+            }
+          ],
+          "tools_called": ["pubmed_tool"],
+          "generation": {
+            "model": "deepinfra:model-name",
+            "status": "ok",
+            "input": "1840 chars of evidence context",
+            "output": "\"Answer preview...\" (420 chars)"
+          }
+        },
+        "image": {
+          "used_roi_image": true
+        }
+      }
+    }
+  ]
+}
+```
+
+While a response is queued, the pending `rag` block temporarily lives on the
+user message so the worker can resume safely. As soon as the assistant message
+is created, the worker moves that block to the assistant message and removes
+large runtime-only fields such as the evidence prompt and temporary image paths.
+The chat interface renders the same data as **AGENT WORKFLOW → PATHWAY → DEG →
+answer**.
+
 ---
 
 ## 6. Run the evaluation
@@ -343,11 +400,11 @@ every ROI. Final outputs are:
 | `evaluation_outputs/technical_metrics.csv` | The 7 technical metrics |
 | `evaluation_outputs/business_metrics.csv` | The 5 business metrics |
 | `evaluation_outputs/per_roi_results.csv` | Auditable per-ROI metric inputs/results |
-| `evaluation_outputs/raw_results.json` | ROI bounds, spot counts, crops, real DEG/evidence, answers, raw judge outputs, timings, errors, and supplementary per-ROI agent traces |
+| `evaluation_outputs/raw_results.json` | ROI bounds, spot counts, crops, real DEG/evidence, answers, raw judge outputs, timings, errors, and supplementary per-ROI agent workflow records |
 
-`raw_results.json` may include the recorded agent trace for each evaluated ROI
+`raw_results.json` may include the recorded agent workflow for each evaluated ROI
 or case. This is supplementary diagnostic information for debugging,
-inspection, and reproducibility; the trace is not itself an evaluation metric
+inspection, and reproducibility; the workflow record is not itself an evaluation metric
 or reported score.
 
 This is a research evaluation, not clinical validation. External NCBI, Enrichr,

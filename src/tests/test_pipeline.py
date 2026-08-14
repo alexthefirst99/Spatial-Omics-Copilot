@@ -29,7 +29,7 @@ def _fake_pathways(genes, top_n=6):
     ]
 
 
-def test_run_sequential_builds_complete_rag_metadata(monkeypatch):
+def test_run_sequential_builds_complete_workflow_metadata(monkeypatch):
     monkeypatch.setattr("rag.pipeline.retrieve_abstracts", _fake_abstracts)
     monkeypatch.setattr("rag.pipeline.enrich_pathways", _fake_pathways)
     gene_objects = [
@@ -51,7 +51,7 @@ def test_run_sequential_builds_complete_rag_metadata(monkeypatch):
 
     metadata = result["metadata"]
     assert metadata["label"] == "ROI 1"
-    assert [step["step"] for step in metadata["trace"]] == [
+    assert [step["step"] for step in metadata["workflow_steps"]] == [
         "Extracted top DEGs",
         "Pathway enrichment",
         "Retrieved 2 PubMed abstracts",
@@ -69,4 +69,4 @@ def test_run_sequential_uses_demo_fallback_for_empty_gene_objects(monkeypatch):
 
     assert result["metadata"]["label"] == "demo"
     assert result["gene_objects"]
-    assert result["metadata"]["trace"][0]["detail"].endswith("genes · demo")
+    assert result["metadata"]["workflow_steps"][0]["detail"].endswith("genes · demo")
