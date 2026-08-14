@@ -42,8 +42,18 @@ def write_outputs(
     run_metadata: dict[str, Any],
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
+    expected = int(run_metadata.get("expected_roi_count", 10))
+    attempted = len(records)
+    coverage = dict(metrics.get("coverage") or {})
+    progress = {
+        "expected_rois": expected,
+        "attempted_rois": attempted,
+        "all_roi_attempts_persisted": attempted == expected,
+        **coverage,
+    }
+    enriched_metadata = {**run_metadata, "progress": progress}
     (output_dir / "raw_results.json").write_text(json.dumps({
-        "schema_version": "3.0", "run_metadata": run_metadata,
+        "schema_version": "3.0", "run_metadata": enriched_metadata,
         "aggregate_metrics": metrics, "per_roi_results": records,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -95,15 +105,27 @@ def write_outputs(
             "manual_data_reentry_steps": (record.get("workflow_efficiency") or {}).get("manual_data_reentry_steps"),
             "trace_valid": (record.get("agent_trace_validation") or {}).get("valid"),
             "status": (record.get("agent") or {}).get("status"),
+            "answer_generated": bool(record.get("answer")),
+            "judge_status": judgments.get("status", ""),
             "errors": "; ".join(record.get("errors") or []),
             "judge_errors": "; ".join(judgments.get("errors") or []),
         })
     fields = list(per_roi[0]) if per_roi else ["roi_id", "status", "errors"]
     _write_csv(output_dir / "per_roi_results.csv", fields, per_roi)
 
+    run_state = "COMPLETE" if attempted == expected else "INCOMPLETE"
+    answer_count = int(coverage.get("answer_generated_rois", 0))
+    text_judged = int(coverage.get("text_judged_rois", 0))
+    vision_judged = int(coverage.get("vision_judged_rois", 0))
+    workflow_errors = int(coverage.get("workflow_error_rois", 0))
+    judge_errors = int(coverage.get("judge_error_rois", 0))
     lines = [
         "# Spatial Omics Copilot Evaluation Summary", "",
-        f"Evaluated {len(records)}/{run_metadata.get('expected_roi_count', 10)} deterministic real ROIs using seed 42. "
+        f"**Run status: {run_state} — {attempted}/{expected} ROI attempts persisted.**", "",
+        f"Answers generated: {answer_count}/{attempted}; text judgments: {text_judged}/{attempted}; "
+        f"vision judgments: {vision_judged}/{attempted}; ROI records with errors: {workflow_errors}; "
+        f"judge partial/error records: {judge_errors}.", "",
+        "Metric denominators use only measurements that were actually available and valid. "
         "Unavailable measurements are reported as N/A; no missing result is fabricated.", "",
         "## Technical Metrics", "",
         "| Technical Metric | Result |", "| --- | --- |",
@@ -118,6 +140,7 @@ def write_outputs(
         f"- Spatial coordinate frame: `{(run_metadata.get('dataset') or {}).get('coordinate_source', 'N/A')}`",
         f"- Provider/model: `{run_metadata.get('provider', 'N/A')}:{run_metadata.get('model', 'N/A')}`",
         f"- Validated agent traces: {sum(bool((r.get('agent_trace_validation') or {}).get('valid')) for r in records)}/{len(records)}",
+        f"- Persisted ROI attempts: {attempted}/{expected}. A report with fewer than {expected} attempts is explicitly marked INCOMPLETE.",
         "- Full ROI bounds, spot counts, crops, retrieved evidence, judgments, raw judge output, timings, errors, and traces are in `raw_results.json`.",
     ])
     (output_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -145,10 +145,14 @@ def aggregate_proposal_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
             ) or []
         )
     ]
+    # Response-time and time-saved metrics are meaningful only when an answer
+    # was actually produced. Failed ROI attempts remain visible in coverage and
+    # workflow metrics but are not misrepresented as successful response times.
     elapsed = [
         value
         for record in records
-        if isinstance(
+        if record.get("answer")
+        and isinstance(
             (value := (record.get("timing") or {}).get(
                 "copilot_end_to_end_seconds"
             )),
@@ -309,7 +313,25 @@ def aggregate_proposal_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
             ),
         },
     }
-    return {"technical": technical, "business": business}
+    coverage = {
+        "attempted_rois": len(records),
+        "answer_generated_rois": sum(bool(record.get("answer")) for record in records),
+        "workflow_error_rois": sum(bool(record.get("errors")) for record in records),
+        "text_judged_rois": sum(
+            bool(((record.get("judgments") or {}).get("text") or {}).get("scores"))
+            for record in records
+        ),
+        "vision_judged_rois": sum(
+            ((record.get("judgments") or {}).get("vision") or {}).get("verdict")
+            in {"PASS", "FAIL"}
+            for record in records
+        ),
+        "judge_error_rois": sum(
+            (record.get("judgments") or {}).get("status") in {"error", "partial"}
+            for record in records
+        ),
+    }
+    return {"coverage": coverage, "technical": technical, "business": business}
 
 
 __all__ = ["aggregate_proposal_metrics", "summarize_tool_calls"]

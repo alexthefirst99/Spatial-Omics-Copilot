@@ -6,7 +6,7 @@ from pathlib import Path
 from evaluation.judges import JudgeClient, _parse_json
 from evaluation.metrics import aggregate_proposal_metrics, summarize_tool_calls
 from evaluation.reporting import write_outputs
-from evaluation.runner import generate_real_rois, load_cases
+from evaluation.runner import _model_error, generate_real_rois, load_cases
 
 
 def test_config_defines_ten_seeded_real_rois_without_synthetic_genes():
@@ -53,6 +53,29 @@ def test_judge_client_retries_invalid_json_once():
     assert len(raw_outputs) == 2
     assert error == ""
     assert _parse_json('```json\n{"verdict":"FAIL"}\n```')["verdict"] == "FAIL"
+
+
+def test_judge_client_does_not_retry_provider_errors():
+    calls = 0
+
+    def failed_model_runner(messages, provider, model):
+        nonlocal calls
+        calls += 1
+        return "DeepInfra returned HTTP 404."
+
+    client = JudgeClient(
+        model_runner=failed_model_runner,
+        provider="deepinfra",
+        model="missing-model",
+    )
+
+    payload, raw_outputs, error = client.ask("judge")
+
+    assert payload is None
+    assert raw_outputs == ["DeepInfra returned HTTP 404."]
+    assert error == "DeepInfra returned HTTP 404."
+    assert calls == 1
+    assert _model_error(error) is True
 
 
 def test_tool_summary_preserves_production_status_and_missing_timing():

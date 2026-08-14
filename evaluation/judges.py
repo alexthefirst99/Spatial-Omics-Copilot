@@ -64,6 +64,8 @@ class JudgeClient:
     ) -> tuple[dict[str, Any] | None, list[str], str]:
         """Request JSON once, retrying once only for invalid/truncated output."""
 
+        from app.inference import is_inference_error
+
         raw_outputs: list[str] = []
         for attempt in range(2):
             content = prompt
@@ -75,8 +77,18 @@ class JudgeClient:
             message: dict[str, Any] = {"role": "user", "content": content}
             if image_path:
                 message["images"] = [image_path]
-            raw = self.model_runner([message], self.provider, self.model)
+            try:
+                raw = self.model_runner([message], self.provider, self.model)
+            except Exception as exc:
+                # A judge transport/provider failure must never abort the ROI loop.
+                return (
+                    None,
+                    raw_outputs,
+                    f"Judge model request failed: {type(exc).__name__}: {exc}",
+                )
             raw_outputs.append(raw)
+            if is_inference_error(raw):
+                return None, raw_outputs, raw
             try:
                 return _parse_json(raw), raw_outputs, ""
             except Exception:

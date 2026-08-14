@@ -87,3 +87,35 @@ def test_deepinfra_can_be_the_default_provider(monkeypatch):
     monkeypatch.setenv("DEEPINFRA_MODEL", "Qwen/configured-model")
 
     assert inference.get_default_model_spec() == "deepinfra:Qwen/configured-model"
+
+
+def test_deepinfra_http_failure_is_classified_as_inference_error():
+    assert inference.is_inference_error("DeepInfra returned HTTP 404.") is True
+    assert inference.is_inference_error("DeepInfra returned HTTP 503.") is True
+    assert inference.is_inference_error("A grounded biological answer") is False
+
+
+def test_deepinfra_call_is_logged_without_secrets(monkeypatch, capsys):
+    from rag.copilot_agent import llm
+
+    monkeypatch.setattr(
+        llm,
+        "call_deepinfra_chat",
+        lambda payload, config: llm.LLMResponse(
+            text="ok", ok=True, model=payload["model"], status_message=""
+        ),
+    )
+
+    output = "".join(
+        inference._run_deepinfra(
+            [{"role": "user", "content": "hi"}],
+            model_name="Qwen/Qwen3-VL-30B-A3B-Instruct",
+        )
+    )
+    captured = capsys.readouterr().out
+
+    assert output == "ok"
+    assert "Calling DeepInfra" in captured
+    assert "Qwen/Qwen3-VL-30B-A3B-Instruct" in captured
+    assert "messages=1" in captured
+    assert "response finished" in captured

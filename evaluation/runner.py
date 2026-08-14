@@ -252,12 +252,9 @@ def _default_model_runner(messages: list[dict[str, Any]], provider: str, model: 
 
 
 def _model_error(text: str) -> bool:
-    lowered = (text or "").lower()
-    return any(marker in lowered for marker in (
-        "ollama is not reachable", "error querying ollama", "error during generation",
-        "deepinfra is not configured", "deepinfra is disabled", "deepinfra call failed",
-        "unsupported model provider", "ollama python client is not installed",
-    ))
+    from app.inference import is_inference_error
+
+    return is_inference_error(text)
 
 
 def _tool_payload(result: Any, tool: str) -> dict[str, Any]:
@@ -313,6 +310,7 @@ def execute_roi(
     answer = ""
     crop_payload: dict[str, Any] = {}
     deg_payload: dict[str, Any] = {}
+    vision_capable = False
 
     try:
         import anndata as ad
@@ -359,7 +357,7 @@ def execute_roi(
             errors.append(crop_payload.get("status_message") or "ROI crop failed.")
 
         app_config = load_config()
-        vision_capable = model_supports_vision(model, app_config)
+        vision_capable = bool(model_supports_vision(model, app_config))
         phase = time.perf_counter()
         result = agent_runner(
             question=question,
@@ -419,7 +417,7 @@ def execute_roi(
         "tissue_context": disease,
         "provider": provider,
         "model": model or "",
-        "vision_capable": bool(model_supports_vision(model, load_config())),
+        "vision_capable": vision_capable,
         "deg": deg_payload,
         "gene_annotations": _tool_payload(result, "gene_annotation_tool") if result else {},
         "pathways": _tool_payload(result, "pathway_tool") if result else {},
@@ -444,10 +442,26 @@ def execute_roi(
         },
         "workflow_efficiency": {
             "automatically_connected_analysis_retrieval_stages": [
-                "H&E ROI crop", "ROI DEG", "NCBI Gene annotation",
-                "Enrichr pathway enrichment", "PubMed retrieval",
+                stage
+                for stage, reached in (
+                    ("H&E ROI crop", bool(crop_payload.get("crop_path"))),
+                    ("ROI DEG", bool(deg_payload.get("top_genes"))),
+                    ("NCBI Gene annotation", "gene_annotation_tool" in tools),
+                    ("Enrichr pathway enrichment", "pathway_tool" in tools),
+                    ("PubMed retrieval", "pubmed_tool" in tools),
+                )
+                if reached
             ],
-            "automatically_connected_stage_count": 5,
+            "automatically_connected_stage_count": sum(
+                bool(reached)
+                for reached in (
+                    crop_payload.get("crop_path"),
+                    deg_payload.get("top_genes"),
+                    "gene_annotation_tool" in tools,
+                    "pathway_tool" in tools,
+                    "pubmed_tool" in tools,
+                )
+            ),
             "tool_calls_executed": len(tools),
             "manual_data_reentry_steps": 0,
         },
@@ -456,11 +470,28 @@ def execute_roi(
     record["agent_trace_validation"] = _trace_validation(trace, result, final_status)
 
     if judge_enabled and answer:
-        judge = JudgeClient(model_runner=model_runner, provider=provider, model=model)
-        record["judgments"] = judge_roi(record, judge)
+        try:
+            judge = JudgeClient(model_runner=model_runner, provider=provider, model=model)
+            record["judgments"] = judge_roi(record, judge)
+        except Exception as exc:
+            judge_error = f"Judge failed: {type(exc).__name__}: {exc}"
+            record["errors"] = list(dict.fromkeys([*record.get("errors", []), judge_error]))
+            record["judgments"] = {
+                "status": "error",
+                "text": {},
+                "vision": {},
+                "raw_text_judge_outputs": [],
+                "raw_vision_judge_outputs": [],
+                "errors": [judge_error],
+            }
     else:
+        reason = (
+            "Judging disabled by --no-judge."
+            if not judge_enabled
+            else "Judging skipped because no answer was generated."
+        )
         record["judgments"] = {
-            "status": "skipped", "errors": ["Judging skipped because no answer was generated."]
+            "status": "skipped", "text": {}, "vision": {}, "errors": [reason]
         }
     return record
 
@@ -475,6 +506,62 @@ def _resolve_provider_model(provider: str | None, model: str | None) -> tuple[st
     if selected_provider not in {"ollama", "deepinfra"}:
         raise ValueError(f"Unsupported provider: {selected_provider}")
     return selected_provider, selected_model or None
+
+
+def _unhandled_roi_failure_record(
+    roi: dict[str, Any], *, provider: str, model: str | None, exc: Exception,
+) -> dict[str, Any]:
+    """Serialize an unexpected per-ROI failure instead of aborting the 10-ROI run."""
+
+    error = f"Unhandled ROI failure: {type(exc).__name__}: {exc}"
+    return {
+        "schema_version": "3.0",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "roi_id": roi.get("roi_id", "unknown_roi"),
+        "roi": dict(roi),
+        "query": "",
+        "tissue_context": "",
+        "provider": provider,
+        "model": model or "",
+        "vision_capable": False,
+        "deg": {},
+        "gene_annotations": {},
+        "pathways": {},
+        "pubmed": {},
+        "answer": "",
+        "agent": {
+            "classified_intent": "",
+            "tools_executed": [],
+            "tool_call_count": 0,
+            "tool_calls": [],
+            "trace": [],
+            "status": "error",
+        },
+        "timing": {
+            "copilot_end_to_end_seconds": None,
+            "backend_seconds": None,
+            "llm_seconds": None,
+            "production_phase_seconds": {},
+            "production_tool_timing": "not available because ROI execution failed unexpectedly",
+        },
+        "workflow_efficiency": {
+            "automatically_connected_analysis_retrieval_stages": [],
+            "automatically_connected_stage_count": 0,
+            "tool_calls_executed": 0,
+            "manual_data_reentry_steps": 0,
+        },
+        "errors": [error],
+        "agent_trace_validation": {
+            "retrieve": False, "route": False, "tool_call": False,
+            "synthesize": False, "classified_intent": "",
+            "tools_executed": [], "tool_call_count": 0,
+            "final_status": "error", "valid": False,
+        },
+        "judgments": {
+            "status": "skipped", "text": {}, "vision": {},
+            "errors": ["Judging skipped because ROI execution failed unexpectedly."],
+        },
+    }
 
 
 def run_evaluation(
@@ -492,17 +579,35 @@ def run_evaluation(
 
     records: list[dict[str, Any]] = []
     for index, roi in enumerate(rois, start=1):
-        print(f"[{index}/{len(rois)}] Evaluating {roi['roi_id']} ({roi['spot_count']} spots)...", flush=True)
-        records.append(execute_roi(
-            roi, config=config, config_path=config_path, output_dir=output_dir,
-            provider=provider, model=model, agent_runner=agent_runner,
-            model_runner=model_runner, judge_enabled=judge_enabled,
-        ))
+        print(
+            f"[{index}/{len(rois)}] Evaluating {roi['roi_id']} "
+            f"({roi['spot_count']} spots)...",
+            flush=True,
+        )
+        try:
+            record = execute_roi(
+                roi, config=config, config_path=config_path, output_dir=output_dir,
+                provider=provider, model=model, agent_runner=agent_runner,
+                model_runner=model_runner, judge_enabled=judge_enabled,
+            )
+        except Exception as exc:
+            # Last-resort isolation: one bad ROI must not terminate the other nine.
+            record = _unhandled_roi_failure_record(
+                roi, provider=provider, model=model, exc=exc
+            )
+            print(
+                f"[{index}/{len(rois)}] {roi['roi_id']} failed but the run will continue: "
+                f"{type(exc).__name__}: {exc}",
+                file=sys.stderr, flush=True,
+            )
+        records.append(record)
+
         # Persist after every ROI so an interrupted long run remains auditable.
         metrics = aggregate_proposal_metrics(records)
         write_outputs(output_dir, records, metrics, {
             "dataset": dataset_metadata, "provider": provider, "model": model or "",
             "config_path": str(config_path), "expected_roi_count": len(rois),
+            "judge_enabled": judge_enabled,
         })
     return records
 

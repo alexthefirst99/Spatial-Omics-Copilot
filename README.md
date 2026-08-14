@@ -180,7 +180,7 @@ In `.env`:
 ```env
 LLM_PROVIDER=deepinfra
 DEEPINFRA_API_KEY=your_api_key
-DEEPINFRA_MODEL=Qwen/Qwen2.5-VL-32B-Instruct
+DEEPINFRA_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct
 ```
 
 `DEEPINFRA_TOKEN` can be used instead of `DEEPINFRA_API_KEY`.
@@ -294,7 +294,7 @@ Configure a vision-capable model in `.env`. For example, with DeepInfra:
 ```env
 LLM_PROVIDER=deepinfra
 DEEPINFRA_API_KEY=your_api_key
-DEEPINFRA_MODEL=Qwen/Qwen2.5-VL-32B-Instruct
+DEEPINFRA_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct
 ```
 
 Then run this one command from the repository root:
@@ -331,7 +331,7 @@ python -m evaluation.runner \
   --config evaluation/eval_cases.json \
   --output-dir evaluation_outputs \
   --provider deepinfra \
-  --model Qwen/Qwen2.5-VL-32B-Instruct
+  --model Qwen/Qwen3-VL-30B-A3B-Instruct
 ```
 
 The command continues after an individual ROI failure and writes progress after

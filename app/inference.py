@@ -14,6 +14,32 @@ DEFAULT_OLLAMA_NUM_PREDICT = 48
 DEFAULT_OLLAMA_KEEP_ALIVE = "10m"
 DEFAULT_PROVIDER = "ollama"
 
+_INFERENCE_ERROR_MARKERS = (
+    "ollama is not reachable",
+    "error querying ollama",
+    "error during generation",
+    "ollama python client is not installed",
+    "deepinfra is not configured",
+    "deepinfra is disabled",
+    "no deepinfra model configured",
+    "deepinfra request failed",
+    "deepinfra rejected the api key",
+    "deepinfra returned http",
+    "deepinfra returned a non-json response",
+    "deepinfra returned no completion choices",
+    "deepinfra returned an empty completion",
+    "deepinfra call failed",
+    "the requests library is required to call deepinfra",
+    "unsupported model provider",
+)
+
+
+def is_inference_error(text):
+    """Return whether model output is one of this module's error messages."""
+
+    lowered = str(text or "").strip().lower()
+    return any(marker in lowered for marker in _INFERENCE_ERROR_MARKERS)
+
 
 def deepinfra_enabled():
     """Return whether the hosted provider was explicitly enabled in `.env`."""
@@ -96,14 +122,38 @@ def _run_deepinfra(messages, model_name=None):
 
     config = load_config()
     selected_model = (model_name or "").strip() or resolve_model(config)
+    prepared_messages = _deepinfra_messages(messages)
+    image_count = sum(
+        1
+        for message in prepared_messages
+        for part in (
+            message.get("content")
+            if isinstance(message.get("content"), list)
+            else []
+        )
+        if isinstance(part, dict) and part.get("type") == "image_url"
+    )
+    print(
+        "DEBUG: Calling DeepInfra "
+        f"(model={selected_model or 'unset'}, messages={len(prepared_messages)}, "
+        f"images={image_count})",
+        flush=True,
+    )
     response = call_deepinfra_chat(
-        {"messages": _deepinfra_messages(messages), "model": selected_model},
+        {"messages": prepared_messages, "model": selected_model},
         config,
     )
     if response.ok:
+        print(
+            f"DEBUG: DeepInfra response finished (model={selected_model}, "
+            f"characters={len(response.text)})",
+            flush=True,
+        )
         yield response.text
     else:
-        yield response.status_message or "DeepInfra call failed."
+        status = response.status_message or "DeepInfra call failed."
+        print(f"DeepInfra Error: {status}", flush=True)
+        yield status
 
 
 def run_model_inference(messages, provider=None, model_name=None):

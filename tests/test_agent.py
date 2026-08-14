@@ -819,7 +819,7 @@ def test_split_fence_marker_cannot_be_reassembled_by_stripping():
     "model,expected",
     [
         ("Qwen/Qwen2.5-VL-7B-Instruct", True),
-        ("Qwen/Qwen2.5-VL-32B-Instruct", True),
+        ("Qwen/Qwen3-VL-30B-A3B-Instruct", True),
         ("meta-llama/Llama-3.2-11B-Vision-Instruct", True),
         ("meta-llama/Llama-3.3-70B-Instruct", False),
         ("deepseek-ai/DeepSeek-V3", False),
