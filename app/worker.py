@@ -13,6 +13,7 @@ try:
         _lock_and_update_session,
         safe_update_session, safe_update_streaming_message,
         safe_update_last_assistant_image,
+        finalize_rag_metadata,
     )
     from app.inference import get_default_model_spec, run_model_inference
     from app.config import load_config
@@ -24,6 +25,7 @@ except ImportError:
         _lock_and_update_session,
         safe_update_session, safe_update_streaming_message,
         safe_update_last_assistant_image,
+        finalize_rag_metadata,
     )
     from inference import get_default_model_spec, run_model_inference
     from config import load_config
@@ -32,6 +34,32 @@ except ImportError:
 _bot_executor = concurrent.futures.ThreadPoolExecutor(max_workers=50)
 processing_keys = set()
 processing_lock = threading.Lock()
+
+_GENERATION_ERROR_PREFIXES = (
+    "ollama is not reachable",
+    "error querying ollama:",
+    "the ollama python client is not installed",
+    "deepinfra is disabled",
+    "deepinfra is not configured",
+    "deepinfra call failed",
+    "deepinfra request failed",
+    "deepinfra rejected",
+    "deepinfra returned",
+    "no messages to send",
+    "the requests library is required",
+    "unsupported model provider:",
+    "[error during generation:",
+)
+
+
+def _generation_error_from_text(text):
+    """Recognize provider failures returned as text instead of exceptions."""
+
+    normalized = str(text or "").strip()
+    lowered = normalized.lower()
+    if any(lowered.startswith(prefix) for prefix in _GENERATION_ERROR_PREFIXES):
+        return normalized
+    return ""
 
 
 def _has_pending_user_message(session_id):
@@ -51,7 +79,9 @@ def ensure_session_processing(session_id):
         return True
 
 
-def _update_assistant_message(session_id, target_timestamp, content, streaming=False):
+def _update_assistant_message(
+    session_id, target_timestamp, content, streaming=False, rag_metadata=None
+):
     def updater(data):
         if not data:
             return None
@@ -61,6 +91,8 @@ def _update_assistant_message(session_id, target_timestamp, content, streaming=F
             if abs(msg.get("timestamp", 0) - target_timestamp) > 1.0:
                 continue
             msg["content"] = content
+            if rag_metadata is not None:
+                msg["rag_metadata"] = copy.deepcopy(rag_metadata)
             if streaming:
                 msg["streaming"] = True
             else:
@@ -87,6 +119,7 @@ def _build_inference_messages(messages, current_user_message):
 
     latest = copy.deepcopy(current_user_message)
     latest.pop("rag_context_str", None)
+    latest.pop("rag_metadata", None)
     # Ollama reprocesses the full prompt; disease context is cached separately.
     history = history[-4:]
     history.append(latest)
@@ -157,16 +190,21 @@ def process_session(session_id):
 
         def do_inference():
             timestamp = time.time()
-            safe_update_session(session_id, {
+            initial_rag_metadata = copy.deepcopy(last_msg.get("rag_metadata"))
+            assistant_message = {
                 "role": "assistant",
                 "content": "...",
                 "timestamp": timestamp,
                 "source": "hpc_worker",
                 "streaming": True,
                 "visible": last_msg.get("visible", True),
-            })
+            }
+            if initial_rag_metadata is not None:
+                assistant_message["rag_metadata"] = initial_rag_metadata
+            safe_update_session(session_id, assistant_message)
 
             full_text = ""
+            generation_error = ""
             stream_path = os.path.join(CHAT_DIR, session_id, "stream.txt")
             last_write = time.time()
             try:
@@ -185,10 +223,34 @@ def process_session(session_id):
                 with open(stream_path, 'w') as sf:
                     sf.write(full_text)
             except Exception as e:
+                generation_error = f"{type(e).__name__}: {e}"
                 full_text += f"\n[Error during generation: {e}]"
 
-            if not _update_assistant_message(session_id, timestamp, full_text, streaming=False):
-                safe_update_streaming_message(session_id, full_text, streaming=False)
+            if not generation_error:
+                generation_error = _generation_error_from_text(full_text)
+            if not generation_error and not full_text.strip():
+                generation_error = "Model returned an empty response."
+
+            final_rag_metadata = finalize_rag_metadata(
+                initial_rag_metadata,
+                success=not generation_error,
+                content=full_text,
+                error=generation_error,
+            )
+
+            if not _update_assistant_message(
+                session_id,
+                timestamp,
+                full_text,
+                streaming=False,
+                rag_metadata=final_rag_metadata,
+            ):
+                safe_update_streaming_message(
+                    session_id,
+                    full_text,
+                    streaming=False,
+                    rag_metadata=final_rag_metadata,
+                )
             try:
                 os.remove(stream_path)
             except Exception:
@@ -236,12 +298,18 @@ def process_session(session_id):
         import traceback
         traceback.print_exc()
         if last_msg and last_msg.get("role") == "user":
+            error_text = f"{type(e).__name__}: {e}"
             safe_update_session(session_id, {
                 "role": "assistant",
                 "content": f"[Error during generation: {e}]",
                 "timestamp": time.time(),
                 "source": "hpc_worker",
                 "visible": last_msg.get("visible", True),
+                "rag_metadata": finalize_rag_metadata(
+                    last_msg.get("rag_metadata"),
+                    success=False,
+                    error=error_text,
+                ),
             })
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -251,7 +319,17 @@ def process_session(session_id):
             ensure_session_processing(session_id)
 
 
-def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None, visible=True, rag_context_str=""):
+def enqueue_chat_job(
+    session_id,
+    model,
+    prompt,
+    images,
+    work_dir,
+    roi_path=None,
+    visible=True,
+    rag_context_str="",
+    rag_metadata=None,
+):
     session_file = _session_path(session_id)
     with processing_lock:
         if session_id in processing_keys:
@@ -286,6 +364,8 @@ def enqueue_chat_job(session_id, model, prompt, images, work_dir, roi_path=None,
         new_message["roi_path"] = roi_path
     if rag_context_str:
         new_message["rag_context_str"] = rag_context_str
+    if rag_metadata is not None:
+        new_message["rag_metadata"] = copy.deepcopy(rag_metadata)
 
     duplicate = False
 

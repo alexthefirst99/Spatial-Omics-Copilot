@@ -697,6 +697,7 @@ def run_roi_deg(
         min_cells = int(settings.get("min_cells", DEFAULT_MIN_CELLS))
         chunk_size = int(settings.get("chunk_size", DEFAULT_CHUNK_SIZE))
         normalize = bool(settings.get("normalize", False))
+        run_statistical_test = bool(settings.get("run_statistical_test", True))
         ranking_label = str(settings.get("ranking_label", "roi_vs_non_roi_log2fc"))
         threshold = settings.get("fdr_threshold", _configured_fdr_threshold())
         if threshold is not None:
@@ -738,6 +739,7 @@ def run_roi_deg(
             fdr_threshold=threshold,
             chunk_size=chunk_size,
             normalize=normalize,
+            run_statistical_test=run_statistical_test,
         )
     except Exception:
         # Documented outermost catch-all — docs/rules.md section 4 forbids an

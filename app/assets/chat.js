@@ -145,6 +145,7 @@ function initApp() {
     error: { glyph: "✗", cls: "rag-trace-status-error" },
     empty: { glyph: "○", cls: "rag-trace-status-empty" },
     skipped: { glyph: "⤳", cls: "rag-trace-status-skipped" },
+    pending: { glyph: "…", cls: "rag-trace-status-pending" },
   };
 
   function buildRagTraceCard(trace, label) {
@@ -251,8 +252,8 @@ function initApp() {
     return `"${preview}" (${trimmed.length} chars)`;
   }
 
-  // Flips the "Synthesizing answer" row from "handed off" (assumed ok at
-  // build time) to what actually happened, once /chat/poll reports the
+  // Flips the "Synthesizing answer" row from pending at handoff to what
+  // actually happened, once /chat/poll reports the
   // generation finished or failed. Without this, a real Ollama error would
   // still show a green check on the one trace step that most needs to
   // report failure honestly.
@@ -284,6 +285,13 @@ function initApp() {
         outLine.appendChild(document.createTextNode(detailText));
       }
     }
+  }
+
+  function getSynthesizeTraceStep(ragMetadata) {
+    const trace = ragMetadata && Array.isArray(ragMetadata.trace)
+      ? ragMetadata.trace
+      : [];
+    return [...trace].reverse().find(step => step.step === "Synthesizing answer") || null;
   }
 
   function buildPathwayPanel(pathways, label) {
@@ -522,15 +530,9 @@ function initApp() {
       let lastContentLength = 0;
 
       await new Promise((resolve) => {
-        const pollStartedAt = Date.now();
-        const maxPollMs = 120000;
         const pollEveryMs = 500;
         const pollInterval = setInterval(async () => {
           try {
-            if (Date.now() - pollStartedAt > maxPollMs) {
-              throw new Error("Chat is still running after 120 seconds. Retry with a smaller ROI or restart Ollama.");
-            }
-
             const pollRes = await fetch(`${getAppBasePath()}/chat/poll`);
             if (!pollRes.ok) throw new Error(pollRes.statusText || "Failed to poll chat response");
             const pollData = await pollRes.json();
@@ -570,14 +572,19 @@ function initApp() {
                 // Now we finally know whether synthesis actually succeeded,
                 // not just that it was handed off — reflect that on the trace.
                 const finalText = pollData.response || "";
-                const failed = finalText.includes("[Error during generation:");
+                const finalSynthesis = getSynthesizeTraceStep(pollData.rag_metadata);
+                const failed = finalSynthesis
+                  ? finalSynthesis.status === "error"
+                  : finalText.includes("[Error during generation:");
                 if (ragTraceCard) {
                   updateSynthesizeTraceStatus(
                     ragTraceCard,
                     !failed,
-                    failed
-                      ? finalText.slice(finalText.indexOf("[Error during generation:"))
-                      : buildAnswerPreview(finalText)
+                    finalSynthesis && finalSynthesis.output_summary
+                      ? finalSynthesis.output_summary
+                      : failed
+                        ? finalText.slice(finalText.indexOf("[Error during generation:"))
+                        : buildAnswerPreview(finalText)
                   );
                 }
 
@@ -594,6 +601,9 @@ function initApp() {
           } catch (pollErr) {
             console.error("Polling Error:", pollErr);
             clearInterval(pollInterval);
+            if (ragTraceCard) {
+              updateSynthesizeTraceStatus(ragTraceCard, false, pollErr.message || "generation failed");
+            }
             thinking.remove();
             if (!aiMsgElement) {
               addMessage(`(error) ${pollErr.message}`, "ai");
@@ -698,6 +708,11 @@ function initApp() {
               return;
             }
 
+            if (data.rag_metadata) {
+              chatMessages.appendChild(
+                buildRagTraceCard(data.rag_metadata.trace, data.rag_metadata.label)
+              );
+            }
             addMessage(currentText, "ai");
             lastKnownResponse = currentText;
           }

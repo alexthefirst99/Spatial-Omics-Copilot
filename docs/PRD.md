@@ -31,7 +31,7 @@ and an agentic LLM pipeline in a single interface.
 - Whole-slide image upload and OME-TIFF pyramid rendering via VivViewer.
 - h5ad spatial gene expression file upload and spot/cell overlay.
 - ROI drawing on the tissue and top-gene extraction from the selected region.
-- ORA pathway enrichment against GO and KEGG via gseapy.
+- ORA pathway enrichment against GO and KEGG via Enrichr.
 - PubMed NCBI E-utilities retrieval based on genes and pathways when literature evidence is needed.
 - LangGraph agentic loop that dynamically decides which tools to call.
 - ChromaDB semantic-search module for fetched PubMed abstracts, with PMID metadata preserved; wired into the agent via `copilot_agent.semantic_rerank` (off by default).

@@ -13,6 +13,7 @@ from app.roi_context import ensure_roi_context
 try:
     from app.session import (
         CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
+        finalize_rag_metadata,
     )
     from app.worker import enqueue_chat_job, ensure_session_processing
     from app.image_utils import TMP_BASE, ensure_ome_tiff_cached, resolve_active_image_path
@@ -20,6 +21,7 @@ try:
 except ImportError:
     from session import (
         CHAT_DIR, _session_path, _lock_and_read_session, _lock_and_write_session,
+        finalize_rag_metadata,
     )
     from worker import enqueue_chat_job, ensure_session_processing
     from image_utils import TMP_BASE, ensure_ome_tiff_cached, resolve_active_image_path
@@ -571,13 +573,13 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                         # outside the graph, so record that handoff explicitly.
                         # Without this, the AGENT TRACE card silently stops one
                         # step short of what was actually asked for (T-022 addendum).
-                        _synth_model = data.get("model", "ollama:qwen2.5vl:7b")
+                        _synth_model = data.get("model") or get_default_model_spec()
                         rag_metadata.setdefault("trace", []).append({
                             "step": "Synthesizing answer",
                             "detail": "",
                             "icon": "agent",
                             "tool": _synth_model,
-                            "status": "ok",
+                            "status": "pending",
                             "input_summary": f"{len(rag_context_str)} chars of evidence context",
                             "output_summary": "handed off for streamed answer generation",
                         })
@@ -592,6 +594,7 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                 work_dir=work_dir,
                 roi_path=roi_s3_path,
                 rag_context_str=rag_context_str if 'rag_context_str' in locals() else "",
+                rag_metadata=rag_metadata,
             )
             if status == "busy":
                 return jsonify({
@@ -632,11 +635,17 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                             if is_streaming:
                                 started_at = float(last_msg.get("timestamp") or time.time())
                                 if time.time() - started_at > _chat_stream_timeout_seconds():
+                                    timeout_message = (
+                                        "Chat generation timed out. Try a smaller ROI, or restart Ollama if it is still busy."
+                                    )
                                     last_msg["streaming"] = False
                                     if not last_msg.get("content") or last_msg.get("content") == "...":
-                                        last_msg["content"] = (
-                                            "Chat generation timed out. Try a smaller ROI, or restart Ollama if it is still busy."
-                                        )
+                                        last_msg["content"] = timeout_message
+                                    last_msg["rag_metadata"] = finalize_rag_metadata(
+                                        last_msg.get("rag_metadata"),
+                                        success=False,
+                                        error=timeout_message,
+                                    )
                                     current_data["updated_at"] = time.time()
                                     _lock_and_write_session(session_file, current_data)
                                     is_streaming = False
@@ -656,7 +665,8 @@ def register_chat_routes(server, workspace_id, work_dir, base_path=None):
                                 "status": status,
                                 "response": response_content,
                                 "images": last_msg.get("images", []),
-                                "visible": last_msg.get("visible", True)
+                                "visible": last_msg.get("visible", True),
+                                "rag_metadata": last_msg.get("rag_metadata"),
                             })
                         if last_msg.get("role") == "user":
                             ensure_session_processing(session_id)

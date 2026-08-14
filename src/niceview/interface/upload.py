@@ -101,6 +101,54 @@ def _start_spatial_clustering_background(stored_path, cluster_path, state_path, 
     return thread
 
 
+def render_spatial_h5ad_summary(state):
+    """Build the upload summary for the current spatial clustering state."""
+    cluster_status = state.get("cluster_status", "running")
+    n_spots = int(state.get("n_spots", 0))
+    n_genes = int(state.get("n_genes", 0))
+    preview_genes = [str(gene) for gene in state.get("preview_genes", [])]
+
+    if cluster_status == "ready":
+        n_clusters = state.get("n_clusters")
+        cluster_count = f" ({int(n_clusters):,} clusters)" if n_clusters is not None else ""
+        status_message = (
+            f"Basic clustering is complete{cluster_count}. "
+            "Click Re-visualize Image to refresh the cluster overlay."
+        )
+        summary_class = "omics-upload-summary"
+    elif cluster_status == "failed":
+        cluster_error = state.get("cluster_error", "Unknown clustering error")
+        status_message = f"Basic clustering failed: {cluster_error}"
+        summary_class = "omics-upload-summary error"
+    else:
+        status_message = (
+            "Basic clustering is running in the background. "
+            "The status will update automatically when it completes."
+        )
+        summary_class = "omics-upload-summary"
+
+    summary_children = [
+        html.Div("h5ad ready", className="omics-upload-title"),
+        html.Div(className="omics-upload-stats", children=[
+            html.Span(f"{n_spots:,} spots"),
+            html.Span(f"{n_genes:,} genes"),
+        ]),
+        html.Div(status_message, className="omics-upload-genes"),
+    ]
+    if preview_genes:
+        summary_children.append(
+            html.Div("Example: " + ", ".join(preview_genes), className="omics-upload-genes")
+        )
+
+    return html.Div(className=summary_class, children=summary_children)
+
+
+def load_spatial_h5ad_summary(work_dir, folder_id=""):
+    """Load and render the latest spatial upload state for UI polling."""
+    state = vio.load_json(_spatial_omics_state_path(work_dir, folder_id))
+    return render_spatial_h5ad_summary(state), state.get("cluster_status", "running")
+
+
 def upload_image(filenames_upload_image, folder_id, work_dir, app_dir, job_id=None, finalize_status=True):
     """
     Uploads the HE image and copy it to data path, then create client.
@@ -276,22 +324,7 @@ def upload_spatial_h5ad(filenames_upload_h5ad, folder_id, work_dir):
 
         _start_spatial_clustering_background(stored_path, cluster_path, state_path, job_id)
 
-        summary_children = [
-            html.Div("h5ad ready", className="omics-upload-title"),
-            html.Div(className="omics-upload-stats", children=[
-                html.Span(f"{n_obs:,} spots"),
-                html.Span(f"{n_vars:,} genes"),
-            ]),
-            html.Div(
-                "Basic clustering is running in the background. Re-visualize after it completes to see cluster overlay.",
-                className="omics-upload-genes"
-            ),
-        ]
-        summary_children.append(
-            html.Div("Example: " + ", ".join(preview_genes), className="omics-upload-genes")
-        )
-
-        return html.Div(className="omics-upload-summary", children=summary_children)
+        return render_spatial_h5ad_summary(state)
     except Exception as e:
         if 'stored_path' in locals() and vio.exists(stored_path):
             vio.remove(stored_path)

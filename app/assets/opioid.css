@@ -867,6 +867,7 @@ h2 {
 .rag-trace-status-error { color: #ff3b30; }
 .rag-trace-status-empty { color: #aeaeb2; }
 .rag-trace-status-skipped { color: #ff9500; }
+.rag-trace-status-pending { color: #007aff; }
 
 .rag-trace-text {
   color: #1d1d1f;

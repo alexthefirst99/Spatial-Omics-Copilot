@@ -65,9 +65,8 @@ spatial-omics-copilot/
 │   │   └── workspace.py          # work_dir/session path resolution for DEG
 │   ├── pathway_enrichment/       # real GO / KEGG ORA
 │   │   ├── __init__.py           # exposes: run_pathway_enrichment
-│   │   ├── enrichment.py         # gseapy/Enrichr calls, one HTTP call per gene-set
-│   │   │                          # library (Enrichr silently drops all but one
-│   │   │                          # library's results when queried together)
+│   │   ├── enrichment.py         # Enrichr HTTPS client with retry and JSON fallback
+│   │   │                          # (one gene-list upload, then one request per library)
 │   │   └── models.py             # PathwayEntry / PathwayResult
 │   ├── gene_annotation/          # NCBI Gene functional annotation
 │   │   ├── __init__.py           # exposes: run_gene_annotation_retrieval
@@ -218,7 +217,7 @@ Offline fallback (no network, or LangGraph unavailable):
 | `src/rag/preprocessing.py` | QC, normalization, HVG selection, PCA on h5ad; cached to disk |
 | `src/rag/clustering.py` | Leiden / KMeans spatial clustering, saves cluster JSON; cached to disk |
 | `src/rag/deg/extraction.py` | DEG extraction from cluster or ROI selection, Wilcoxon rank-sum + BH correction |
-| `src/rag/pathway_enrichment/enrichment.py` | Real ORA against GO / KEGG via `gseapy`/Enrichr |
+| `src/rag/pathway_enrichment/enrichment.py` | Real ORA against GO / KEGG via the Enrichr HTTPS API |
 | `src/rag/gene_annotation/retrieval.py` | Real NCBI Gene functional annotation retrieval |
 | `src/rag/pubmed_retrieval/` | Live NCBI ESearch/EFetch, safe result envelope, query building, and ChromaDB semantic search |
 | `src/rag/copilot_agent/graph.py` | The real LangGraph agent — dynamic tool routing, evidence assembly, disease-context statement |
@@ -282,7 +281,7 @@ worker.py  → appends context_str to messages, attaches ROI crop if a vision
 | Visualization | local `dash_viv_viewer`, Plotly/Dash components |
 | LLM | Ollama Python client (default); DeepInfra HTTP client (optional, `copilot_agent/llm.py`) |
 | RAG / Agents | LangGraph state machine with dynamic tool selection (`copilot_agent/graph.py`); sequential fallback (`pipeline._run_sequential()`) for offline/no-LangGraph use |
-| Pathway | Real ORA via `gseapy`/Enrichr against GO Biological Process and KEGG |
+| Pathway | Real ORA via Enrichr's HTTPS API against GO Biological Process and KEGG |
 | Gene annotation | Real NCBI Gene ESearch/ESummary retrieval |
 | Literature | PubMed E-utilities ESearch + EFetch (called synchronously in the request path — see Technical Risks) |
 | Vector store | ChromaDB, optional semantic re-ranking of retrieved abstracts |
@@ -306,7 +305,7 @@ General settings live in `config/app.yaml`. Secrets live in `.env`.
 | `app.hot_reload` / `COPILOT_HOT_RELOAD` | No | Enable Dash dev-tools hot reload |
 | `copilot_agent.max_tool_calls` | No | Hard cap on tool calls per turn; defaults to 5 |
 | `copilot_agent.semantic_rerank` | No | Re-rank retrieved abstracts against the question with ChromaDB; off by default |
-| `pathway_enrichment.*` | No | `gene_sets`, `organism`, `top_n`, `max_genes`, `adjusted_p_value_cutoff`, `significant_only` — real ORA query/filter parameters for `gseapy.enrichr()` |
+| `pathway_enrichment.*` | No | `gene_sets`, `organism`, `top_n`, `max_genes`, `adjusted_p_value_cutoff`, `significant_only`, `timeout`, `max_retries` — real Enrichr ORA query/filter and network parameters |
 | `gene_annotation.*` | No | `organism`, `max_genes`, `timeout`, `max_retries`, `tool` — NCBI Gene ESearch/ESummary lookup parameters |
 | `deepinfra.*` / `.env: DEEPINFRA_API_KEY`, `DEEPINFRA_MODEL` | For DeepInfra | Hosted chat provider settings; set `LLM_PROVIDER=deepinfra` to make it the default |
 | `paths.chat_dir` / `COPILOT_CHAT_DIR` | No | Chat session path |

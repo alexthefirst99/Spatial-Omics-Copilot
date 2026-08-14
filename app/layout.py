@@ -230,7 +230,13 @@ def create_layout(work_dir, folder_id):
                         file_types="Supports: .h5ad gene expression matrix",
                         accept=".h5ad"
                     ),
-                    html.Div(id="h5ad-upload-summary", className="omics-upload-result")
+                    html.Div(id="h5ad-upload-summary", className="omics-upload-result"),
+                    dcc.Interval(
+                        id="spatial-clustering-status-poll",
+                        interval=1500,
+                        n_intervals=0,
+                        disabled=True,
+                    ),
                 ]),
 
                 dcc.Store(id='processing-job-id'),

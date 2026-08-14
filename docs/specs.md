@@ -86,10 +86,10 @@ Returns:
 ```
 
 Required behavior:
-- Run real ORA against GO Biological Process and KEGG via `gseapy`/Enrichr.
+- Run real ORA against GO Biological Process and KEGG via Enrichr's HTTPS API.
 - Sort by ascending adjusted p-value.
 - Return an empty result when no pathways are enriched, or when Enrichr is unreachable — the two cases have different `status_message` text (the latter contains "unavailable") so callers can tell a real failure apart from a genuine negative result instead of treating both as one clean "no results" checkmark.
-- Enrichr silently drops every gene-set library but one when queried with multiple libraries in a single call; each configured library (GO, KEGG) is queried in its own separate call and the results merged.
+- Submit the gene list once, fetch each configured library (GO, KEGG) separately, and merge the results. Retry transient HTTP failures and fall back from Enrichr's tabular export endpoint to its JSON enrichment endpoint.
 - `rag.pathway_enrichment.models.PathwayEntry`/`PathwayResult` are the typed result; `overlap`/`gene_count`/`set_size`/`pvalue` are legacy dict-style aliases still supported for existing callers.
 
 ### 3.3 PubMed Retrieval

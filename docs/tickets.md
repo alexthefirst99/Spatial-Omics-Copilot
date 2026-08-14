@@ -48,7 +48,7 @@
 
 | **ID** | **Task** | **Done When** | **Status** |
 | --- | --- | --- | --- |
-| T-012 | Replace mock with real gseapy.enrichr() or g:Profiler API | Returns real GO/KEGG terms with valid adjusted p-values | ✓ Done |
+| T-012 | Replace mock with a real Enrichr or g:Profiler API | Returns real GO/KEGG terms with valid adjusted p-values | ✓ Done |
 | T-013 | Handle empty gene list and API errors | Returns `[]` without raising an exception | ✓ Done |
 | T-014 | Write `test_pathway.py` | Tests cover happy path, empty input, API unavailability | ✓ Done |
 
@@ -56,7 +56,7 @@
 
 **Status:** Implemented by Quynh
 
-**Current behavior:** `src/rag/pathway_enrichment/enrichment.py` runs real ORA against GO Biological Process and KEGG via `gseapy.enrichr()`. `src/rag/pathway/` is a back-compat import path for the current pipeline. Each configured gene-set library is queried in its own separate call and the results merged — Enrichr silently drops every library but one when queried together in a single call.
+**Current behavior:** `src/rag/pathway_enrichment/enrichment.py` runs real ORA against GO Biological Process and KEGG through Enrichr's HTTPS API. `src/rag/pathway/` is a back-compat import path for the current pipeline. The gene list is uploaded once, each configured library is fetched separately, and the results are merged. Transient failures are retried, and an unavailable tabular export falls back to Enrichr's JSON endpoint.
 
 **Desired behavior (met):** Replace mock and synthetic pathway output with a documented real enrichment backend for GO and KEGG terms, such as `gseapy.enrichr()`, g:Profiler, Enrichr, or another backend selected by the team.
 

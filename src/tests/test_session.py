@@ -6,6 +6,50 @@ import threading
 import app.session as session
 
 
+def _pending_metadata():
+    return {
+        "label": "ROI",
+        "trace": [
+            {
+                "step": "Synthesizing answer",
+                "tool": "ollama:qwen2.5vl:7b",
+                "status": "pending",
+                "input_summary": "120 chars of evidence context",
+                "output_summary": "handed off for streamed answer generation",
+            }
+        ],
+    }
+
+
+def test_finalize_rag_metadata_records_success_without_mutating_pending_trace():
+    pending = _pending_metadata()
+
+    finalized = session.finalize_rag_metadata(
+        pending,
+        success=True,
+        content="A real generated answer.",
+    )
+
+    assert pending["trace"][-1]["status"] == "pending"
+    assert finalized["trace"][-1]["status"] == "ok"
+    assert finalized["trace"][-1]["output_summary"] == (
+        '"A real generated answer." (24 chars)'
+    )
+
+
+def test_finalize_rag_metadata_records_real_error():
+    finalized = session.finalize_rag_metadata(
+        _pending_metadata(),
+        success=False,
+        error="Chat generation timed out.",
+    )
+
+    assert finalized["trace"][-1]["status"] == "error"
+    assert finalized["trace"][-1]["output_summary"] == (
+        "Chat generation timed out."
+    )
+
+
 def test_session_write_read_and_append_are_persisted(tmp_path, monkeypatch):
     monkeypatch.setattr(session, "CHAT_DIR", str(tmp_path))
 

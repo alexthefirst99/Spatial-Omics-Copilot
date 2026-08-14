@@ -3,6 +3,7 @@ import json
 import fcntl
 import time
 import threading
+import copy
 
 from app.config import get_path
 
@@ -11,6 +12,43 @@ _DATA_DIR = os.path.join(_PROJECT_ROOT, 'data')
 
 CHAT_DIR = get_path('paths.chat_dir', os.path.join(_DATA_DIR, 'chat_sessions'), env='COPILOT_CHAT_DIR')
 os.makedirs(CHAT_DIR, exist_ok=True)
+
+
+def finalize_rag_metadata(rag_metadata, *, success, content="", error=""):
+    """Return a copy of ``rag_metadata`` with the synthesis step finalized.
+
+    Live generation happens outside the agent graph, so the graph cannot know
+    whether it succeeded. Keeping this transition on the server makes the
+    persisted trace and every polling client agree on the final outcome.
+    """
+
+    if not isinstance(rag_metadata, dict):
+        return None
+
+    metadata = copy.deepcopy(rag_metadata)
+    trace = metadata.get("trace")
+    if not isinstance(trace, list):
+        return metadata
+
+    synthesis_step = next(
+        (
+            step
+            for step in reversed(trace)
+            if isinstance(step, dict) and step.get("step") == "Synthesizing answer"
+        ),
+        None,
+    )
+    if synthesis_step is None:
+        return metadata
+
+    synthesis_step["status"] = "ok" if success else "error"
+    if success:
+        normalized = " ".join(str(content or "").split())
+        preview = normalized[:140] + ("…" if len(normalized) > 140 else "")
+        synthesis_step["output_summary"] = f'"{preview}" ({len(normalized)} chars)'
+    else:
+        synthesis_step["output_summary"] = str(error or content or "generation failed")
+    return metadata
 
 
 def _ensure_parent_dir(path):
@@ -125,7 +163,9 @@ def safe_update_session(session_id, new_message):
     return False
 
 
-def safe_update_streaming_message(session_id, content, streaming=True):
+def safe_update_streaming_message(
+    session_id, content, streaming=True, rag_metadata=None
+):
     retries = 5
     while retries > 0:
         try:
@@ -135,6 +175,8 @@ def safe_update_streaming_message(session_id, content, streaming=True):
                 msgs = data.get("messages", [])
                 if msgs and msgs[-1]["role"] == "assistant":
                     msgs[-1]["content"] = content
+                    if rag_metadata is not None:
+                        msgs[-1]["rag_metadata"] = copy.deepcopy(rag_metadata)
                     if streaming:
                         msgs[-1]["streaming"] = True
                     else:

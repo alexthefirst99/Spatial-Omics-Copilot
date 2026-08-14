@@ -58,7 +58,6 @@ langchain-ollama>=0.1.0
 langgraph>=0.1.0
 
 # Bioinformatics tools
-gseapy==1.1.2         # pathway enrichment; newest macOS x86_64 cp311 wheel
 biopython>=1.83       # biomedical parsing utilities
 chromadb>=1.5,<2.0    # semantic search over PubMed abstracts — Anh
 

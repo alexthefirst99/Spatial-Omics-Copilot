@@ -330,8 +330,8 @@ class DEGResult:
 # re-exports these
 # --------------------------------------
 
-# Trace icons. app/assets/chat.js never reads trace[].icon — every row gets a
-# hardcoded green check — so these are advisory metadata for future UI work.
+# Trace category icons remain advisory metadata; the browser renders the
+# outcome indicator from each step's status.
 ICON_DEG = "deg"
 ICON_PATHWAY = "pathway"
 ICON_PUBMED = "pubmed"
@@ -342,6 +342,7 @@ ICON_AGENT = "agent"
 # Tool-call outcomes recorded in the trace (T-022).
 STATUS_EMPTY = "empty"
 STATUS_SKIPPED = "skipped"
+STATUS_PENDING = "pending"
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,7 +355,7 @@ class TraceStep:
         icon: Advisory category; not read by the current front-end.
         tool: Tool name, or "" for non-tool steps such as routing.
         status: One of ``STATUS_OK`` / ``STATUS_EMPTY`` / ``STATUS_ERROR`` /
-            ``STATUS_SKIPPED``.
+            ``STATUS_SKIPPED`` / ``STATUS_PENDING``.
         input_summary: Short description of what the tool was called with.
         output_summary: Short description of what came back.
     """
@@ -547,6 +548,7 @@ __all__ = [
     "STATUS_NO_DATA",
     "STATUS_NO_SIGNIFICANT",
     "STATUS_OK",
+    "STATUS_PENDING",
     "STATUS_SKIPPED",
     "AgentResult",
     "Citation",

@@ -10,7 +10,12 @@ import pytest
 ad = pytest.importorskip("anndata")
 
 import niceview.interface.upload as upload_module
-from niceview.interface.upload import _wait_for_file, upload_spatial_h5ad
+from niceview.interface.upload import (
+    _wait_for_file,
+    load_spatial_h5ad_summary,
+    render_spatial_h5ad_summary,
+    upload_spatial_h5ad,
+)
 
 
 def _write_h5ad(path, n_obs=6, n_vars=4, with_spatial=True):
@@ -62,6 +67,41 @@ def test_upload_spatial_h5ad_valid_file_registers_state_and_starts_clustering(tm
     # Clustering is kicked off exactly once, on the stored (not source) copy.
     assert len(calls) == 1
     assert calls[0][0] == stored_path
+
+    summary, cluster_status = load_spatial_h5ad_summary(str(work_dir), "")
+    assert cluster_status == "running"
+    assert "status will update automatically" in str(summary)
+
+
+def test_render_spatial_h5ad_summary_reports_completed_clustering():
+    state = {
+        "n_spots": 105_951,
+        "n_genes": 18_988,
+        "preview_genes": ["EPCAM", "COL1A1"],
+        "cluster_status": "ready",
+        "n_clusters": 6,
+    }
+
+    result = render_spatial_h5ad_summary(state)
+
+    assert "Basic clustering is complete" in str(result)
+    assert "6 clusters" in str(result)
+    assert "Re-visualize Image" in str(result)
+    assert "running in the background" not in str(result)
+
+
+def test_render_spatial_h5ad_summary_reports_clustering_failure():
+    state = {
+        "n_spots": 6,
+        "n_genes": 4,
+        "cluster_status": "failed",
+        "cluster_error": "PCA failed",
+    }
+
+    result = render_spatial_h5ad_summary(state)
+
+    assert "error" in result.className
+    assert "Basic clustering failed: PCA failed" in str(result)
 
 
 def test_upload_spatial_h5ad_missing_spatial_key_is_rejected(tmp_path, monkeypatch):

@@ -4,8 +4,7 @@ Covers the test names named in ``docs/tickets.md`` for T-021 and T-024, plus
 the UI-contract failure modes that would silently break a turn.
 
 Every tool is stubbed. Nothing here touches the network: the real tools call
-Enrichr, NCBI Gene and PubMed, and ``gseapy`` is not installed in the project's
-test interpreter anyway.
+Enrichr, NCBI Gene and PubMed, but external services are not used by these tests.
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ GENE_OBJECTS = [
 
 
 class FakePathwayResult:
-    """Stands in for ``PathwayResult`` without importing gseapy."""
+    """Stands in for ``PathwayResult`` without importing the pathway client."""
 
     def __init__(self):
         self.pathways = [

@@ -21,10 +21,6 @@ ROI / cluster
     → grounded LLM response
 ```
 
-You can load a whole-slide image and a matching `.h5ad` file, select a region of interest, inspect genes, and ask questions about gene function, pathways, and supporting literature.
-
-> This is a research prototype, not a clinical decision-support tool.
-
 ---
 
 ## What it supports
@@ -36,6 +32,7 @@ You can load a whole-slide image and a matching `.h5ad` file, select a region of
 - NCBI Gene lookup
 - Enrichr pathway enrichment
 - PubMed retrieval
+- Per-turn agent trace cards for routed RAG questions
 - Local Ollama or hosted DeepInfra models
 - Reproducible evaluation and test scripts
 
@@ -183,7 +180,7 @@ In `.env`:
 ```env
 LLM_PROVIDER=deepinfra
 DEEPINFRA_API_KEY=your_api_key
-DEEPINFRA_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
+DEEPINFRA_MODEL=Qwen/Qwen2.5-VL-32B-Instruct
 ```
 
 `DEEPINFRA_TOKEN` can be used instead of `DEEPINFRA_API_KEY`.
@@ -268,38 +265,39 @@ What does the literature say about these genes?
 
 ---
 
+### Trace storage
+
+Agent traces are displayed in the chat interface and saved with the corresponding
+chat session. Session files are created automatically at runtime under
+`data/chat_sessions/`.
+
+Each RAG-enabled message stores its trace in `rag_metadata.trace`, allowing the
+agent's routing, tool calls, and generation status to be inspected later.
+---
+
 ## 6. Run the evaluation
 
-### One-command full metrics
+The evaluator measures all **7 technical + 5 business metrics** on 10 real
+ROIs from the loaded spatial-transcriptomics dataset. It does not use synthetic
+genes or synthetic expression results. These metrics answer: **How well did the
+system perform?**
 
-With the default app data in `data/demo` and provider credentials/model set in
-`.env`, run:
+Before running, confirm that these matching sample files exist:
 
-```bash
-./run_full_metrics
+```text
+data/demo/Visium_HD_Human_Colon_Cancer_feature_slice.h5ad
+data/demo/Visium_HD_Human_Colon_Cancer_image.tif
 ```
 
-This validates the default `.h5ad` and `.tif` assets, automatically uses the
-provider/model selected in `.env`, runs all 28 benchmark cases with generation,
-and writes everything to `evaluation_outputs_full/`. The main machine-readable
-result is `evaluation_outputs_full/full_metrics.json`; the directory also
-contains category metrics, raw results, the readable summary, and human-review
-sheets.
+Configure a vision-capable model in `.env`. For example, with DeepInfra:
 
-The audited 28-case benchmark uses controlled synthetic ROI fixtures. The demo
-assets are preflighted and recorded in `dataset_manifest.json`, but they are not
-presented as real-ROI biological ground truth because the demo directory does
-not contain audited ROI polygons or labels.
-
-For route/tool metrics without LLM generation:
-
-```bash
-./run_full_metrics --no-generation
+```env
+LLM_PROVIDER=deepinfra
+DEEPINFRA_API_KEY=your_api_key
+DEEPINFRA_MODEL=Qwen/Qwen2.5-VL-32B-Instruct
 ```
 
-### Advanced commands
-
-Run the benchmark with the provider configured in `.env`:
+Then run this one command from the repository root:
 
 ```bash
 python -m evaluation.runner \
@@ -307,42 +305,54 @@ python -m evaluation.runner \
   --output-dir evaluation_outputs
 ```
 
-Run with DeepInfra explicitly:
+The configured provider/model is used for answer generation and structured LLM
+judging. A vision-capable model is required to populate the image-to-gene
+metric; otherwise that metric is reported as `N/A`, never fabricated.
+Each ROI normally makes one answer-generation call, one structured text-judge
+call, and one vision-judge call, so the complete live run can take several
+minutes depending on the provider and external biomedical services.
+
+The evaluator automatically builds 10 deterministic real ROIs:
+
+- fixed random seed `42`;
+- one saved ROI snapped to its nearest real expression spot;
+- nine additional centers sampled only from real spatial spots;
+- consistent 256×256-pixel square bounds;
+- at least 100 spots per ROI, with invalid candidates resampled;
+- real H&E crop and real production ROI-vs-rest DEG for every case.
+
+The ROI set is cached in `evaluation_outputs/roi_fixtures.json` and reused only
+when the dataset fingerprint and ROI settings still match.
+
+Optional provider/model overrides:
 
 ```bash
 python -m evaluation.runner \
   --config evaluation/eval_cases.json \
   --output-dir evaluation_outputs \
   --provider deepinfra \
-  --model Qwen/Qwen2.5-VL-7B-Instruct
+  --model Qwen/Qwen2.5-VL-32B-Instruct
 ```
 
-To test routing and retrieval without an LLM call:
-
-```bash
-python -m evaluation.runner \
-  --config evaluation/eval_cases.json \
-  --output-dir evaluation_outputs \
-  --no-generation
-```
-
-Results are written to:
-
-```text
-evaluation_outputs/
-```
-
-Main outputs:
+The command continues after an individual ROI failure and writes progress after
+every ROI. Final outputs are:
 
 | File | What it contains |
 |---|---|
-| `raw_results.jsonl` | Full result for each case |
-| `metrics_summary.csv` | Automatic metrics |
-| `evaluation_summary.md` | Readable benchmark summary |
-| `human_review.csv` | Manual scientific review sheet |
-| `business_metrics_review.csv` | Manual workflow review sheet |
+| `evaluation_outputs/summary.md` | Final tables with exactly 7 technical and 5 business metrics |
+| `evaluation_outputs/technical_metrics.csv` | The 7 technical metrics |
+| `evaluation_outputs/business_metrics.csv` | The 5 business metrics |
+| `evaluation_outputs/per_roi_results.csv` | Auditable per-ROI metric inputs/results |
+| `evaluation_outputs/raw_results.json` | ROI bounds, spot counts, crops, real DEG/evidence, answers, raw judge outputs, timings, errors, and supplementary per-ROI agent traces |
 
-The included benchmark uses synthetic workflow cases. It is not a clinical benchmark.
+`raw_results.json` may include the recorded agent trace for each evaluated ROI
+or case. This is supplementary diagnostic information for debugging,
+inspection, and reproducibility; the trace is not itself an evaluation metric
+or reported score.
+
+This is a research evaluation, not clinical validation. External NCBI, Enrichr,
+PubMed, and model responses can change between runs; ROI selection itself is
+deterministic.
 
 ---
 

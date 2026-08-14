@@ -41,7 +41,6 @@ dependencies = [
     "langchain-community>=0.2.0",
     "langchain-ollama>=0.1.0",
     "langgraph>=0.1.0",
-    "gseapy==1.1.2",
     "biopython>=1.83",
     "chromadb>=1.5,<2.0",
     "ipyleaflet==0.17.4",

@@ -40,7 +40,7 @@
 ## 5. API Usage Rules
 
 - PubMed: use NCBI E-utilities; respect 3 req/s without key, 10 req/s with `PUBMED_API_KEY`.
-- Pathway: use gseapy (local) or g:Profiler REST API — no API key required.
+- Pathway: use the Enrichr or g:Profiler HTTPS API — no API key required.
 - Do not call external APIs on the main thread; processing happens in `worker.py`.
 
 ## 6. Session and State Rules

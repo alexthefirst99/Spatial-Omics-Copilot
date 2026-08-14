@@ -141,6 +141,7 @@ gene_chosen = None
 from niceview.interface.callback import (
     upload_image, upload_spatial_h5ad, reset, save_roi, clear_cache_forcall
 )
+from niceview.interface.upload import load_spatial_h5ad_summary
 from rag.deg import get_cluster_high_expression_genes
 from app.roi_context import ensure_roi_context
 
@@ -248,12 +249,32 @@ def main():
 
     @app.callback(
         Output('h5ad-upload-summary', 'children'),
-        Input('upload-spatial-h5ad-result', 'value')
+        Output('spatial-clustering-status-poll', 'disabled'),
+        Input('upload-spatial-h5ad-result', 'value'),
+        Input('spatial-clustering-status-poll', 'n_intervals'),
+        prevent_initial_call=True,
     )
-    def callback_upload_spatial_h5ad(filenames_upload_h5ad):
-        if not filenames_upload_h5ad:
-            return dash.no_update
-        return upload_spatial_h5ad([filenames_upload_h5ad], folder_id, work_dir)
+    def callback_upload_spatial_h5ad(filenames_upload_h5ad, _poll_count):
+        if ctx.triggered_id == 'upload-spatial-h5ad-result':
+            if not filenames_upload_h5ad:
+                return dash.no_update, True
+
+            summary = upload_spatial_h5ad([filenames_upload_h5ad], folder_id, work_dir)
+            try:
+                _, cluster_status = load_spatial_h5ad_summary(work_dir, folder_id)
+            except (OSError, ValueError, json.JSONDecodeError):
+                return summary, True
+            return summary, cluster_status != "running"
+
+        try:
+            summary, cluster_status = load_spatial_h5ad_summary(work_dir, folder_id)
+        except FileNotFoundError:
+            return dash.no_update, True
+        except (OSError, ValueError, json.JSONDecodeError):
+            # A state write may briefly overlap a poll. Keep polling and retry.
+            return dash.no_update, False
+
+        return summary, cluster_status != "running"
 
     @app.callback(
         [Output('status1', 'children'),

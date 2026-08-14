@@ -1,14 +1,8 @@
-"""Transparent, evidence-based metrics for Spatial Omics Copilot runs.
-
-The metrics in this module intentionally avoid treating lexical similarity as
-scientific correctness.  They score observable agent behaviour (route, tools,
-retrieval) and conservative grounding checks.  Expert biological correctness,
-completeness, and usefulness remain human-review fields.
-"""
+"""Aggregation for the proposal's seven technical and five business metrics."""
 
 from __future__ import annotations
 
-import re
+import statistics
 from typing import Any, Iterable
 
 
@@ -23,343 +17,299 @@ TOOL_SERVICE_NAMES = {
     "pubmed_tool": "pubmed",
 }
 
-_GENE_TOKEN = re.compile(r"\b[A-Z][A-Z0-9-]{1,14}\b")
-_NON_GENE_ACRONYMS = {
-    "API", "DNA", "ECM", "GO", "H&E", "KEGG", "LLM", "NCBI", "N/A",
-    "PMID", "PMIDS", "RNA", "ROI", "ROIS", "URL",
-}
-_INSUFFICIENT_PATTERNS = (
-    "insufficient evidence", "not enough evidence", "no evidence", "no relevant",
-    "no matching", "not found", "could not find", "cannot determine", "can't determine",
-    "uncertain", "unclear", "unavailable", "tool failed", "weak enrichment",
-    "no significant", "no enriched", "does not support", "do not support",
-)
+
+def _mean(values: Iterable[Any]) -> float | None:
+    numbers = [
+        float(value)
+        for value in values
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    return statistics.fmean(numbers) if numbers else None
 
 
-def _rows(payload: Any, key: str) -> list[dict[str, Any]]:
-    if not isinstance(payload, dict):
-        return []
-    values = payload.get(key)
-    return [row for row in (values or []) if isinstance(row, dict)]
-
-
-def _term_present(text: str, term: str) -> bool:
-    term = str(term or "").strip()
-    if not term:
-        return False
-    return re.search(rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", text, re.I) is not None
-
-
-def _unique(values: Iterable[str]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for value in values:
-        clean = str(value or "").strip()
-        if clean and clean not in seen:
-            seen.add(clean)
-            result.append(clean)
-    return result
-
-
-def result_count(tool_name: str, outcome: Any) -> int:
-    """Return the number of public evidence rows in a serialized tool outcome."""
-
-    if not isinstance(outcome, dict):
-        return 0
+def _result_count(tool: str, outcome: dict[str, Any]) -> int:
     payload = outcome.get("result")
-    if not isinstance(payload, dict):
-        return 0
-    key = TOOL_RESULT_KEYS.get(tool_name)
-    return len(payload.get(key) or []) if key else 0
+    key = TOOL_RESULT_KEYS.get(tool)
+    return len(payload.get(key) or []) if key and isinstance(payload, dict) else 0
 
 
 def summarize_tool_calls(
     tools_called: Iterable[str],
     tool_outcomes: dict[str, Any] | None,
-    trace: Iterable[dict[str, Any]] = (),
+    trace: Iterable[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Build ordered, debuggable tool-call records from production metadata.
-
-    The production graph currently does not expose per-tool timing, so
-    ``latency_seconds`` is explicitly ``None``.  The field is ready for timing
-    data if the production contract adds it later.
-    """
+    """Serialize production tool outcomes without inventing missing timings."""
 
     outcomes = tool_outcomes or {}
-    trace_by_tool: dict[str, dict[str, Any]] = {}
-    for step in trace:
-        tool = str(step.get("tool") or "") if isinstance(step, dict) else ""
-        if tool in TOOL_RESULT_KEYS:
-            trace_by_tool[tool] = step
-
-    ordered = _unique([*tools_called, *outcomes.keys()])
-    summaries: list[dict[str, Any]] = []
-    for order, name in enumerate(ordered, start=1):
-        outcome = outcomes.get(name) if isinstance(outcomes.get(name), dict) else {}
-        step = trace_by_tool.get(name, {})
+    trace_by_tool = {
+        str(step.get("tool")): step
+        for step in trace
+        if isinstance(step, dict) and step.get("tool") in TOOL_RESULT_KEYS
+    }
+    ordered_tools = list(dict.fromkeys([*tools_called, *outcomes]))
+    calls: list[dict[str, Any]] = []
+    for order, tool in enumerate(ordered_tools, start=1):
+        outcome = outcomes.get(tool) if isinstance(outcomes.get(tool), dict) else {}
+        step = trace_by_tool.get(tool, {})
         status = str(outcome.get("status") or step.get("status") or "unknown")
-        count = result_count(name, outcome)
-        summaries.append({
+        count = _result_count(tool, outcome)
+        calls.append({
             "order": order,
-            "tool": name,
-            "service": TOOL_SERVICE_NAMES.get(name, name),
+            "tool": tool,
+            "service": TOOL_SERVICE_NAMES.get(tool, tool),
             "status": status,
             "success": status in {"ok", "supplied"},
             "failure": status == "error",
             "result_count": count,
             "evidence_nonempty": count > 0,
             "latency_seconds": outcome.get("latency_seconds"),
-            "input_summary": str(outcome.get("input_summary") or step.get("input_summary") or ""),
-            "output_summary": str(outcome.get("output_summary") or step.get("output_summary") or ""),
+            "input_summary": str(
+                outcome.get("input_summary") or step.get("input_summary") or ""
+            ),
+            "output_summary": str(
+                outcome.get("output_summary") or step.get("output_summary") or ""
+            ),
             "error": str(outcome.get("error") or ""),
         })
-    return summaries
+    return calls
 
 
-def compare_expected_tools(expected: Iterable[str], actual: Iterable[str]) -> dict[str, Any]:
-    """Compare expected and actual tools without assigning scientific quality."""
+def _all_judged(records: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:
+    return [
+        item
+        for record in records
+        for item in (
+            ((record.get("judgments") or {}).get("text") or {}).get(field) or []
+        )
+    ]
 
-    expected_list = _unique(expected)
-    actual_list = _unique(actual)
-    expected_set, actual_set = set(expected_list), set(actual_list)
-    matched = expected_set & actual_set
-    unexpected = actual_set - expected_set
-    recall = len(matched) / len(expected_set) if expected_set else (1.0 if not actual_set else None)
-    unexpected_rate = len(unexpected) / len(actual_set) if actual_set else 0.0
-    appropriate = actual_set == expected_set
-    return {
-        "expected_tool_recall": recall,
-        "unexpected_tool_rate": unexpected_rate,
-        "appropriate_tool_call": appropriate,
-        "missing_expected_tools": sorted(expected_set - actual_set),
-        "unexpected_tools": sorted(unexpected),
+
+def _scores(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        ((record.get("judgments") or {}).get("text") or {}).get("scores") or {}
+        for record in records
+    ]
+
+
+def _quality_metric(scores: list[dict[str, Any]]) -> dict[str, Any]:
+    means = {
+        name: _mean(score.get(name) for score in scores)
+        for name in (
+            "biological_reasonableness",
+            "roi_specificity",
+            "clarity_understandability",
+        )
+    }
+    overall = _mean(means.values())
+    complete = all(value is not None for value in means.values())
+    display = "N/A (incomplete quality judgments)"
+    if complete and overall is not None:
+        display = (
+            f"biological reasonableness {means['biological_reasonableness']:.2f}/5; "
+            f"ROI specificity {means['roi_specificity']:.2f}/5; "
+            f"clarity {means['clarity_understandability']:.2f}/5; "
+            f"overall {overall:.2f}/5"
+        )
+    return {**means, "overall_mean": overall, "display": display}
+
+
+def aggregate_proposal_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return exactly the 7 technical and 5 business metrics requested."""
+
+    pubmed = _all_judged(records, "pubmed")
+    pathways = _all_judged(records, "pathways")
+    claims = _all_judged(records, "claims")
+    scores = _scores(records)
+    vision = [
+        verdict
+        for record in records
+        if (verdict := (
+            (record.get("judgments") or {}).get("vision") or {}
+        ).get("verdict")) in {"PASS", "FAIL"}
+    ]
+    mentioned_genes = [
+        gene
+        for record in records
+        for gene in (
+            ((record.get("judgments") or {}).get("text") or {}).get(
+                "mentioned_genes"
+            ) or []
+        )
+    ]
+    unsupported_genes = [
+        gene
+        for record in records
+        for gene in (
+            ((record.get("judgments") or {}).get("text") or {}).get(
+                "unsupported_mentioned_genes"
+            ) or []
+        )
+    ]
+    elapsed = [
+        value
+        for record in records
+        if isinstance(
+            (value := (record.get("timing") or {}).get(
+                "copilot_end_to_end_seconds"
+            )),
+            (int, float),
+        )
+    ]
+
+    pubmed_relevant = sum(item.get("label") == "relevant" for item in pubmed)
+    pathway_relevant = sum(item.get("label") == "relevant" for item in pathways)
+    supported = sum(item.get("label") == "supported" for item in claims)
+    unsupported = sum(item.get("label") == "unsupported" for item in claims)
+    image_passes = sum(verdict == "PASS" for verdict in vision)
+
+    response_time = {
+        "mean_seconds": _mean(elapsed),
+        "median_seconds": statistics.median(elapsed) if elapsed else None,
+        "min_seconds": min(elapsed) if elapsed else None,
+        "max_seconds": max(elapsed) if elapsed else None,
+        "display": "N/A",
+    }
+    if elapsed:
+        response_time["display"] = (
+            f"mean {response_time['mean_seconds']:.2f}s; "
+            f"median {response_time['median_seconds']:.2f}s; "
+            f"min {response_time['min_seconds']:.2f}s; "
+            f"max {response_time['max_seconds']:.2f}s"
+        )
+
+    technical = {
+        "pubmed_retrieval_relevance": {
+            "relevant": pubmed_relevant,
+            "retrieved": len(pubmed),
+            "precision_at_k": pubmed_relevant / len(pubmed) if pubmed else None,
+            "display": (
+                f"{pubmed_relevant}/{len(pubmed)} relevant; "
+                f"Precision@k={100 * pubmed_relevant / len(pubmed):.1f}%"
+                if pubmed else "N/A (no papers judged)"
+            ),
+        },
+        "pathway_relevance": {
+            "relevant": pathway_relevant,
+            "evaluated": len(pathways),
+            "rate": pathway_relevant / len(pathways) if pathways else None,
+            "display": (
+                f"{pathway_relevant}/{len(pathways)} relevant "
+                f"({100 * pathway_relevant / len(pathways):.1f}%)"
+                if pathways else "N/A (no pathways judged)"
+            ),
+        },
+        "image_to_gene_connection": {
+            "passes": image_passes,
+            "evaluated_rois": len(vision),
+            "pass_rate": image_passes / len(vision) if vision else None,
+            "display": (
+                f"{image_passes}/{len(vision)} PASS "
+                f"({100 * image_passes / len(vision):.1f}%)"
+                if vision else "N/A (no vision judgments)"
+            ),
+        },
+        "groundedness": {
+            "supported_claims": supported,
+            "verifiable_claims": len(claims),
+            "rate": supported / len(claims) if claims else None,
+            "display": (
+                f"{supported}/{len(claims)} supported "
+                f"({100 * supported / len(claims):.1f}%)"
+                if claims else "N/A (no verifiable claims judged)"
+            ),
+        },
+        "hallucination_rate": {
+            "unsupported_claims": unsupported,
+            "verifiable_claims": len(claims),
+            "rate": unsupported / len(claims) if claims else None,
+            "unsupported_gene_names": len(unsupported_genes),
+            "mentioned_gene_names": len(mentioned_genes),
+            "gene_name_rate": (
+                len(unsupported_genes) / len(mentioned_genes)
+                if mentioned_genes else None
+            ),
+            "display": (
+                f"claims {unsupported}/{len(claims)} "
+                f"({100 * unsupported / len(claims):.1f}%); "
+                if claims else "claims N/A; "
+            ) + (
+                f"gene names {len(unsupported_genes)}/{len(mentioned_genes)} "
+                f"({100 * len(unsupported_genes) / len(mentioned_genes):.1f}%)"
+                if mentioned_genes else "gene names N/A"
+            ),
+        },
+        "answer_quality": _quality_metric(scores),
+        "response_time": response_time,
     }
 
+    time_saved = [14400.0 - value for value in elapsed]
+    time_saved_percent = [value / 14400.0 * 100.0 for value in time_saved]
+    stage_counts = [
+        (record.get("workflow_efficiency") or {}).get(
+            "automatically_connected_stage_count"
+        )
+        for record in records
+    ]
+    tool_counts = [
+        (record.get("agent") or {}).get("tool_call_count") for record in records
+    ]
+    reentry_counts = [
+        (record.get("workflow_efficiency") or {}).get(
+            "manual_data_reentry_steps"
+        )
+        for record in records
+    ]
+    mean_stages = _mean(stage_counts)
+    mean_tools = _mean(tool_counts)
+    mean_reentry = _mean(reentry_counts)
+    total_tools = sum(
+        int(value) for value in tool_counts if isinstance(value, (int, float))
+    )
 
-def _evidence_entities(record: dict[str, Any]) -> dict[str, Any]:
-    gene_rows = (record.get("gene_image_evidence") or {}).get("gene_evidence") or []
-    roi_genes = {
-        str(row.get("gene") or "").strip().upper()
-        for row in gene_rows if isinstance(row, dict) and row.get("gene")
-    }
-
-    annotations = _rows(record.get("gene_image_evidence", {}).get("gene_annotations"), "genes")
-    annotation_genes = {
-        str(row.get("gene_symbol") or row.get("symbol") or "").strip().upper()
-        for row in annotations
-    }
-    pathways = _rows(record.get("pathway_results"), "pathways")
-    overlap_genes = {
-        str(gene).strip().upper()
-        for row in pathways
-        for gene in (row.get("overlap_genes") or row.get("overlap") or [])
-    }
-    pathway_names = [str(row.get("name") or "").strip() for row in pathways if row.get("name")]
-    papers = _rows(record.get("pubmed_results"), "papers")
-    pmids = {str(row.get("pmid") or "").strip() for row in papers if row.get("pmid")}
-    titles = [str(row.get("title") or "").strip() for row in papers if row.get("title")]
-    return {
-        "supported_genes": roi_genes | annotation_genes | overlap_genes,
-        "roi_genes": roi_genes,
-        "pathway_names": pathway_names,
-        "papers": papers,
-        "pmids": pmids,
-        "titles": titles,
-    }
-
-
-def _mentioned_pmids(answer: str) -> set[str]:
-    direct = set(re.findall(r"\bPMID\s*[:#]?\s*(\d{5,10})\b", answer, re.I))
-    links = set(re.findall(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d{5,10})", answer, re.I))
-    return direct | links
-
-
-def compute_grounding_metrics(record: dict[str, Any]) -> dict[str, Any]:
-    """Compute a conservative, interpretable evidence-grounding score.
-
-    The score is the unweighted mean of applicable components:
-
-    * ``evidence_reference``: answer mentions an ROI/retrieved gene, pathway,
-      retrieved paper title (first eight words), or retrieved PMID.
-    * ``gene_support``: fraction of gene-like uppercase symbols in the answer
-      that occur in ROI, annotation, or pathway-overlap evidence.
-    * ``citation_support``: all numeric ``[n]`` citations and PMID/link mentions
-      map to papers retrieved in this run.  If PubMed evidence exists but the
-      answer cites none, this component is 0.
-    * ``insufficient_evidence_acknowledgement``: for cases marked
-      ``expect_insufficient_evidence``, the answer explicitly qualifies the
-      lack/weakness/unavailability of evidence.
-
-    Components that do not apply are ``None`` and are excluded.  An empty
-    answer scores 0.  This is provenance checking, not a biological-correctness
-    score.
-    """
-
-    answer = str(record.get("final_answer") or "").strip()
-    if not answer:
+    def score_metric(name: str) -> dict[str, Any]:
+        value = _mean(score.get(name) for score in scores)
         return {
-            "evidence_grounding_score": 0.0,
-            "grounding_components": {
-                "evidence_reference": 0.0,
-                "gene_support": None,
-                "citation_support": None,
-                "insufficient_evidence_acknowledgement": None,
-            },
-            "mentioned_genes": [],
-            "unsupported_genes": [],
-            "mentioned_pmids": [],
-            "unsupported_pmids": [],
-            "insufficient_evidence_acknowledged": False,
+            "mean_score": value,
+            "display": f"{value:.2f}/5 mean" if value is not None else "N/A",
         }
 
-    entities = _evidence_entities(record)
-    supported_genes: set[str] = entities["supported_genes"]
-    tokens = {
-        token for token in _GENE_TOKEN.findall(answer)
-        if token not in _NON_GENE_ACRONYMS and not token.isdigit()
-    }
-    # Only score symbols when there is gene evidence or when the answer uses
-    # gene-like tokens. This deliberately errs toward flagging for review.
-    unsupported_genes = sorted(tokens - supported_genes)
-    gene_support = len(tokens & supported_genes) / len(tokens) if tokens else None
-
-    evidence_mentions = any(_term_present(answer, gene) for gene in supported_genes)
-    evidence_mentions = evidence_mentions or any(
-        name and name.casefold() in answer.casefold() for name in entities["pathway_names"]
-    )
-    for title in entities["titles"]:
-        title_anchor = " ".join(title.split()[:8])
-        evidence_mentions = evidence_mentions or (
-            bool(title_anchor) and title_anchor.casefold() in answer.casefold()
-        )
-    mentioned_pmids = _mentioned_pmids(answer)
-    evidence_mentions = evidence_mentions or bool(mentioned_pmids & entities["pmids"])
-
-    numeric_citations = re.findall(r"\[(\d+)\]", answer)
-    valid_indices = {str(index) for index in range(1, len(entities["papers"]) + 1)}
-    citation_items = len(numeric_citations) + len(mentioned_pmids)
-    citation_supported = sum(index in valid_indices for index in numeric_citations)
-    citation_supported += sum(pmid in entities["pmids"] for pmid in mentioned_pmids)
-    if citation_items:
-        citation_support = citation_supported / citation_items
-    elif entities["papers"]:
-        citation_support = 0.0
-    else:
-        citation_support = None
-
-    expect_insufficient = bool(record.get("expect_insufficient_evidence"))
-    lower_answer = answer.casefold()
-    acknowledged = any(pattern in lower_answer for pattern in _INSUFFICIENT_PATTERNS)
-    negative_component = float(acknowledged) if expect_insufficient else None
-
-    components = {
-        "evidence_reference": float(evidence_mentions),
-        "gene_support": gene_support,
-        "citation_support": citation_support,
-        "insufficient_evidence_acknowledgement": negative_component,
-    }
-    applicable = [float(value) for value in components.values() if isinstance(value, (int, float))]
-    score = sum(applicable) / len(applicable) if applicable else 0.0
-    return {
-        "evidence_grounding_score": score,
-        "grounding_components": components,
-        "mentioned_genes": sorted(tokens),
-        "unsupported_genes": unsupported_genes,
-        "mentioned_pmids": sorted(mentioned_pmids),
-        "unsupported_pmids": sorted(mentioned_pmids - entities["pmids"]),
-        "insufficient_evidence_acknowledged": acknowledged if expect_insufficient else None,
-    }
-
-
-def compute_automatic_metrics(record: dict[str, Any]) -> dict[str, Any]:
-    """Compute Level 1–3 metrics supported by observable run artifacts."""
-
-    gene_rows = (record.get("gene_image_evidence") or {}).get("gene_evidence") or []
-    genes = [str(row.get("gene", "")).strip() for row in gene_rows if isinstance(row, dict)]
-    genes = [gene for gene in genes if gene]
-
-    pubmed_rows = _rows(record.get("pubmed_results"), "papers")
-    pubmed_rate = None
-    if pubmed_rows:
-        relevant = 0
-        disease = str(record.get("disease") or "").strip()
-        for paper in pubmed_rows:
-            text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
-            if any(_term_present(text, gene) for gene in genes) or (
-                disease and disease.casefold() in text.casefold()
-            ):
-                relevant += 1
-        pubmed_rate = relevant / len(pubmed_rows)
-
-    pathway_rows = _rows(record.get("pathway_results"), "pathways")
-    pathway_overlap_rate = None
-    if pathway_rows:
-        gene_set = {gene.upper() for gene in genes}
-        connected = 0
-        for pathway in pathway_rows:
-            overlap = pathway.get("overlap_genes", pathway.get("overlap", [])) or []
-            if any(str(gene).upper() in gene_set for gene in overlap):
-                connected += 1
-        pathway_overlap_rate = connected / len(pathway_rows)
-
-    expected_route = str(record.get("expected_route") or record.get("expected_intent") or "").strip()
-    actual_route = str(record.get("actual_route") or record.get("detected_route_intent") or "").strip()
-    route_match = actual_route == expected_route if expected_route else None
-
-    expected_tools = record.get("expected_tools") or []
-    actual_tools = record.get("tools_actually_called") or record.get("tools_called") or []
-    tool_comparison = compare_expected_tools(expected_tools, actual_tools)
-    calls = record.get("tool_calls") or []
-    statuses = [call.get("status") for call in calls if isinstance(call, dict)]
-    tool_success_rate = (
-        sum(status in {"ok", "supplied"} for status in statuses) / len(statuses)
-        if statuses else None
-    )
-    evidence_retrieval_rate = (
-        sum(bool(call.get("evidence_nonempty")) for call in calls if isinstance(call, dict)) / len(calls)
-        if calls else None
-    )
-    external_failure_rate = (
-        sum(status == "error" for status in statuses) / len(statuses)
-        if statuses else None
-    )
-
-    grounding = compute_grounding_metrics(record)
-    evidence = record.get("gene_image_evidence") or {}
-    return {
-        "level_1_infrastructure": {
-            "run_completed": not bool(record.get("errors")),
-            "llm_status": record.get("llm", {}).get("status", "unknown"),
-            "external_service_failure_rate": external_failure_rate,
+    trust = _mean(score.get("trust") for score in scores)
+    adoption = _mean(score.get("adoption") for score in scores)
+    business = {
+        "time_saved": {
+            "manual_baseline_seconds": 14400,
+            "mean_time_saved_seconds": _mean(time_saved),
+            "mean_time_saved_percent": _mean(time_saved_percent),
+            "display": (
+                f"{_mean(time_saved):.2f}s ({_mean(time_saved_percent):.2f}%) "
+                "mean saved per ROI"
+                if time_saved else "N/A"
+            ),
         },
-        "level_2_agent_behavior": {
-            "expected_route_match": route_match,
-            **tool_comparison,
-            "tool_success_rate": tool_success_rate,
-            "evidence_retrieval_rate": evidence_retrieval_rate,
+        "workflow_efficiency": {
+            "mean_connected_stage_count": mean_stages,
+            "total_tool_calls": total_tools,
+            "mean_tool_calls": mean_tools,
+            "mean_manual_data_reentry_steps": mean_reentry,
+            "display": (
+                f"{mean_stages:.0f} connected analysis/retrieval stages/ROI; "
+                f"{total_tools} tool calls total ({mean_tools:.1f}/ROI); "
+                f"{mean_reentry:.0f} manual data re-entry steps/ROI"
+                if None not in (mean_stages, mean_tools, mean_reentry) else "N/A"
+            ),
         },
-        "level_3_answer_quality": grounding,
-        # Flat aliases keep downstream CSV/report consumption straightforward
-        # and preserve the names emitted by schema version 1.0.
-        "response_time_seconds": record.get("total_response_time_seconds"),
-        "pubmed_lexical_relevance_rate": pubmed_rate,
-        "pathway_input_gene_overlap_rate": pathway_overlap_rate,
-        "image_gene_evidence_available": bool(evidence.get("image_available") and evidence.get("gene_evidence")),
-        "expected_route_match": route_match,
-        **tool_comparison,
-        "tool_success_rate": tool_success_rate,
-        "evidence_retrieval_rate": evidence_retrieval_rate,
-        "external_service_failure_rate": external_failure_rate,
-        **grounding,
+        "hypothesis_usefulness": score_metric("hypothesis_usefulness"),
+        "decision_quality": score_metric("decision_quality"),
+        "trust_and_adoption": {
+            "trust_mean": trust,
+            "adoption_mean": adoption,
+            "display": (
+                f"Trust {trust:.2f}/5; Adoption {adoption:.2f}/5"
+                if trust is not None and adoption is not None else "N/A"
+            ),
+        },
     }
+    return {"technical": technical, "business": business}
 
 
-__all__ = [
-    "TOOL_RESULT_KEYS",
-    "TOOL_SERVICE_NAMES",
-    "compare_expected_tools",
-    "compute_automatic_metrics",
-    "compute_grounding_metrics",
-    "result_count",
-    "summarize_tool_calls",
-]
+__all__ = ["aggregate_proposal_metrics", "summarize_tool_calls"]

@@ -33,6 +33,8 @@ pathway_enrichment:
   max_genes: 100
   adjusted_p_value_cutoff: 0.05
   significant_only: true
+  timeout: 30
+  max_retries: 2
 
 gene_annotation:
   organism: "Homo sapiens"
