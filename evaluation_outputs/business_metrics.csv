@@ -1,0 +1,6 @@
+metric,result
+Time saved,14376.45s (99.84%) mean saved per ROI
+Workflow efficiency,5 connected analysis/retrieval stages/ROI; 30 tool calls total (3.0/ROI); 0 manual data re-entry steps/ROI
+Hypothesis usefulness,4.10/5 mean
+Decision quality,4.10/5 mean
+Trust and adoption,Trust 4.10/5; Adoption 4.10/5

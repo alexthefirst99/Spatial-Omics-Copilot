@@ -1,0 +1,8 @@
+metric,result
+PubMed retrieval relevance,23/30 relevant; Precision@k=76.7%
+Pathway relevance,33/45 relevant (73.3%)
+Image-to-gene connection,9/10 PASS (90.0%)
+Groundedness,59/60 supported (98.3%)
+Hallucination rate,claims 1/60 (1.7%); gene names 0/95 (0.0%)
+Answer quality,biological reasonableness 4.10/5; ROI specificity 4.40/5; clarity 4.30/5; overall 4.27/5
+Response time,mean 23.55s; median 23.18s; min 16.96s; max 35.82s

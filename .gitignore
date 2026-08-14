@@ -33,7 +33,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .cache/
-evaluation_outputs*/
 
 # Node / frontend build artifacts
 node_modules/
